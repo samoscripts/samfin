@@ -1,0 +1,20 @@
+# Backend
+/backend/vendor/
+/backend/var/
+/backend/.env.local
+/backend/.env.*.local
+/backend/composer.lock
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+/backend/public/app/*
+!/backend/public/app/.gitkeep
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,36 @@
+security:
+    password_hashers:
+        App\Entity\User:
+            algorithm: bcrypt
+            cost: 12
+
+    providers:
+        app_user_provider:
+            entity:
+                class: App\Entity\User
+                property: email
+
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: app_user_provider
+            entry_point: App\Security\AuthEntryPoint
+            custom_authenticators:
+                - App\Security\ApiTokenAuthenticator
+
+    access_control:
+        # Public endpoints
+        - { path: ^/api/auth/login$,         roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/login-options$,  roles: PUBLIC_ACCESS }
+        - { path: ^/api/health$,              roles: PUBLIC_ACCESS }
+
+        # Admin only
+        - { path: ^/api/users,               roles: ROLE_ADMIN }
+
+        # Everything else requires a valid token
+        - { path: ^/api,                      roles: IS_AUTHENTICATED_FULLY }
