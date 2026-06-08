@@ -1,14 +1,13 @@
 export interface FlowFilters {
   dateFrom?: string
   dateTo?: string
-  type?: 'EXPENSE' | 'INCOME' | ''
-  wallet?: string
-  concern?: string
-  category?: string
+  direction?: 'EXPENSE' | 'INCOME' | ''
+  paidFromPartyId?: string
+  paidToPartyId?: string
+  walletId?: string
+  concernId?: string
+  categoryId?: string
   status?: string
-  paidFrom?: string
-  paidTo?: string
-  tags?: string
   amountMin?: string
   amountMax?: string
 }

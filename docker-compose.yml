@@ -32,22 +32,23 @@ services:
       - app
 
   db:
-    image: postgres:16
+    image: mariadb:11
     container_name: samfin_db
     environment:
-      POSTGRES_DB: samfin
-      POSTGRES_USER: samfin
-      POSTGRES_PASSWORD: samfin
+      MARIADB_DATABASE: samfin
+      MARIADB_USER: samfin
+      MARIADB_PASSWORD: samfin
+      MARIADB_ROOT_PASSWORD: root
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data_mysql:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U samfin -d samfin"]
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -usamfin -psamfin --silent"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  db_data:
+  db_data_mysql:
   frontend_node_modules:

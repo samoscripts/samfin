@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import Breadcrumbs from './Breadcrumbs'
 import { RightPanelContext } from './RightPanelContext'
 
 export default function Layout() {
@@ -25,6 +26,7 @@ export default function Layout() {
 
         <div className="flex flex-col min-h-screen md:min-h-0 md:flex-1 min-w-0 md:overflow-hidden">
           <Topbar onMobileMenuOpen={handleMobileOpen} />
+          <Breadcrumbs />
           <main className="flex-1 overflow-y-auto">
             <Outlet />
           </main>

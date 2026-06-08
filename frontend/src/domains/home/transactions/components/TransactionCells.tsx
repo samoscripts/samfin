@@ -1,5 +1,4 @@
 import { Transaction } from '@/shared/types'
-import { WALLET_LABELS, CONCERN_LABELS, resolveLabel } from '../mockData'
 import { formatAmount } from '@/shared/utils/format'
 
 export function ItemAmounts({ tx }: { tx: Transaction }) {
@@ -44,24 +43,22 @@ export function ItemField({
   items: Transaction['items']
   field: ItemFieldName
 }) {
-  const map = field === 'wallet' ? WALLET_LABELS : field === 'concern' ? CONCERN_LABELS : {}
-
   if (items.length === 1) {
     const val = items[0][field]
     return (
       <span className="text-xs text-gray-600 dark:text-gray-400">
-        {val ? resolveLabel(map, val) : '—'}
+        {val ?? '—'}
       </span>
     )
   }
 
   return (
     <div className="space-y-0.5">
-      {items.map((item) => {
+      {items.map((item, idx) => {
         const val = item[field]
         return (
-          <div key={item.id} className="text-xs text-gray-600 dark:text-gray-400">
-            {val ? resolveLabel(map, val) : '—'}
+          <div key={item.id ?? idx} className="text-xs text-gray-600 dark:text-gray-400">
+            {val ?? '—'}
           </div>
         )
       })}

@@ -1,40 +1,38 @@
 import { X } from 'lucide-react'
 import { FlowFilters } from '../types'
-import {
-  WALLET_LABELS,
-  CONCERN_LABELS,
-  STATUS_LABELS,
-  DIRECTION_LABELS,
-  ENTITY_LABELS,
-  resolveLabel,
-} from '../mockData'
 
 const KEY_LABELS: Record<keyof FlowFilters, string> = {
-  dateFrom: 'Data od',
-  dateTo: 'Data do',
-  type: 'Typ',
-  wallet: 'Portfel',
-  concern: 'Dotyczy',
-  category: 'Kategoria',
-  status: 'Status',
-  paidFrom: 'Skąd',
-  paidTo: 'Dokąd',
-  tags: 'Tagi',
-  amountMin: 'Kwota od',
-  amountMax: 'Kwota do',
+  dateFrom:        'Data od',
+  dateTo:          'Data do',
+  direction:       'Typ',
+  walletId:        'Portfel',
+  concernId:       'Dotyczy',
+  categoryId:      'Kategoria',
+  status:          'Status',
+  paidFromPartyId: 'Skąd',
+  paidToPartyId:   'Dokąd',
+  amountMin:       'Kwota od',
+  amountMax:       'Kwota do',
+}
+
+const DIRECTION_LABELS: Record<string, string> = {
+  INCOME:  'Wpływ',
+  EXPENSE: 'Wydatek',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  CLASSIFIED:          'Sklasyfikowany',
+  PARTIALLY_CLASSIFIED: 'Częściowo',
+  UNCLASSIFIED:        'Nieklasyfikowany',
 }
 
 function resolveValue(key: keyof FlowFilters, value: string): string {
   switch (key) {
-    case 'type': return resolveLabel(DIRECTION_LABELS, value)
-    case 'wallet': return resolveLabel(WALLET_LABELS, value)
-    case 'concern': return resolveLabel(CONCERN_LABELS, value)
-    case 'status': return resolveLabel(STATUS_LABELS, value)
-    case 'paidFrom':
-    case 'paidTo': return resolveLabel(ENTITY_LABELS, value)
+    case 'direction': return DIRECTION_LABELS[value] ?? value
+    case 'status':    return STATUS_LABELS[value]    ?? value
     case 'amountMin': return `${value} zł`
     case 'amountMax': return `${value} zł`
-    default: return value
+    default:          return value
   }
 }
 

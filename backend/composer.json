@@ -9,7 +9,7 @@
         "php": ">=8.3",
         "ext-ctype": "*",
         "ext-iconv": "*",
-        "ext-pgsql": "*",
+        "ext-pdo_mysql": "*",
         "doctrine/doctrine-bundle": "^2.12",
         "doctrine/doctrine-migrations-bundle": "^3.3",
         "doctrine/orm": "^3.2",
@@ -49,6 +49,7 @@
         }
     },
     "scripts": {
+        "check:migration-fk-names": "php bin/check-migration-fk-names.php",
         "post-install-cmd": [],
         "post-update-cmd": []
     }

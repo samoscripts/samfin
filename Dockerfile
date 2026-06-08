@@ -6,15 +6,14 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libzip-dev \
     libicu-dev \
-    libpq-dev \
+    default-libmysqlclient-dev \
     zip \
     vim \
     curl \
     rsync \
     && docker-php-ext-install \
         pdo \
-        pdo_pgsql \
-        pgsql \
+        pdo_mysql \
         mbstring \
         zip \
         opcache \

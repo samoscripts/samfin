@@ -5,6 +5,7 @@ import {
   Upload,
   BarChart2,
   Settings,
+  SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
   X,
@@ -22,9 +23,10 @@ interface NavItem {
 
 const NAV_MAIN: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
-  { to: '/operacje', label: 'Operacje', icon: <ArrowLeftRight size={18} /> },
+  { to: '/transactions', label: 'Transactions', icon: <ArrowLeftRight size={18} /> },
   { to: '/import', label: 'Import', icon: <Upload size={18} /> },
   { to: '/raporty', label: 'Raporty', icon: <BarChart2 size={18} /> },
+  { to: '/konfiguracja', label: 'Konfiguracja', icon: <SlidersHorizontal size={18} /> },
 ]
 
 interface SidebarProps {

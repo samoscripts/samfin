@@ -1,13 +1,13 @@
 security:
     password_hashers:
-        App\Entity\User:
+        App\Identity\Entity\User:
             algorithm: bcrypt
             cost: 12
 
     providers:
         app_user_provider:
             entity:
-                class: App\Entity\User
+                class: App\Identity\Entity\User
                 property: email
 
     firewalls:
@@ -19,9 +19,9 @@ security:
             pattern: ^/api
             stateless: true
             provider: app_user_provider
-            entry_point: App\Security\AuthEntryPoint
+            entry_point: App\Identity\Security\AuthEntryPoint
             custom_authenticators:
-                - App\Security\ApiTokenAuthenticator
+                - App\Identity\Security\ApiTokenAuthenticator
 
     access_control:
         # Public endpoints

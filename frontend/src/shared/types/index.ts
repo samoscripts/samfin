@@ -5,20 +5,26 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 export interface FlowItem {
   id: number
   amount: number
-  wallet?: string
-  concern?: string
-  category?: string
+  description?: string | null
+  walletId?: number | null
+  wallet?: string | null
+  concernId?: number | null
+  concern?: string | null
+  categoryId?: number | null
+  category?: string | null
 }
 
 export interface Transaction {
   transactionId: number
   date: string
-  description: string
+  description: string | null
   amount: number
-  paidFrom: string
-  paidTo: string
+  paidFromPartyId?: number | null
+  paidFrom?: string | null
+  paidToPartyId?: number | null
+  paidTo?: string | null
   direction: Direction
   status: Status
-  unassigned?: boolean
+  source?: string
   items: FlowItem[]
 }

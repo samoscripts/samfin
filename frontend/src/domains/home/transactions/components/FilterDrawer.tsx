@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { FlowFilters } from '../types'
-import { WALLET_LABELS, CONCERN_LABELS } from '../mockData'
 import { useIsMobile } from '@/shared/hooks/useIsMobile'
+import { fetchWallets, type Wallet } from '@/shared/api/wallets'
+import { fetchConcerns, type Concern } from '@/shared/api/concerns'
+import { fetchCategories, type Category } from '@/shared/api/categories'
+import { fetchParties } from '@/shared/api/parties'
+import type { Party } from '@/domains/home/configuration/parties/types'
 
 const EMPTY_FILTERS: FlowFilters = {}
 const MIN_WIDTH = 280
@@ -27,6 +31,18 @@ export default function FilterDrawer({
 }: FilterDrawerProps) {
   const isMobile = useIsMobile()
   const [draft, setDraft] = useState<FlowFilters>(EMPTY_FILTERS)
+
+  const [wallets, setWallets]     = useState<Wallet[]>([])
+  const [concerns, setConcerns]   = useState<Concern[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [parties, setParties]     = useState<Party[]>([])
+
+  useEffect(() => {
+    fetchWallets().then(setWallets).catch(() => {})
+    fetchConcerns().then(setConcerns).catch(() => {})
+    fetchCategories().then(setCategories).catch(() => {})
+    fetchParties().then(setParties).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (open) setDraft(activeFilters)
@@ -61,6 +77,9 @@ export default function FilterDrawer({
     window.addEventListener('mouseup', onMouseUp)
   }
 
+  const paidFromParties = parties.filter((p) => p.usageType === 'INCOME' || p.usageType === 'BOTH')
+  const paidToParties   = parties.filter((p) => p.usageType === 'EXPENSE' || p.usageType === 'BOTH')
+
   const content = (
     <>
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
@@ -90,7 +109,7 @@ export default function FilterDrawer({
         </Section>
         <Hr />
         <Section label="Typ operacji">
-          <select value={draft.type ?? ''} onChange={(e) => setField('type', e.target.value as FlowFilters['type'])} className={inputCls}>
+          <select value={draft.direction ?? ''} onChange={(e) => setField('direction', e.target.value as FlowFilters['direction'])} className={inputCls}>
             <option value="">Wszystkie</option>
             <option value="INCOME">Wpływ</option>
             <option value="EXPENSE">Wydatek</option>
@@ -109,21 +128,21 @@ export default function FilterDrawer({
         </Section>
         <Hr />
         <Section label="Portfel">
-          <select value={draft.wallet ?? ''} onChange={(e) => setField('wallet', e.target.value)} className={inputCls}>
+          <select value={draft.walletId ?? ''} onChange={(e) => setField('walletId', e.target.value)} className={inputCls}>
             <option value="">Wszystkie</option>
-            {Object.entries(WALLET_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {wallets.filter((w) => w.active).map((w) => <option key={w.id} value={String(w.id)}>{w.name}</option>)}
           </select>
         </Section>
         <Section label="Dotyczy">
-          <select value={draft.concern ?? ''} onChange={(e) => setField('concern', e.target.value)} className={inputCls}>
+          <select value={draft.concernId ?? ''} onChange={(e) => setField('concernId', e.target.value)} className={inputCls}>
             <option value="">Wszystkie</option>
-            {Object.entries(CONCERN_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {concerns.filter((c) => c.active).map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
           </select>
         </Section>
         <Section label="Kategoria">
-          <select value={draft.category ?? ''} onChange={(e) => setField('category', e.target.value)} className={inputCls}>
+          <select value={draft.categoryId ?? ''} onChange={(e) => setField('categoryId', e.target.value)} className={inputCls}>
             <option value="">Wszystkie</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {categories.filter((c) => c.active).map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
           </select>
         </Section>
         <Section label="Status">
@@ -136,20 +155,16 @@ export default function FilterDrawer({
         </Section>
         <Hr />
         <Section label="Skąd">
-          <select value={draft.paidFrom ?? ''} onChange={(e) => setField('paidFrom', e.target.value)} className={inputCls}>
+          <select value={draft.paidFromPartyId ?? ''} onChange={(e) => setField('paidFromPartyId', e.target.value)} className={inputCls}>
             <option value="">Wszystkie</option>
-            {PAID_FROM_OPTIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {paidFromParties.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
           </select>
         </Section>
         <Section label="Dokąd">
-          <select value={draft.paidTo ?? ''} onChange={(e) => setField('paidTo', e.target.value)} className={inputCls}>
+          <select value={draft.paidToPartyId ?? ''} onChange={(e) => setField('paidToPartyId', e.target.value)} className={inputCls}>
             <option value="">Wszystkie</option>
-            {PAID_TO_OPTIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {paidToParties.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
           </select>
-        </Section>
-        <Hr />
-        <Section label="Tagi">
-          <input type="text" placeholder="Szukaj tagów…" value={draft.tags ?? ''} onChange={(e) => setField('tags', e.target.value)} className={inputCls} />
         </Section>
       </div>
 
@@ -228,28 +243,3 @@ const inputCls =
   'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 ' +
   'placeholder-gray-400 dark:placeholder-gray-600 ' +
   'focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40'
-
-const CATEGORIES = [
-  'Spożywcze', 'Drogeria', 'Wakacje', 'Rachunki', 'Samochód',
-  'Ubrania', 'Dziecko', 'Salon', 'Oszczędności', 'Elektronika',
-  'Dom', 'Jedzenie', 'Zdrowie', 'Rozrywka', 'Zasilenie budżetu',
-  'Środki prywatne', 'Pożyczka',
-]
-
-const PAID_FROM_OPTIONS: [string, string][] = [
-  ['KONTO_WSPOLNE', 'Konto wspólne'], ['KONTO_MACKA', 'Konto Maćka'],
-  ['KONTO_FIRMOWE_BASI', 'Konto firmowe Basi'], ['GOTOWKA', 'Gotówka'],
-  ['BASIA', 'Basia'], ['MACIEJ', 'Maciej'], ['PAYTEL', 'Paytel'],
-  ['ALLEGRO', 'Allegro'], ['SZWAGIERKA', 'Szwagierka'], ['ZUS', 'ZUS'],
-]
-
-const PAID_TO_OPTIONS: [string, string][] = [
-  ['BIEDRONKA', 'Biedronka'], ['ROSSMANN', 'Rossmann'], ['ZALANDO', 'Zalando'],
-  ['ENERGA', 'Energa'], ['ORLEN', 'Orlen'], ['HEBE', 'Hebe'], ['APTEKA', 'Apteka'],
-  ['KONTO_FIRMOWE_BASI', 'Konto firmowe Basi'], ['OSZCZEDNOSCI_WSPOLNE', 'Oszczędności wspólne'],
-  ['OSZCZEDNOSCI_TOSI', 'Oszczędności Tosi'], ['URZAD_SKARBOWY', 'Urząd skarbowy'],
-  ['HURTOWNIA_FRYZJERSKA', 'Hurtownia fryzjerska'], ['LINIE_LOTNICZE', 'Linie lotnicze'],
-  ['SKLEP_KOMPUTEROWY', 'Sklep komputerowy'], ['CASTORAMA', 'Castorama'],
-  ['SKLEP_OBUWNICZY', 'Sklep obuwniczy'], ['STEAM', 'Steam'],
-  ['DOSTAWCA_OPALU', 'Dostawca opału'], ['NIEZNANY', 'Nieznany'],
-]
