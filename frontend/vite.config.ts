@@ -23,6 +23,14 @@ export default defineConfig({
         target: 'http://app:80',
         changeOrigin: true,
       },
+      '/_profiler': {
+        target: 'http://app:80',
+        changeOrigin: true,
+      },
+      '/_wdt': {
+        target: 'http://app:80',
+        changeOrigin: true,
+      },
     },
   },
 })

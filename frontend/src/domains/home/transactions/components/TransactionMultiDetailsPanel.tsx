@@ -1,5 +1,9 @@
 import { AlertCircle, Pencil, Sparkles } from 'lucide-react'
 import type { Transaction } from '@/shared/types'
+import Pill from '@/shared/components/Pill'
+import ExpandableText from '@/shared/components/ExpandableText'
+import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
+import { DIRECTION_LABEL_BY_VALUE } from '../constants/labels'
 import { formatAmount } from '@/shared/utils/format'
 
 export interface TransactionMultiDetailsPanelProps {
@@ -43,9 +47,11 @@ export default function TransactionMultiDetailsPanel({
                 <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{tx.date}</span>
                 <DirectionBadge direction={tx.direction} />
               </div>
-              <p className="text-xs font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
-                {tx.description ?? '—'}
-              </p>
+              <ExpandableText
+                text={tx.description}
+                textClassName="text-xs font-medium text-gray-900 dark:text-gray-100"
+                lines={2}
+              />
               <p className="text-xs font-mono font-semibold text-gray-700 dark:text-gray-300 mt-1">
                 {formatAmount(tx.amount)}
               </p>
@@ -92,15 +98,9 @@ export default function TransactionMultiDetailsPanel({
 }
 
 function DirectionBadge({ direction }: { direction: Transaction['direction'] }) {
-  const label = direction === 'INCOME' ? 'Wpływ' : 'Wydatek'
-  const cls =
-    direction === 'INCOME'
-      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${cls}`}>
-      {label}
-    </span>
+    <Pill variant={DIRECTION_PILL[direction]} size="sm">
+      {DIRECTION_LABEL_BY_VALUE[direction]}
+    </Pill>
   )
 }

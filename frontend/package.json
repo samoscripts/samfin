@@ -1,7 +1,7 @@
 {
   "name": "samfin-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.9.12",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -9,7 +9,7 @@
   "scripts": {
     "predev": "node scripts/check-node.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/check-node.mjs",
+    "prebuild": "node scripts/generate-build-info.mjs && node scripts/check-node.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

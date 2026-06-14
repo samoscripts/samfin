@@ -4,6 +4,8 @@ import FormActions from '@/shared/components/form/FormActions'
 import FormError from '@/shared/components/form/FormError'
 import FormField from '@/shared/components/form/FormField'
 import Select from '@/shared/components/form/Select'
+import Pill from '@/shared/components/Pill'
+import type { PillVariant } from '@/shared/components/pillVariants'
 import { configInputCls, configSelectCls, textareaCls } from '@/shared/components/form/formClasses'
 import { getApiErrorMessage } from '@/shared/utils/errors'
 
@@ -21,7 +23,7 @@ export interface SimpleEntity {
 export interface SelectOption {
   value: string
   label: string
-  badgeCls?: string
+  badgeVariant?: PillVariant
 }
 
 export interface ExtraField {
@@ -391,10 +393,8 @@ function EntityTable<T extends SimpleEntity>({
                     return (
                       <td key={f.key} className="px-4 py-3 whitespace-nowrap">
                         {opt ? (
-                          opt.badgeCls ? (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.badgeCls}`}>
-                              {opt.label}
-                            </span>
+                          opt.badgeVariant ? (
+                            <Pill variant={opt.badgeVariant}>{opt.label}</Pill>
                           ) : (
                             <span className="text-xs text-gray-600 dark:text-gray-400">{opt.label}</span>
                           )
@@ -449,10 +449,8 @@ function EntityTable<T extends SimpleEntity>({
                       const val = (item as Record<string, unknown>)[f.key] as string | undefined
                       const opt = f.options.find((o) => o.value === val)
                       return opt ? (
-                        opt.badgeCls ? (
-                          <span key={f.key} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.badgeCls}`}>
-                            {opt.label}
-                          </span>
+                        opt.badgeVariant ? (
+                          <Pill key={f.key} variant={opt.badgeVariant}>{opt.label}</Pill>
                         ) : (
                           <span key={f.key} className="text-xs text-gray-500">{opt.label}</span>
                         )

@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TrendingUp, TrendingDown, Scale, AlertCircle, ArrowRight } from 'lucide-react'
 import PageHeader from '@/layout/PageHeader'
-import StatusBadge from '@/shared/components/StatusBadge'
+import Pill from '@/shared/components/Pill'
+import ListTextTooltip from '@/shared/components/ListTextTooltip'
+import { STATUS_PILL } from '@/shared/constants/pillMaps'
+import { STATUS_LABEL_BY_VALUE } from '@/domains/home/transactions/constants/labels'
 import { fetchTransactionStats, fetchTransactions, type TransactionStats } from '@/shared/api/transactions'
 import { Transaction } from '@/shared/types'
 import { formatAmount } from '@/shared/utils/format'
@@ -55,8 +58,11 @@ function RecentCard({ tx }: { tx: Transaction }) {
   return (
     <div className="px-4 py-3.5 border-b border-gray-50 dark:border-gray-800/60 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{tx.description ?? '—'}</p>
+          <div className="min-w-0 flex-1">
+          <ListTextTooltip
+            text={tx.description}
+            className="text-sm font-medium text-gray-900 dark:text-gray-100"
+          />
           <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 dark:text-gray-400">
             <span className="font-mono">{tx.date}</span>
             <span>·</span>
@@ -78,7 +84,7 @@ function RecentCard({ tx }: { tx: Transaction }) {
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1.5">
           <ItemAmounts tx={tx} />
-          <StatusBadge status={tx.status} />
+          <Pill variant={STATUS_PILL[tx.status]}>{STATUS_LABEL_BY_VALUE[tx.status]}</Pill>
         </div>
       </div>
     </div>
@@ -172,13 +178,17 @@ export default function Dashboard() {
                   {recent.map((tx) => (
                     <tr key={tx.transactionId} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                       <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono">{tx.date}</td>
-                      <td className="px-4 py-3 text-gray-900 dark:text-gray-200 max-w-[220px] truncate">{tx.description ?? '—'}</td>
+                      <td className="px-4 py-3 text-gray-900 dark:text-gray-200 max-w-[220px]">
+                        <ListTextTooltip text={tx.description} />
+                      </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{tx.paidFrom ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{tx.paidTo ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{tx.items[0]?.wallet ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{tx.items[0]?.concern ?? '—'}</td>
                       <td className="px-4 py-3 whitespace-nowrap"><ItemAmounts tx={tx} /></td>
-                      <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
+                      <td className="px-4 py-3">
+                        <Pill variant={STATUS_PILL[tx.status]}>{STATUS_LABEL_BY_VALUE[tx.status]}</Pill>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

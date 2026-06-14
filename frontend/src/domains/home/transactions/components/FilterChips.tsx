@@ -1,4 +1,6 @@
 import { X } from 'lucide-react'
+import type { Category } from '@/shared/api/categories'
+import { formatCategoryLabel } from '@/shared/utils/categoryOptions'
 import { FlowFilters } from '../types'
 import {
   DIRECTION_LABEL_BY_VALUE,
@@ -19,22 +21,31 @@ const KEY_LABELS: Record<keyof FlowFilters, string> = {
   amountMax:       'Kwota do',
 }
 
-function resolveValue(key: keyof FlowFilters, value: string): string {
+function resolveValue(
+  key: keyof FlowFilters,
+  value: string,
+  categories: Category[],
+): string {
   switch (key) {
     case 'direction': return DIRECTION_LABEL_BY_VALUE[value] ?? value
     case 'status':    return STATUS_LABEL_BY_VALUE[value]    ?? value
     case 'amountMin': return `${value} zł`
     case 'amountMax': return `${value} zł`
+    case 'categoryId': {
+      const cat = categories.find((c) => String(c.id) === value)
+      return cat ? formatCategoryLabel(cat) : value
+    }
     default:          return value
   }
 }
 
 interface FilterChipsProps {
   filters: FlowFilters
+  categories: Category[]
   onChange: (filters: FlowFilters) => void
 }
 
-export default function FilterChips({ filters, onChange }: FilterChipsProps) {
+export default function FilterChips({ filters, categories, onChange }: FilterChipsProps) {
   const active = (Object.entries(filters) as [keyof FlowFilters, string][]).filter(
     ([, v]) => v !== '' && v !== undefined,
   )
@@ -55,7 +66,7 @@ export default function FilterChips({ filters, onChange }: FilterChipsProps) {
           className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium bg-[#163526]/10 dark:bg-[#c9a96e]/15 text-[#163526] dark:text-[#c9a96e] border border-[#163526]/20 dark:border-[#c9a96e]/25"
         >
           <span className="text-[10px] font-normal opacity-70">{KEY_LABELS[key]}:</span>
-          {resolveValue(key, String(value))}
+          {resolveValue(key, String(value), categories)}
           <button
             onClick={() => remove(key)}
             className="ml-0.5 p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"

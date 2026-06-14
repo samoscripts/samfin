@@ -1,4 +1,4 @@
-.PHONY: up down build restart logs shell sf npm migrate cc fix-frontend-node-modules
+.PHONY: up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +47,9 @@ shell-frontend:
 
 npm:
 	docker compose exec frontend npm $(CMD)
+
+build-info:
+	docker compose exec frontend node scripts/generate-build-info.mjs
 
 # One-time fix when frontend_node_modules volume was created as root (EACCES on npm install)
 fix-frontend-node-modules:

@@ -8,7 +8,7 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs text-gray-500 dark:text-gray-500 mb-1">{label}</p>
       {children}
     </div>

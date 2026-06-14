@@ -4,21 +4,13 @@ import type { Party } from '../types'
 import {
   PARTY_TYPE_LABELS,
   OWNERSHIP_TYPE_LABELS,
-  PARTY_TYPE_COLORS,
 } from '../types'
+import Pill from '@/shared/components/Pill'
 import { fetchParties, deactivateParty } from '@/shared/api/parties'
 import PartyForm from '../components/PartyForm'
 import PartyBankAccountsSection from '../components/PartyBankAccountsSection'
 
 type View = 'list' | 'create' | 'edit'
-
-function Badge({ className, children }: { className: string; children: React.ReactNode }) {
-  return (
-    <span className={['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', className].join(' ')}>
-      {children}
-    </span>
-  )
-}
 
 export default function Parties() {
   const [parties, setParties] = useState<Party[]>([])
@@ -246,7 +238,7 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <Badge className={PARTY_TYPE_COLORS[p.type]}>{PARTY_TYPE_LABELS[p.type]}</Badge>
+                    <Pill variant="neutral">{PARTY_TYPE_LABELS[p.type]}</Pill>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={[
@@ -299,7 +291,7 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
                 <div>
                   <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{p.name}</span>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    <Badge className={PARTY_TYPE_COLORS[p.type]}>{PARTY_TYPE_LABELS[p.type]}</Badge>
+                    <Pill variant="neutral">{PARTY_TYPE_LABELS[p.type]}</Pill>
                     <span className={['text-xs font-medium', p.ownershipType === 'OWN' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'].join(' ')}>
                       {OWNERSHIP_TYPE_LABELS[p.ownershipType]}
                     </span>

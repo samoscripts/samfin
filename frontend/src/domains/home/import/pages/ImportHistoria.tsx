@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Loader2, RefreshCw } from 'lucide-react'
+import Pill from '@/shared/components/Pill'
+import { IMPORT_STATUS_PILL } from '@/shared/constants/pillMaps'
 import { fetchImports, type CsvImportResult } from '@/shared/api/csvImports'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -8,13 +10,6 @@ const STATUS_LABEL: Record<string, string> = {
   VALIDATED: 'Zwalidowany',
   FAILED:    'Błąd',
   IMPORTED:  'Zaimportowany',
-}
-
-const STATUS_CLS: Record<string, string> = {
-  PENDING:   'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  VALIDATED: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300',
-  FAILED:    'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
-  IMPORTED:  'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
 }
 
 function formatDate(iso: string) {
@@ -119,9 +114,9 @@ export default function ImportHistoria() {
                       {imp.detectedAccountDisplay ?? imp.detectedAccountNumber ?? '—'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CLS[imp.status] ?? ''}`}>
+                      <Pill variant={IMPORT_STATUS_PILL[imp.status] ?? 'neutral'}>
                         {STATUS_LABEL[imp.status] ?? imp.status}
-                      </span>
+                      </Pill>
                     </td>
                     <td className="px-4 py-3 text-right text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {imp.rowsParsed}/{imp.rowsTotal}
@@ -154,9 +149,9 @@ export default function ImportHistoria() {
                       <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
                         {imp.source}
                       </span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CLS[imp.status] ?? ''}`}>
+                      <Pill variant={IMPORT_STATUS_PILL[imp.status] ?? 'neutral'}>
                         {STATUS_LABEL[imp.status] ?? imp.status}
-                      </span>
+                      </Pill>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                       {imp.originalFilename ?? '—'}

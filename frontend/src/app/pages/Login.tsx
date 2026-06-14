@@ -4,6 +4,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { fetchLoginOptions } from '@/shared/api/auth'
 import { LoginOption } from '@/shared/types/auth'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
+import AppFooter from '@/layout/AppFooter'
 
 export default function Login() {
   const { login } = useAuth()
@@ -43,8 +44,9 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <img
@@ -170,7 +172,9 @@ export default function Login() {
             </button>
           </form>
         </div>
+        </div>
       </div>
+      <AppFooter variant="minimal" />
     </div>
   )
 }

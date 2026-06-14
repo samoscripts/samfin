@@ -4,6 +4,7 @@
 /backend/.env.local
 /backend/.env.*.local
 /backend/composer.lock
+/backend/config/build_info.json
 
 # Frontend
 /frontend/node_modules/

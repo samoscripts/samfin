@@ -13,9 +13,12 @@ import {
   filterPartiesForField,
   isPartyFieldBulkBlocked,
 } from '../utils/partyAssignment'
+import Pill from '@/shared/components/Pill'
+import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
 import { DIRECTION_LABEL_BY_VALUE, EDIT_EMPTY_LABEL } from '../constants/labels'
-import { filterCategoriesForDirection, formatCategoryLabel } from '../utils/categoryOptions'
+import { formatCategoryLabel } from '../utils/categoryOptions'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
+import CategorySelect from '@/shared/components/form/CategorySelect'
 import { selectCls } from '@/shared/components/form/formClasses'
 
 type FieldState = {
@@ -77,10 +80,6 @@ export default function EditBulkPanel({
 
   const direction = transactions[0]?.direction ?? 'EXPENSE'
   const directionLabel = DIRECTION_LABEL_BY_VALUE[direction] ?? direction
-  const directionCls =
-    direction === 'INCOME'
-      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
 
   const enabledFields = useMemo(
     () => FIELD_DEFS.filter((f) => draft[f.key].enabled),
@@ -176,7 +175,6 @@ export default function EditBulkPanel({
     'paidTo',
     draft.paidFromPartyId.enabled ? draft.paidFromPartyId.value : null,
   )
-  const relevantCategories = filterCategoriesForDirection(categories, direction)
 
   const previewLines = enabledFields.map((f) => {
     const val = draft[f.key].value
@@ -191,9 +189,7 @@ export default function EditBulkPanel({
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             Edycja zbiorcza
           </span>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${directionCls}`}>
-            {directionLabel}
-          </span>
+          <Pill variant={DIRECTION_PILL[direction]}>{directionLabel}</Pill>
         </div>
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
           {transactions.length}{' '}
@@ -305,13 +301,13 @@ export default function EditBulkPanel({
                     />
                   )}
                   {field.key === 'categoryId' && (
-                    <DictionarySelect
-                      items={relevantCategories}
+                    <CategorySelect
+                      categories={categories}
                       value={draft[field.key].value}
                       onChange={(v) => setFieldValue(field.key, v as number | null)}
                       emptyLabel={EDIT_EMPTY_LABEL}
                       valueType="number"
-                      getLabel={formatCategoryLabel}
+                      direction={direction}
                     />
                   )}
                 </div>

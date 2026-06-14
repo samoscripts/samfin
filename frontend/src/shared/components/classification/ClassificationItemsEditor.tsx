@@ -2,14 +2,13 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { Direction } from '@/shared/types'
 import type { Category } from '@/shared/api/categories'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
+import CategorySelect from '@/shared/components/form/CategorySelect'
 import {
   FieldRow,
   SectionLabel,
   readOnlyFieldCls,
   splitInputCls,
 } from '@/shared/components/form/FormSection'
-import { EDIT_EMPTY_LABEL } from '@/domains/home/transactions/constants/labels'
-import { formatCategoryLabel } from '@/domains/home/transactions/utils/categoryOptions'
 import {
   DEFAULT_SPLIT_PERCENT,
   MAX_SPLIT_ITEMS,
@@ -19,6 +18,7 @@ import {
   roundMoney,
   syncPercentPair,
 } from '@/shared/utils/splitAllocation'
+import { EDIT_EMPTY_LABEL } from '@/domains/home/transactions/constants/labels'
 
 export interface ClassificationItemDraft {
   walletId: number | null
@@ -52,7 +52,7 @@ export default function ClassificationItemsEditor({
   concerns,
   categories,
   totalAmount = 0,
-  direction: _direction = 'EXPENSE',
+  direction = 'EXPENSE',
   emptyDictLabel = EDIT_EMPTY_LABEL,
 }: ClassificationItemsEditorProps) {
   const isSplit = items.length > 1
@@ -207,38 +207,40 @@ export default function ClassificationItemsEditor({
             </div>
           )}
 
-          <FieldRow label="Portfel">
-            <DictionarySelect
-              items={wallets}
-              value={item.walletId}
-              onChange={(v) => setItem(i, { walletId: v as number | null })}
-              emptyLabel={emptyDictLabel}
-              valueType="number"
-              filterItem={(w) => w.active !== false}
-            />
-          </FieldRow>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <FieldRow label="Portfel">
+              <DictionarySelect
+                items={wallets}
+                value={item.walletId}
+                onChange={(v) => setItem(i, { walletId: v as number | null })}
+                emptyLabel={emptyDictLabel}
+                valueType="number"
+                filterItem={(w) => w.active !== false}
+              />
+            </FieldRow>
 
-          <FieldRow label="Dotyczy">
-            <DictionarySelect
-              items={concerns}
-              value={item.concernId}
-              onChange={(v) => setItem(i, { concernId: v as number | null })}
-              emptyLabel={emptyDictLabel}
-              valueType="number"
-              filterItem={(c) => c.active !== false}
-            />
-          </FieldRow>
+            <FieldRow label="Dotyczy">
+              <DictionarySelect
+                items={concerns}
+                value={item.concernId}
+                onChange={(v) => setItem(i, { concernId: v as number | null })}
+                emptyLabel={emptyDictLabel}
+                valueType="number"
+                filterItem={(c) => c.active !== false}
+              />
+            </FieldRow>
 
-          <FieldRow label="Kategoria">
-            <DictionarySelect
-              items={categories}
-              value={item.categoryId}
-              onChange={(v) => setItem(i, { categoryId: v as number | null })}
-              emptyLabel={emptyDictLabel}
-              valueType="number"
-              getLabel={formatCategoryLabel}
-            />
-          </FieldRow>
+            <FieldRow label="Kategoria">
+              <CategorySelect
+                categories={categories}
+                value={item.categoryId}
+                onChange={(v) => setItem(i, { categoryId: v as number | null })}
+                emptyLabel={emptyDictLabel}
+                valueType="number"
+                direction={direction}
+              />
+            </FieldRow>
+          </div>
         </div>
       ))}
     </div>

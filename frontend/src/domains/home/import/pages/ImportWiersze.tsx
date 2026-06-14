@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
+import ListTextTooltip from '@/shared/components/ListTextTooltip'
 import { fetchImportRows, type CsvImportRow } from '@/shared/api/csvImports'
 
 type ParseFilter = 'ALL' | 'VALIDATED' | 'IMPORTED' | 'DUPLICATE' | 'PARSE_ERROR'
@@ -103,18 +104,18 @@ export default function ImportWiersze() {
       </div>
 
       {items.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-10 text-center">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-10 text-center">
           <p className="text-sm text-gray-400 dark:text-gray-500">
             Brak wierszy spełniających kryteria.
           </p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
           {/* Desktop */}
           <div className="hidden lg:block overflow-x-auto">
             <table className="min-w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
+                <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-12">#</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-24">Data</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400">Opis</th>
@@ -125,12 +126,12 @@ export default function ImportWiersze() {
                   <th className="px-3 py-2.5 text-center font-semibold text-gray-500 dark:text-gray-400 w-20">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
                 {items.map((row) => (
                   <tr
                     key={row.id}
                     className={[
-                      'hover:bg-gray-50 dark:hover:bg-gray-700/20',
+                      'hover:bg-gray-50 dark:hover:bg-gray-800/40',
                       row.parseStatus === 'PARSE_ERROR' ? 'bg-red-50/40 dark:bg-red-950/20' : '',
                     ].join(' ')}
                   >
@@ -139,9 +140,7 @@ export default function ImportWiersze() {
                       {row.operationDate ?? '—'}
                     </td>
                     <td className="px-3 py-2.5 text-gray-800 dark:text-gray-200 max-w-sm">
-                      <p className="truncate" title={row.descriptionRaw ?? ''}>
-                        {row.descriptionRaw ?? '—'}
-                      </p>
+                      <ListTextTooltip text={row.descriptionRaw} />
                       {row.parseStatus === 'PARSE_ERROR' && row.parseError && (
                         <p className="text-red-600 dark:text-red-400 mt-0.5 text-xs">
                           {row.parseError}
@@ -177,7 +176,7 @@ export default function ImportWiersze() {
           </div>
 
           {/* Mobile/tablet cards */}
-          <div className="lg:hidden divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="lg:hidden divide-y divide-gray-50 dark:divide-gray-800/60">
             {items.map((row) => (
               <div
                 key={row.id}
@@ -190,9 +189,9 @@ export default function ImportWiersze() {
                   <span className={`text-xs ${ROW_STATUS_CLS[row.parseStatus] ?? 'text-gray-500'}`}>
                     {ROW_STATUS_LABEL[row.parseStatus] ?? row.parseStatus}
                   </span></div>
-                <p className="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">
-                  {row.descriptionRaw ?? '—'}
-                </p>
+                <div className="text-sm text-gray-800 dark:text-gray-200">
+                  <ListTextTooltip text={row.descriptionRaw} lines={2} />
+                </div>
                 {(row.ownAccountLabelRaw || row.counterpartyAccountRaw) && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                     {row.ownAccountLabelRaw && (

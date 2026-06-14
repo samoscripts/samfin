@@ -6,6 +6,8 @@ import {
   type Category,
   type CategoryType,
 } from '@/shared/api/categories'
+import Pill from '@/shared/components/Pill'
+import { CATEGORY_TYPE_PILL } from '@/shared/constants/pillMaps'
 import CategoryForm from '../components/CategoryForm'
 
 type View = 'list' | 'create' | 'edit'
@@ -13,11 +15,6 @@ type View = 'list' | 'create' | 'edit'
 const TYPE_LABEL: Record<CategoryType, string> = {
   EXPENSE: 'Wydatek',
   INCOME: 'Wpływ',
-}
-
-const TYPE_BADGE_CLASS: Record<CategoryType, string> = {
-  EXPENSE: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
-  INCOME: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
 }
 
 export default function Categories() {
@@ -194,9 +191,7 @@ function CategoryTable({ title, items, deactivating, onEdit, onDeactivate }: Cat
                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{item.name}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE_CLASS[item.type]}`}>
-                      {TYPE_LABEL[item.type]}
-                    </span>
+                    <Pill variant={CATEGORY_TYPE_PILL[item.type]}>{TYPE_LABEL[item.type]}</Pill>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{item.parentName ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs max-w-xs truncate">{item.description ?? '—'}</td>
@@ -234,9 +229,7 @@ function CategoryTable({ title, items, deactivating, onEdit, onDeactivate }: Cat
                 <div className="min-w-0">
                   <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">{item.name}</span>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE_CLASS[item.type]}`}>
-                      {TYPE_LABEL[item.type]}
-                    </span>
+                    <Pill variant={CATEGORY_TYPE_PILL[item.type]}>{TYPE_LABEL[item.type]}</Pill>
                     <span className="text-xs text-gray-500 dark:text-gray-400">Nadrzędna: {item.parentName ?? '—'}</span>
                   </div>
                   {item.description && (

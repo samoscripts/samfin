@@ -1,0 +1,22 @@
+---
+description: Standardowe pola formularzy frontendowych SamFin
+globs: frontend/src/**/*.tsx
+alwaysApply: false
+---
+
+# Pola formularzy (frontend)
+
+## Kategoria
+
+Do wyboru kategorii klasyfikacji (transakcje, reguły, filtry) **zawsze** używaj `CategorySelect` z `@/shared/components/form/CategorySelect`.
+
+- Nie używaj `DictionarySelect` ani zwykłego `<select>` do kategorii.
+- Etykieta zamknięta: **`Rodzic / Dziecko`** (`formatCategoryLabel` z `@/shared/utils/categoryOptions`).
+- Wybieralne są tylko kategorie-dzieci (`parentId != null`, aktywne).
+- Gdy kontekst ma kierunek (INCOME/EXPENSE), przekaż `direction` — lista filtruje się automatycznie.
+
+Wyjątek: formularz CRUD kategorii (`CategoryForm`) — tam wybór **kategorii nadrzędnej** ma inne semantyki i pozostaje na `DictionarySelect`.
+
+## Pomocnicze utils
+
+Logika grup, wyszukiwania i etykiet: `@/shared/utils/categoryOptions.ts`.

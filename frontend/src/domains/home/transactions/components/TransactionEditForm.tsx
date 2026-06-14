@@ -176,69 +176,71 @@ export default function TransactionEditForm({
 
       {error && <FormError message={error} />}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 md:p-5 space-y-5">
         <div className="space-y-3">
           <SectionLabel>Strony transakcji</SectionLabel>
-          <FieldRow label="Skąd (wpłacający)">
-            {paidFromLocked ? (
-              <ReadOnlyField
-                value={resolvePartyName(parties, draft.paidFromPartyId)}
-                hint="Ustalone przy imporcie"
-              />
-            ) : (
-              <select
-                value={draft.paidFromPartyId ?? ''}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    ...applyPartyFieldChange(
-                      prev,
-                      'paidFrom',
-                      e.target.value ? Number(e.target.value) : null,
-                    ),
-                  }))
-                }
-                className={selectCls}
-              >
-                <option value="">{EDIT_EMPTY_LABEL}</option>
-                {paidFromParties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </FieldRow>
-          <FieldRow label="Dokąd (odbiorca)">
-            {paidToLocked ? (
-              <ReadOnlyField
-                value={resolvePartyName(parties, draft.paidToPartyId)}
-                hint="Ustalone przy imporcie"
-              />
-            ) : (
-              <select
-                value={draft.paidToPartyId ?? ''}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    ...applyPartyFieldChange(
-                      prev,
-                      'paidTo',
-                      e.target.value ? Number(e.target.value) : null,
-                    ),
-                  }))
-                }
-                className={selectCls}
-              >
-                <option value="">{EDIT_EMPTY_LABEL}</option>
-                {paidToParties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </FieldRow>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FieldRow label="Skąd (wpłacający)">
+              {paidFromLocked ? (
+                <ReadOnlyField
+                  value={resolvePartyName(parties, draft.paidFromPartyId)}
+                  hint="Ustalone przy imporcie"
+                />
+              ) : (
+                <select
+                  value={draft.paidFromPartyId ?? ''}
+                  onChange={(e) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      ...applyPartyFieldChange(
+                        prev,
+                        'paidFrom',
+                        e.target.value ? Number(e.target.value) : null,
+                      ),
+                    }))
+                  }
+                  className={selectCls}
+                >
+                  <option value="">{EDIT_EMPTY_LABEL}</option>
+                  {paidFromParties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FieldRow>
+            <FieldRow label="Dokąd (odbiorca)">
+              {paidToLocked ? (
+                <ReadOnlyField
+                  value={resolvePartyName(parties, draft.paidToPartyId)}
+                  hint="Ustalone przy imporcie"
+                />
+              ) : (
+                <select
+                  value={draft.paidToPartyId ?? ''}
+                  onChange={(e) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      ...applyPartyFieldChange(
+                        prev,
+                        'paidTo',
+                        e.target.value ? Number(e.target.value) : null,
+                      ),
+                    }))
+                  }
+                  className={selectCls}
+                >
+                  <option value="">{EDIT_EMPTY_LABEL}</option>
+                  {paidToParties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FieldRow>
+          </div>
         </div>
 
         <div className="border-t border-gray-100 dark:border-gray-800" />

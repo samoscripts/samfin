@@ -54,11 +54,16 @@ function SidebarNav({
   return (
     <>
       {/* Logo */}
-      <div className="flex items-center justify-center h-16 shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 relative">
+      <div
+        className={[
+          'flex items-center h-16 shrink-0 border-b border-white/10 relative',
+          navCollapsed ? 'justify-center px-0' : 'justify-start pl-3 pr-4',
+        ].join(' ')}
+      >
         {navCollapsed ? (
-          <img src="/app/images/samfin_logo_ico.png" alt="SamFin" className="h-8 w-8 object-contain" />
+          <img src="/app/images/samfin_logo_ico.png" alt="SamFin" className="h-9 w-9 object-contain" />
         ) : (
-          <img src="/app/images/samfin_logo_small.png" alt="SamFin" className="h-8 w-auto px-4" />
+          <img src="/app/images/samfin_logo_small.png" alt="SamFin" className="h-11 w-auto object-contain" />
         )}
         {isMobile && (
           <button
@@ -180,10 +185,9 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
       {/* Desktop sidebar */}
       <aside
         className={[
-          'hidden md:flex flex-col h-screen shrink-0 transition-all duration-300 overflow-hidden',
+          'hidden md:flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden bg-gray-900',
           collapsed ? 'w-16' : 'w-64',
         ].join(' ')}
-        style={{ backgroundColor: '#163526' }}
       >
         <SidebarNav collapsed={collapsed} onToggle={onToggle} />
       </aside>
@@ -197,8 +201,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
             aria-hidden="true"
           />
           <aside
-            className="md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col overflow-hidden"
-            style={{ backgroundColor: '#163526' }}
+            className="md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col overflow-hidden bg-gray-900"
           >
             <SidebarNav
               collapsed={false}

@@ -11,6 +11,7 @@ import {
   STATUS_OPTIONS,
 } from '../../constants/labels'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
+import CategorySelect from '@/shared/components/form/CategorySelect'
 
 export interface TransactionFiltersFormProps {
   draft: FlowFilters
@@ -116,14 +117,13 @@ export default function TransactionFiltersForm({
         />
       </Section>
       <Section label="Kategoria">
-        <DictionarySelect
-          items={categories}
+        <CategorySelect
+          categories={categories}
           value={draft.categoryId}
           onChange={(v) => onFieldChange('categoryId', (v as string) ?? '')}
           emptyLabel={FILTER_EMPTY_LABEL}
           valueType="string"
-          filterItem={(c) => activeOnly(c)}
-          getLabel={(c) => c.name}
+          direction={draft.direction ?? ''}
         />
       </Section>
       <Section label="Status">

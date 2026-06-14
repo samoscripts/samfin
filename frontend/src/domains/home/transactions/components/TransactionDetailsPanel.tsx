@@ -1,6 +1,9 @@
 import { Pencil } from 'lucide-react'
 import type { Transaction } from '@/shared/types'
-import StatusBadge from '@/shared/components/StatusBadge'
+import Pill from '@/shared/components/Pill'
+import ExpandableText from '@/shared/components/ExpandableText'
+import { DIRECTION_PILL, STATUS_PILL } from '@/shared/constants/pillMaps'
+import { DIRECTION_LABEL_BY_VALUE, STATUS_LABEL_BY_VALUE } from '../constants/labels'
 import { formatAmount } from '@/shared/utils/format'
 import TransactionHistorySection from './TransactionHistorySection'
 
@@ -11,12 +14,6 @@ export interface TransactionDetailsPanelProps {
 }
 
 export default function TransactionDetailsPanel({ tx, onEdit, onRestored }: TransactionDetailsPanelProps) {
-  const directionLabel = tx.direction === 'INCOME' ? 'Wpływ' : 'Wydatek'
-  const directionCls =
-    tx.direction === 'INCOME'
-      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-
   const items =
     tx.items.length > 0
       ? tx.items
@@ -27,17 +24,22 @@ export default function TransactionDetailsPanel({ tx, onEdit, onRestored }: Tran
       <div className="px-5 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 shrink-0">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{tx.date}</span>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${directionCls}`}>
-            {directionLabel}
-          </span>
+          <Pill variant={DIRECTION_PILL[tx.direction]}>
+            {DIRECTION_LABEL_BY_VALUE[tx.direction]}
+          </Pill>
         </div>
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{tx.description ?? '—'}</p>
+        <ExpandableText
+          text={tx.description}
+          className="mb-1"
+          textClassName="text-sm font-medium text-gray-900 dark:text-gray-100"
+          lines={2}
+        />
         <p className="text-base font-bold text-gray-900 dark:text-gray-100">{formatAmount(tx.amount)}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
         <DetailSection label="Status">
-          <StatusBadge status={tx.status} />
+          <Pill variant={STATUS_PILL[tx.status]}>{STATUS_LABEL_BY_VALUE[tx.status]}</Pill>
         </DetailSection>
 
         <div className="border-t border-gray-100 dark:border-gray-800" />
@@ -69,7 +71,17 @@ export default function TransactionDetailsPanel({ tx, onEdit, onRestored }: Tran
             <DetailRow label="Portfel" value={item.wallet} />
             <DetailRow label="Dotyczy" value={item.concern} />
             <DetailRow label="Kategoria" value={item.category} />
-            {item.description && <DetailRow label="Opis pozycji" value={item.description} />}
+            {item.description && (
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-xs text-gray-500 dark:text-gray-500 shrink-0">Opis pozycji</span>
+                <ExpandableText
+                  text={item.description}
+                  className="flex-1 min-w-0 text-right"
+                  textClassName="text-sm text-gray-900 dark:text-gray-100"
+                  lines={2}
+                />
+              </div>
+            )}
           </div>
         ))}
 

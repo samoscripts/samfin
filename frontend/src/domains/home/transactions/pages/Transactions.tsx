@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowUp, ArrowDown, ArrowUpDown, PanelRight, ArrowRight } from 'lucide-react'
 import PageHeader from '@/layout/PageHeader'
-import StatusBadge from '@/shared/components/StatusBadge'
+import Pill from '@/shared/components/Pill'
 import Pagination from '@/shared/components/Pagination'
+import { DIRECTION_PILL, STATUS_PILL } from '@/shared/constants/pillMaps'
+import { DIRECTION_LABEL_BY_VALUE, STATUS_LABEL_BY_VALUE } from '../constants/labels'
 import FilterChips from '../components/FilterChips'
 import { ItemAmounts, ItemField } from '../components/TransactionCells'
 import TransactionsSidebar from '../components/TransactionsSidebar'
@@ -22,8 +24,10 @@ import { useRightPanelPortal } from '@/layout/RightPanelContext'
 import { Transaction } from '@/shared/types'
 import { formatDate } from '@/shared/utils/format'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
+import ListTextTooltip from '@/shared/components/ListTextTooltip'
 import ApplyClassificationRulesDialog from '../components/ApplyClassificationRulesDialog'
 import { applyClassificationRules } from '@/shared/api/transactions'
+import { fetchCategories, type Category } from '@/shared/api/categories'
 import { flowFiltersToTransactionFilters } from '../utils/flowFilters'
 
 const INITIAL_SORT: SortState = { field: 'date', direction: 'desc' }
@@ -69,6 +73,7 @@ export default function Transactions() {
   const [applyRulesMode, setApplyRulesMode] = useState<'selection' | 'filter' | null>(null)
   const [applyRulesLoading, setApplyRulesLoading] = useState(false)
   const [applyRulesMessage, setApplyRulesMessage] = useState<string | null>(null)
+  const [filterCategories, setFilterCategories] = useState<Category[]>([])
 
   const saveFnRef = useRef<(() => Promise<void>) | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
@@ -82,6 +87,10 @@ export default function Transactions() {
     [data, selectedIds],
   )
   const selectionMixed = bulkTransactions.length > 1 && hasMixedDirections(bulkTransactions)
+
+  useEffect(() => {
+    fetchCategories().then(setFilterCategories).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const selectedTxId = (location.state as { selectedTxId?: number } | null)?.selectedTxId
@@ -379,7 +388,7 @@ export default function Transactions() {
 
         {activeCount > 0 && (
           <div className="px-4 md:px-6 pb-2 pt-3 shrink-0">
-            <FilterChips filters={activeFilters} onChange={handleApplyFilters} />
+            <FilterChips filters={activeFilters} categories={filterCategories} onChange={handleApplyFilters} />
           </div>
         )}
 
@@ -499,16 +508,9 @@ export default function Transactions() {
                             {tx.date}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span
-                              className={[
-                                'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                                tx.direction === 'INCOME'
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-                              ].join(' ')}
-                            >
-                              {tx.direction === 'INCOME' ? 'Wpływ' : 'Wydatek'}
-                            </span>
+                            <Pill variant={DIRECTION_PILL[tx.direction]}>
+                              {DIRECTION_LABEL_BY_VALUE[tx.direction]}
+                            </Pill>
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                             {tx.paidFrom ?? '—'}
@@ -517,7 +519,7 @@ export default function Transactions() {
                             {tx.paidTo ?? '—'}
                           </td>
                           <td className="px-4 py-3 text-gray-800 dark:text-gray-200 max-w-[220px]">
-                            <span className="line-clamp-1">{tx.description ?? '—'}</span>
+                            <ListTextTooltip text={tx.description} />
                           </td>
                           <td className="px-4 py-3">
                             <ItemField items={tx.items} field="wallet" />
@@ -532,7 +534,9 @@ export default function Transactions() {
                             <ItemAmounts tx={tx} />
                           </td>
                           <td className="px-4 py-3">
-                            <StatusBadge status={tx.status} />
+                            <Pill variant={STATUS_PILL[tx.status]}>
+                              {STATUS_LABEL_BY_VALUE[tx.status]}
+                            </Pill>
                           </td>
                         </tr>
                       )
@@ -650,9 +654,9 @@ function TransactionCard({
         <ItemAmounts tx={tx} />
       </div>
 
-      <p className="mt-1.5 text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
-        {tx.description ?? '—'}
-      </p>
+      <div className="mt-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+        <ListTextTooltip text={tx.description} lines={2} />
+      </div>
 
       <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
         <span className="truncate max-w-[120px]">{tx.paidFrom ?? '—'}</span>
@@ -661,17 +665,12 @@ function TransactionCard({
       </div>
 
       <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-        <span
-          className={[
-            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-            tx.direction === 'INCOME'
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-          ].join(' ')}
-        >
-          {tx.direction === 'INCOME' ? 'Wpływ' : 'Wydatek'}
-        </span>
-        <StatusBadge status={tx.status} />
+        <Pill variant={DIRECTION_PILL[tx.direction]}>
+          {DIRECTION_LABEL_BY_VALUE[tx.direction]}
+        </Pill>
+        <Pill variant={STATUS_PILL[tx.status]}>
+          {STATUS_LABEL_BY_VALUE[tx.status]}
+        </Pill>
         <button
           onClick={(e) => {
             e.stopPropagation()

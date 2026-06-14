@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import Breadcrumbs from './Breadcrumbs'
+import AppFooter from './AppFooter'
 import { RightPanelContext } from './RightPanelContext'
 
 export default function Layout() {
@@ -16,23 +17,27 @@ export default function Layout() {
 
   return (
     <RightPanelContext.Provider value={portalRoot}>
-      <div className="min-h-screen md:flex md:h-screen md:min-h-0 md:overflow-hidden bg-gray-50 dark:bg-gray-950">
-        <Sidebar
-          collapsed={sidebarCollapsed}
-          onToggle={handleToggleSidebar}
-          mobileOpen={mobileSidebarOpen}
-          onMobileClose={handleMobileClose}
-        />
+      <div className="flex flex-col min-h-screen md:h-screen md:min-h-0 md:overflow-hidden bg-gray-50 dark:bg-gray-950">
+        <div className="flex flex-1 min-h-0 min-w-0">
+          <Sidebar
+            collapsed={sidebarCollapsed}
+            onToggle={handleToggleSidebar}
+            mobileOpen={mobileSidebarOpen}
+            onMobileClose={handleMobileClose}
+          />
 
-        <div className="flex flex-col min-h-screen md:min-h-0 md:flex-1 min-w-0 md:overflow-hidden">
-          <Topbar onMobileMenuOpen={handleMobileOpen} />
-          <Breadcrumbs />
-          <main className="flex-1 overflow-y-auto">
-            <Outlet />
-          </main>
+          <div className="flex flex-col flex-1 min-w-0 min-h-0 md:overflow-hidden">
+            <Topbar onMobileMenuOpen={handleMobileOpen} />
+            <Breadcrumbs />
+            <main className="flex-1 overflow-y-auto min-h-0">
+              <Outlet />
+            </main>
+          </div>
+
+          <div ref={setPortalRoot} className="shrink-0" />
         </div>
 
-        <div ref={setPortalRoot} className="shrink-0" />
+        <AppFooter />
       </div>
     </RightPanelContext.Provider>
   )

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
+import Pill from '@/shared/components/Pill'
+import { IMPORT_ERROR_SCOPE_PILL } from '@/shared/constants/pillMaps'
 import { fetchImportErrors, type CsvImportError } from '@/shared/api/csvImports'
 
-const SCOPE_CLS: Record<string, string> = {
-  HEADER: 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
-  ROW:    'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
+const SCOPE_LABEL: Record<string, string> = {
+  HEADER: 'Nagłówek',
+  ROW: 'Wiersz',
 }
 
 export default function ImportBledy() {
@@ -72,9 +74,9 @@ export default function ImportBledy() {
               {items.map((err) => (
                 <tr key={err.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/20">
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${SCOPE_CLS[err.scope] ?? ''}`}>
-                      {err.scope}
-                    </span>
+                    <Pill variant={IMPORT_ERROR_SCOPE_PILL[err.scope] ?? 'neutral'}>
+                      {SCOPE_LABEL[err.scope] ?? err.scope}
+                    </Pill>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
                     {err.lineNo ?? '—'}
@@ -96,9 +98,9 @@ export default function ImportBledy() {
           {items.map((err) => (
             <div key={err.id} className="p-4 space-y-1">
               <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${SCOPE_CLS[err.scope] ?? ''}`}>
-                  {err.scope}
-                </span>
+                <Pill variant={IMPORT_ERROR_SCOPE_PILL[err.scope] ?? 'neutral'}>
+                  {SCOPE_LABEL[err.scope] ?? err.scope}
+                </Pill>
                 {err.lineNo && (
                   <span className="text-xs text-gray-400">linia {err.lineNo}</span>
                 )}

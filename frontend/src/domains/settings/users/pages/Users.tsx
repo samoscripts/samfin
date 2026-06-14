@@ -3,6 +3,8 @@ import { ChevronRight, UserPlus } from 'lucide-react'
 import { AuthUser } from '@/shared/types/auth'
 import { fetchUsers, deactivateUser } from '@/shared/api/users'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
+import Pill from '@/shared/components/Pill'
+import { USER_ROLE_PILL } from '@/shared/constants/pillMaps'
 import UserForm from '../components/UserForm'
 
 type View = 'list' | 'create' | 'edit'
@@ -142,10 +144,14 @@ export default function Users() {
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{user.email}</td>
                         <td className="px-4 py-3">
-                          <RoleBadge role={user.role} />
+                          <Pill variant={USER_ROLE_PILL[user.role] ?? 'neutral'}>
+                            {user.role === 'ADMIN' ? 'Administrator' : 'Użytkownik'}
+                          </Pill>
                         </td>
                         <td className="px-4 py-3">
-                          <ActiveBadge active={user.active} />
+                          <Pill variant={user.active ? 'success' : 'danger'}>
+                            {user.active ? 'Aktywny' : 'Nieaktywny'}
+                          </Pill>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -185,35 +191,5 @@ export default function Users() {
         </>
       )}
     </div>
-  )
-}
-
-function RoleBadge({ role }: { role: string }) {
-  return (
-    <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap',
-        role === 'ADMIN'
-          ? 'bg-[#163526]/10 text-[#163526] dark:bg-[#c9a96e]/15 dark:text-[#c9a96e]'
-          : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-      ].join(' ')}
-    >
-      {role === 'ADMIN' ? 'Administrator' : 'Użytkownik'}
-    </span>
-  )
-}
-
-function ActiveBadge({ active }: { active: boolean }) {
-  return (
-    <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap',
-        active
-          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-          : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400',
-      ].join(' ')}
-    >
-      {active ? 'Aktywny' : 'Nieaktywny'}
-    </span>
   )
 }
