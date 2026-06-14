@@ -2,6 +2,7 @@ import { Navigate, Routes, Route } from 'react-router-dom'
 import Layout       from '@/layout/Layout'
 import Dashboard    from '@/domains/home/dashboard/pages/Dashboard'
 import Transactions from '@/domains/home/transactions/pages/Transactions'
+import TransactionEdit from '@/domains/home/transactions/pages/TransactionEdit'
 import ComingSoon   from '@/shared/components/ComingSoon'
 import Settings     from '@/domains/settings/pages/Settings'
 import UsersPage    from '@/domains/settings/users/pages/Users'
@@ -26,6 +27,7 @@ export default function AppRoutes() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="transactions" element={<Transactions />} />
+        <Route path="transactions/:transactionId/edit" element={<TransactionEdit />} />
 
         {/* Import CSV — url-based tab navigation */}
         <Route path="import" element={<ImportLayout />}>

@@ -18,8 +18,6 @@ import { fetchParties } from '@/shared/api/parties'
 
 import type { Party } from '@/domains/home/configuration/parties/types'
 
-import EditSinglePanel from './EditSinglePanel'
-
 import EditBulkPanel from './EditBulkPanel'
 
 import TransactionDetailsPanel from './TransactionDetailsPanel'
@@ -34,7 +32,7 @@ import { filterPartiesForFilterPanel } from '../utils/partyAssignment'
 
 export type SidebarTab = 'filters' | 'details' | 'edit'
 
-export type EditMode = 'single' | 'bulk' | null
+export type EditMode = 'bulk' | null
 
 
 
@@ -64,8 +62,6 @@ export interface TransactionsSidebarProps {
 
   selectedTx: Transaction | null
 
-  singleEditTx: Transaction | null
-
   selectionMixed: boolean
 
   editMode: EditMode
@@ -75,8 +71,6 @@ export interface TransactionsSidebarProps {
   editTabOpen: boolean
 
   onStartEdit: () => void
-
-  onSaved: (updated: Transaction) => void
 
   onBulkSaved: () => void
 
@@ -120,8 +114,6 @@ export default function TransactionsSidebar({
 
   selectedTx,
 
-  singleEditTx,
-
   selectionMixed,
 
   editMode,
@@ -131,8 +123,6 @@ export default function TransactionsSidebar({
   editTabOpen,
 
   onStartEdit,
-
-  onSaved,
 
   onBulkSaved,
 
@@ -388,7 +378,7 @@ export default function TransactionsSidebar({
 
           <Pencil size={13} />
 
-          {editMode === 'bulk' ? 'Edycja zbiorcza' : 'Edycja'}
+          Edycja zbiorcza
 
         </button>
 
@@ -561,32 +551,6 @@ export default function TransactionsSidebar({
         parties={parties}
 
         onSaved={onBulkSaved}
-
-        onSaveClick={onSaveClick}
-
-        onCancelClick={onCancelClick}
-
-        onRegisterSave={onRegisterSave}
-
-        onDirtyChange={onDirtyChange}
-
-      />
-
-    ) : singleEditTx && editTabOpen && editMode === 'single' ? (
-
-      <EditSinglePanel
-
-        tx={singleEditTx}
-
-        wallets={wallets}
-
-        concerns={concerns}
-
-        categories={categories}
-
-        parties={parties}
-
-        onSaved={onSaved}
 
         onSaveClick={onSaveClick}
 

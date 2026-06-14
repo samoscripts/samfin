@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowUp, ArrowDown, ArrowUpDown, PanelRight, ArrowRight } from 'lucide-react'
 import PageHeader from '@/layout/PageHeader'
 import StatusBadge from '@/shared/components/StatusBadge'
@@ -44,6 +45,8 @@ const COLUMNS: { key: string; label: string; sortable?: SortableCol }[] = [
 ]
 
 export default function Transactions() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [activeFilters, setActiveFilters] = useState<FlowFilters>({})
   const [sort, setSort]                   = useState<SortState>(INITIAL_SORT)
   const [pagination, setPagination]       = useState<PaginationState>(INITIAL_PAGINATION)
@@ -80,10 +83,17 @@ export default function Transactions() {
   )
   const selectionMixed = bulkTransactions.length > 1 && hasMixedDirections(bulkTransactions)
 
-  const singleEditTx = useMemo(() => {
-    if (bulkTransactions.length === 1) return bulkTransactions[0]
-    return selectedTx
-  }, [bulkTransactions, selectedTx])
+  useEffect(() => {
+    const selectedTxId = (location.state as { selectedTxId?: number } | null)?.selectedTxId
+    if (!selectedTxId || data.length === 0) return
+    const tx = data.find((t) => t.transactionId === selectedTxId)
+    if (tx) {
+      setSelectedTx(tx)
+      setPanelOpen(true)
+      setActiveTab('details')
+    }
+    navigate(location.pathname, { replace: true, state: {} })
+  }, [data, location.pathname, location.state, navigate])
 
   useEffect(() => {
     setSelectedIds(new Set())
@@ -197,12 +207,15 @@ export default function Transactions() {
     if (bulkTransactions.length > 1) {
       if (selectionMixed) return
       setEditMode('bulk')
-    } else {
-      setEditMode('single')
+      setEditTabOpen(true)
+      setActiveTab('edit')
+      return
     }
-    setEditTabOpen(true)
-    setActiveTab('edit')
-  }, [bulkTransactions.length, selectionMixed])
+    const tx = bulkTransactions[0] ?? selectedTx
+    if (tx) {
+      navigate(`/transactions/${tx.transactionId}/edit`)
+    }
+  }, [bulkTransactions, selectedTx, selectionMixed, navigate])
 
   const handleCancelEdit = useCallback(() => {
     setEditTabOpen(false)
@@ -210,15 +223,6 @@ export default function Transactions() {
     setActiveTab(selectedTx || bulkTransactions.length > 0 ? 'details' : 'filters')
     setIsDirty(false)
   }, [selectedTx, bulkTransactions.length])
-
-  const handleSaved = useCallback((updated: Transaction) => {
-    setRefreshKey((k) => k + 1)
-    setSelectedTx(updated)
-    setEditTabOpen(false)
-    setEditMode(null)
-    setActiveTab('details')
-    setIsDirty(false)
-  }, [])
 
   const handleBulkSaved = useCallback(() => {
     setRefreshKey((k) => k + 1)
@@ -356,19 +360,11 @@ export default function Transactions() {
     </button>
   )
 
-  const saveConfirmMessage =
-    editMode === 'bulk'
-      ? `Zostanie zaktualizowanych ${bulkTransactions.length} transakcji. Kontynuować?`
-      : 'Zmiany w klasyfikacji transakcji zostaną zapisane.'
+  const saveConfirmMessage = `Zostanie zaktualizowanych ${bulkTransactions.length} transakcji. Kontynuować?`
 
-  const cancelConfirmMessage =
-    editMode === 'bulk'
-      ? isDirty
-        ? 'Niezapisane zmiany zostaną utracone. Wrócisz do listy transakcji.'
-        : 'Wrócisz do listy transakcji bez zapisywania.'
-      : isDirty
-        ? 'Niezapisane zmiany zostaną utracone. Wrócisz do widoku szczegółów.'
-        : 'Wrócisz do widoku szczegółów bez zapisywania.'
+  const cancelConfirmMessage = isDirty
+    ? 'Niezapisane zmiany zostaną utracone. Wrócisz do listy transakcji.'
+    : 'Wrócisz do listy transakcji bez zapisywania.'
 
   return (
     <>
@@ -561,13 +557,11 @@ export default function Transactions() {
             activeFilters={activeFilters}
             onApply={handleApplyFilters}
             selectedTx={selectedTx}
-            singleEditTx={singleEditTx}
             selectionMixed={selectionMixed}
             editMode={editMode}
             bulkTransactions={bulkTransactions}
             editTabOpen={editTabOpen}
             onStartEdit={handleStartEdit}
-            onSaved={handleSaved}
             onBulkSaved={handleBulkSaved}
             onRestored={handleRestored}
             onSaveClick={requestSaveEdit}

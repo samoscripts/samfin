@@ -7,6 +7,7 @@ import {
   type RuleCondition,
 } from '@/shared/api/classificationRules'
 import type { Party } from '@/domains/home/configuration/parties/types'
+import type { Category } from '@/shared/api/categories'
 import { DIRECTION_OPTIONS } from '@/domains/home/transactions/constants/labels'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import FormActions from '@/shared/components/form/FormActions'
@@ -33,7 +34,7 @@ export interface ClassificationRuleFormProps {
   parties: Party[]
   wallets: { id: number; name: string }[]
   concerns: { id: number; name: string }[]
-  categories: { id: number; name: string }[]
+  categories: Category[]
   onSaved: () => void
   onCancel: () => void
 }

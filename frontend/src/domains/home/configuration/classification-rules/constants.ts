@@ -7,12 +7,13 @@ import type {
   RuleItemAction,
   RuleOperator,
 } from '@/shared/api/classificationRules'
+import type { ClassificationItemDraft } from '@/shared/components/classification/ClassificationItemsEditor'
+import { DEFAULT_SPLIT_PERCENT } from '@/shared/utils/splitAllocation'
 
 export type RuleDirection = 'EXPENSE' | 'INCOME' | ''
 
 export const CONDITION_FIELDS: { value: RuleConditionField; label: string }[] = [
   { value: 'description', label: 'Opis' },
-  { value: 'direction', label: 'Kierunek' },
   { value: 'amount_minor', label: 'Kwota (grosze)' },
   { value: 'operation_date', label: 'Data operacji' },
   { value: 'classification_status', label: 'Status klasyfikacji' },
@@ -110,4 +111,56 @@ export function applyOwnSideToActions(
   }
 
   return { ...actions, transaction: tx }
+}
+
+export function ruleItemsToDraft(items: RuleItemAction[]): ClassificationItemDraft[] {
+  if (items.length === 1 && items[0].split.type === 'FULL') {
+    return [{ walletId: items[0].walletId ?? null, concernId: items[0].concernId ?? null, categoryId: items[0].categoryId ?? null }]
+  }
+  if (items.length === 2) {
+    const p0 = items[0].split.type === 'PERCENT' ? (items[0].split.value ?? DEFAULT_SPLIT_PERCENT) : DEFAULT_SPLIT_PERCENT
+    const p1 = items[1].split.type === 'PERCENT' ? (items[1].split.value ?? 100 - p0) : 100 - p0
+    return items.map((item, i) => ({
+      walletId: item.walletId ?? null,
+      concernId: item.concernId ?? null,
+      categoryId: item.categoryId ?? null,
+      percent: i === 0 ? p0 : p1,
+    }))
+  }
+  return items.map((item) => ({
+    walletId: item.walletId ?? null,
+    concernId: item.concernId ?? null,
+    categoryId: item.categoryId ?? null,
+  }))
+}
+
+export function draftToRuleItems(draft: ClassificationItemDraft[]): RuleItemAction[] {
+  if (draft.length === 1) {
+    return [{
+      split: { type: 'FULL' },
+      walletId: draft[0].walletId,
+      concernId: draft[0].concernId,
+      categoryId: draft[0].categoryId,
+    }]
+  }
+  const p0 = draft[0].percent ?? DEFAULT_SPLIT_PERCENT
+  const p1 = draft[1]?.percent ?? 100 - p0
+  return [
+    {
+      split: { type: 'PERCENT', value: p0 },
+      walletId: draft[0].walletId,
+      concernId: draft[0].concernId,
+      categoryId: draft[0].categoryId,
+    },
+    {
+      split: { type: 'PERCENT', value: p1 },
+      walletId: draft[1].walletId,
+      concernId: draft[1].concernId,
+      categoryId: draft[1].categoryId,
+    },
+  ]
+}
+
+export function mergeDraftIntoActions(actions: RuleActionsPayload, draft: ClassificationItemDraft[]): RuleActionsPayload {
+  return { ...actions, items: draftToRuleItems(draft) }
 }

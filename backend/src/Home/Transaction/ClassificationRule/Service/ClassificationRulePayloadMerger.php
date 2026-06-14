@@ -100,10 +100,20 @@ class ClassificationRulePayloadMerger
      */
     private function computeSplitAmounts(int $totalMinor, array $ruleItemActions): array
     {
-        $count      = count($ruleItemActions);
-        $amounts    = array_fill(0, $count, 0);
-        $assigned   = 0;
-        $remainderI = null;
+        $count = count($ruleItemActions);
+        if ($count === 0) {
+            return [];
+        }
+
+        if ($count === 1 && $ruleItemActions[0]->split->type === 'FULL') {
+            return [$totalMinor];
+        }
+
+        $sign     = $totalMinor < 0 ? -1 : 1;
+        $absTotal = abs($totalMinor);
+        $amounts  = array_fill(0, $count, 0);
+        $assigned = 0;
+        $lastPercentI = null;
 
         foreach ($ruleItemActions as $i => $action) {
             if ($action->split->type === 'FULL') {
@@ -112,18 +122,23 @@ class ClassificationRulePayloadMerger
                 return $amounts;
             }
             if ($action->split->type === 'REMAINDER') {
-                $remainderI = $i;
-                continue;
+                $amounts[$i] = $sign * ($absTotal - $assigned);
+
+                return $amounts;
             }
             if ($action->split->type === 'PERCENT') {
-                $pct           = $action->split->value ?? 0;
-                $amounts[$i]   = (int) round($totalMinor * $pct / 100);
-                $assigned     += $amounts[$i];
+                $lastPercentI = $i;
+                if ($i < $count - 1) {
+                    $pct           = $action->split->value ?? 0;
+                    $part          = (int) round($absTotal * $pct / 100);
+                    $amounts[$i]   = $sign * $part;
+                    $assigned     += $part;
+                }
             }
         }
 
-        if ($remainderI !== null) {
-            $amounts[$remainderI] = $totalMinor - $assigned;
+        if ($lastPercentI !== null) {
+            $amounts[$lastPercentI] = $sign * ($absTotal - $assigned);
         }
 
         return $amounts;

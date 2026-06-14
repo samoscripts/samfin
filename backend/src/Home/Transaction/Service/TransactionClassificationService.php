@@ -37,8 +37,8 @@ class TransactionClassificationService
         if ($itemCount < 1) {
             throw new \InvalidArgumentException('Wymagana co najmniej 1 pozycja.');
         }
-        if ($itemCount > 5) {
-            throw new \InvalidArgumentException('Maksymalnie 5 pozycji.');
+        if ($itemCount > 2) {
+            throw new \InvalidArgumentException('Maksymalnie 2 pozycje.');
         }
 
         $sumMinor = array_reduce(
