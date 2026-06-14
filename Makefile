@@ -1,4 +1,4 @@
-.PHONY: up down build restart logs shell sf npm migrate cc
+.PHONY: up down build restart logs shell sf npm migrate cc fix-frontend-node-modules
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +47,12 @@ shell-frontend:
 
 npm:
 	docker compose exec frontend npm $(CMD)
+
+# One-time fix when frontend_node_modules volume was created as root (EACCES on npm install)
+fix-frontend-node-modules:
+	docker run --rm -v fin_frontend_node_modules:/app/node_modules node:lts-alpine \
+		chown -R $$(grep '^HOST_UID=' .env 2>/dev/null | cut -d= -f2 || echo 1000):$$(grep '^HOST_GID=' .env 2>/dev/null | cut -d= -f2 || echo 1000) /app/node_modules
+	@echo "✓ node_modules volume ownership updated — run: docker compose up -d frontend"
 
 # ── Setup (pierwsze uruchomienie) ─────────────────────────────────────────────
 

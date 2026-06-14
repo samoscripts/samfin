@@ -4,6 +4,12 @@ import { updateMe } from '@/shared/api/auth'
 import { UserPayload, createUser, updateUser } from '@/shared/api/users'
 import AvatarPicker from '@/shared/components/AvatarPicker'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
+import FormActions from '@/shared/components/form/FormActions'
+import FormError from '@/shared/components/form/FormError'
+import FormField from '@/shared/components/form/FormField'
+import Select from '@/shared/components/form/Select'
+import { configInputCls, configSelectCls } from '@/shared/components/form/formClasses'
+import { getApiErrorMessage } from '@/shared/utils/errors'
 
 type UserFormMode = 'admin-edit' | 'self-edit'
 
@@ -27,13 +33,17 @@ const EMPTY: UserPayload = {
   password: '',
 }
 
+const readOnlyInputCls =
+  configInputCls +
+  ' bg-gray-100 dark:bg-gray-800/70 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+
 export default function UserForm({ mode, user, onSaved, onCancel, hideCancel = false }: UserFormProps) {
   const isSelfEdit = mode === 'self-edit'
   const isEdit = !!user
   const [form, setForm] = useState<UserPayload>({ ...EMPTY })
   const [newPassword, setNewPassword] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -53,7 +63,7 @@ export default function UserForm({ mode, user, onSaved, onCancel, hideCancel = f
     }
     setNewPassword('')
     setCurrentPassword('')
-    setError('')
+    setError(null)
   }, [user])
 
   const set = <K extends keyof UserPayload>(key: K, val: UserPayload[K]) =>
@@ -61,7 +71,7 @@ export default function UserForm({ mode, user, onSaved, onCancel, hideCancel = f
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    setError(null)
     setIsSaving(true)
     try {
       let saved: AuthUser
@@ -94,7 +104,7 @@ export default function UserForm({ mode, user, onSaved, onCancel, hideCancel = f
       }
       onSaved(saved)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Wystąpił błąd przy zapisie.')
+      setError(getApiErrorMessage(err, 'Wystąpił błąd przy zapisie.'))
     } finally {
       setIsSaving(false)
     }
@@ -121,63 +131,63 @@ export default function UserForm({ mode, user, onSaved, onCancel, hideCancel = f
             </div>
 
             <div className="space-y-4">
-              <Row label="Email *">
+              <FormField label="Email" required>
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => set('email', e.target.value)}
                   readOnly={isSelfEdit}
                   required
-                  className={isSelfEdit ? readOnlyInputCls : inputCls}
+                  className={isSelfEdit ? readOnlyInputCls : configInputCls}
                   placeholder="np. maciej@example.com"
                 />
-              </Row>
+              </FormField>
 
               <div className="grid grid-cols-2 gap-4">
-                <Row label="Imię">
+                <FormField label="Imię">
                   <input
                     type="text"
                     value={form.forename}
                     onChange={(e) => set('forename', e.target.value)}
-                    className={inputCls}
+                    className={configInputCls}
                     placeholder="Imię"
                   />
-                </Row>
-                <Row label="Nazwisko">
+                </FormField>
+                <FormField label="Nazwisko">
                   <input
                     type="text"
                     value={form.surname}
                     onChange={(e) => set('surname', e.target.value)}
-                    className={inputCls}
+                    className={configInputCls}
                     placeholder="Nazwisko"
                   />
-                </Row>
+                </FormField>
               </div>
 
-              <Row label="Nazwa wyświetlana *">
+              <FormField label="Nazwa wyświetlana" required>
                 <input
                   type="text"
                   value={form.displayName}
                   onChange={(e) => set('displayName', e.target.value)}
                   required
-                  className={inputCls}
+                  className={configInputCls}
                   placeholder="np. Maciej"
                 />
-              </Row>
+              </FormField>
 
               {!isSelfEdit && (
                 <div className="grid grid-cols-2 gap-4">
-                  <Row label="Rola">
-                    <select
+                  <FormField label="Rola">
+                    <Select
+                      className={configSelectCls}
                       value={form.role}
                       onChange={(e) => set('role', e.target.value as UserRole)}
-                      className={inputCls}
                     >
                       <option value="USER">Użytkownik</option>
                       <option value="ADMIN">Administrator</option>
-                    </select>
-                  </Row>
-                  <Row label="Status">
+                    </Select>
+                  </FormField>
+                  <FormField label="Status">
                     <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -187,75 +197,58 @@ export default function UserForm({ mode, user, onSaved, onCancel, hideCancel = f
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-300">Aktywny</span>
                     </label>
-                  </Row>
+                  </FormField>
                 </div>
               )}
             </div>
           </Card>
 
-          <Card title={isSelfEdit ? 'Zmiana hasła' : isEdit ? 'Zmiana hasła (opcjonalna)' : 'Hasło *'}>
+          <Card title={isSelfEdit ? 'Zmiana hasła' : isEdit ? 'Zmiana hasła (opcjonalna)' : 'Hasło'}>
             {!isEdit && !isSelfEdit ? (
-              <Row label="Hasło *">
+              <FormField label="Hasło" required>
                 <input
                   type="password"
                   value={form.password ?? ''}
                   onChange={(e) => set('password', e.target.value)}
                   required
-                  className={inputCls}
+                  className={configInputCls}
                   placeholder="Minimum 6 znaków"
                 />
-              </Row>
+              </FormField>
             ) : (
               <div className="space-y-3">
                 {isSelfEdit && (
-                  <Row label="Aktualne hasło">
+                  <FormField label="Aktualne hasło">
                     <input
                       type="password"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
-                      className={inputCls}
+                      className={configInputCls}
                       placeholder="Wymagane przy zmianie hasła"
                     />
-                  </Row>
+                  </FormField>
                 )}
-                <Row label="Nowe hasło">
+                <FormField label="Nowe hasło">
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className={inputCls}
+                    className={configInputCls}
                     placeholder={isSelfEdit ? 'Pozostaw puste, aby nie zmieniać' : 'Pozostaw puste, aby nie zmieniać'}
                   />
-                </Row>
+                </FormField>
               </div>
             )}
           </Card>
 
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-4 py-3">
-              {error}
-            </p>
-          )}
+          {error && <FormError message={error} />}
 
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-5 py-2.5 rounded-lg text-sm font-medium text-white hover:opacity-90 disabled:opacity-60 transition-opacity"
-              style={{ backgroundColor: '#1c4230' }}
-            >
-              {isSaving ? 'Zapisywanie…' : isEdit ? 'Zapisz zmiany' : 'Dodaj użytkownika'}
-            </button>
-            {!hideCancel && (
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                Anuluj
-              </button>
-            )}
-          </div>
+          <FormActions
+            saving={isSaving}
+            submitLabel={isEdit ? 'Zapisz zmiany' : 'Dodaj użytkownika'}
+            onCancel={onCancel}
+            hideCancel={hideCancel}
+          />
         </div>
 
         <div className="lg:col-span-2">
@@ -284,22 +277,3 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
     </div>
   )
 }
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-const inputCls =
-  'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 ' +
-  'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 ' +
-  'placeholder-gray-400 dark:placeholder-gray-600 ' +
-  'focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40'
-
-const readOnlyInputCls =
-  'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 ' +
-  'bg-gray-100 dark:bg-gray-800/70 text-gray-500 dark:text-gray-400 cursor-not-allowed'

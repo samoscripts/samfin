@@ -232,6 +232,34 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-021: Reguły klasyfikacji per `party_id`
+
+**Kontekst:** Użytkownik chce automatycznie klasyfikować transakcje (jak filtry w Gmail), z osobnym zestawem reguł na każdy podmiot-rachunek (OWN+ACCOUNT).
+
+**Decyzja:** Tabela `classification_rule` z FK `party_id`. Warunki i akcje w JSON (`conditions_json`, `actions_json`). `party_id` można zmienić (przeniesienie reguły). Pole `created_from_transaction_id` (nullable) — informacja o proweniencji, bez wpływu na logikę.
+
+**Konsekwencje:** API CRUD pod `/api/parties/{partyId}/classification-rules`. Wykonanie reguł używa party z kontekstu własnej strony transakcji.
+
+---
+
+### ADR-022: Reguły nie nadpisują przy automacie (`fill_empty`)
+
+**Kontekst:** Import CSV i domyślny run ręczny nie powinny nadpisywać ręcznej klasyfikacji.
+
+**Decyzja:** Przy imporcie i run ręcznym z `overwrite=false` applier uzupełnia tylko puste pola. Nadpisanie wymaga jawnego `overwrite=true`.
+
+---
+
+### ADR-023: Reguły wyłącznie przez `TransactionClassificationService`
+
+**Kontekst:** Ryzyko rozjazdu walidacji i historii przy osobnej ścieżce zapisu.
+
+**Decyzja:** `ClassificationRuleApplier` buduje payload jak `PUT /transactions/{id}/items` i wywołuje `classifyTransaction()`. Zakaz bezpośredniej mutacji encji i własnego `flush()` poza tą ścieżką. Przechodzą ADR-009, ADR-015, ADR-017.
+
+**Pliki:** `ClassificationRuleApplier`, `TransactionClassificationService`.
+
+---
+
 ## DO POTWIERDZENIA
 
 ### ADR-P01: Ujednolicenie nazewnictwa Flow → Transaction
@@ -303,3 +331,4 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-13 | Utworzenie rejestru na podstawie analizy kodu |
 | 2026-06-13 | ADR-017: usunięcie direction_usage_*; reguły kontekstowe Skąd/Dokąd |
 | 2026-06-13 | ADR-018 (portfel), ADR-019 (transakcje ręczne MVP — plan) |
+| 2026-06-14 | ADR-021..023: reguły klasyfikacji per party, fill_empty, classify service |

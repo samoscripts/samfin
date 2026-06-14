@@ -2,6 +2,7 @@
 
 namespace App\Home\Transaction\Controller;
 
+use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleApplyService;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Repository\TransactionRepository;
 use App\Home\Transaction\Service\TransactionBulkUpdateService;
@@ -21,6 +22,7 @@ class TransactionController extends AbstractController
         private TransactionRepository            $repository,
         private TransactionClassificationService $classificationService,
         private TransactionBulkUpdateService     $bulkUpdateService,
+        private ClassificationRuleApplyService     $classificationRuleApplyService,
         private TransactionSnapshotLogService    $snapshotLogService,
         private Security                         $security,
     ) {}
@@ -103,6 +105,45 @@ class TransactionController extends AbstractController
         }
 
         return $this->json(['updated' => $updated]);
+    }
+
+    #[Route('/apply-classification-rules', name: 'api_transactions_apply_classification_rules', methods: ['POST'])]
+    public function applyClassificationRules(Request $request): JsonResponse
+    {
+        $body = json_decode($request->getContent(), true) ?? [];
+
+        $transactionIds = $body['transactionIds'] ?? null;
+        $filters        = $body['filters'] ?? null;
+        $overwrite      = (bool) ($body['overwrite'] ?? false);
+
+        if ($transactionIds !== null && $filters !== null) {
+            return $this->json(['message' => 'Podaj transactionIds albo filters, nie oba.'], 422);
+        }
+        if ($transactionIds === null && $filters === null) {
+            return $this->json(['message' => 'Pole transactionIds lub filters jest wymagane.'], 422);
+        }
+
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        try {
+            if (is_array($transactionIds)) {
+                $result = $this->classificationRuleApplyService->applyByIds(
+                    array_map('intval', $transactionIds),
+                    $user,
+                    $overwrite,
+                );
+            } else {
+                if (!is_array($filters)) {
+                    return $this->json(['message' => 'Pole filters musi być obiektem.'], 422);
+                }
+                $result = $this->classificationRuleApplyService->applyByFilters($filters, $user, $overwrite);
+            }
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['message' => $e->getMessage()], 422);
+        }
+
+        return $this->json($result);
     }
 
     #[Route('/{id}', name: 'api_transactions_show', methods: ['GET'], requirements: ['id' => '\d+'])]

@@ -20,6 +20,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (14 plików, chronologicznie o
 | `transactions` | `Transaction` | Transakcje |
 | `transaction_items` | `TransactionItem` | Pozycje transakcji |
 | `transactions_change_log` | `TransactionChangeLog` | Historia klasyfikacji |
+| `classification_rule` | `ClassificationRule` | Reguły auto-klasyfikacji per podmiot |
 
 ## Diagram relacji (FK)
 
@@ -62,12 +63,18 @@ erDiagram
         int id PK
         int csv_import_id FK
     }
+    classification_rule {
+        int id PK
+        int party_id FK
+        int created_from_transaction_id FK
+    }
     transactions {
         int id PK
         int import_id FK
         int import_row_id FK UK
         int paid_from_party_id FK
         int paid_to_party_id FK
+        string counterparty_account_number
     }
     transaction_items {
         int id PK
@@ -140,6 +147,7 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260608120000` | `transactions_change_log` |
 | `20260613120000` | `party`: `direction_usage_income`, `direction_usage_expense` (zastępuje `usage_type`) |
 | `20260613140000` | Usunięcie `direction_usage_*` z `party` |
+| `20260614150000` | `classification_rule`; `transactions.counterparty_account_number` |
 
 ## Konwencja kwot
 

@@ -8,15 +8,15 @@ import {
   deactivatePartyBankAccount,
 } from '@/shared/api/partyBankAccounts'
 import { fetchProviders, type BankProvider } from '@/shared/api/csvImports'
+import FormError from '@/shared/components/form/FormError'
+import FormField from '@/shared/components/form/FormField'
+import Select from '@/shared/components/form/Select'
+import { configInputCls, configSelectCls } from '@/shared/components/form/formClasses'
+import { getApiErrorMessage } from '@/shared/utils/errors'
 
 interface Props {
   partyId: number
 }
-
-const inputCls =
-  'w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e] transition-colors placeholder:text-gray-400'
-
-const labelCls = 'block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1'
 
 type FormMode = 'add' | { edit: PartyBankAccount }
 
@@ -91,8 +91,7 @@ function BankAccountForm({ partyId, account, onSaved, onCancel, bankProviders }:
         : await createPartyBankAccount(payload)
       onSaved(saved)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Wystąpił błąd podczas zapisywania.')
+      setError(getApiErrorMessage(err, 'Wystąpił błąd podczas zapisywania.'))
     } finally {
       setSaving(false)
     }
@@ -104,27 +103,21 @@ function BankAccountForm({ partyId, account, onSaved, onCancel, bankProviders }:
         {isEdit ? 'Edytuj rachunek bankowy' : 'Nowy rachunek bankowy'}
       </h4>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-700 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      {error && <FormError message={error} className="text-xs px-3 py-2" />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Nazwa wyświetlana</label>
+        <FormField label="Nazwa wyświetlana">
           <input
             type="text"
-            className={inputCls}
+            className={configInputCls}
             placeholder="np. eKonto"
             value={form.displayName ?? ''}
             onChange={(e) => set('displayName', e.target.value)}
           />
-        </div>
-        <div>
-          <label className={labelCls}>Bank</label>
-          <select
-            className={inputCls}
+        </FormField>
+        <FormField label="Bank">
+          <Select
+            className={configSelectCls}
             value={form.bankName ?? ''}
             onChange={(e) => set('bankName', e.target.value || null as unknown as string)}
           >
@@ -132,44 +125,41 @@ function BankAccountForm({ partyId, account, onSaved, onCancel, bankProviders }:
             {bankProviders.map((p) => (
               <option key={p.code} value={p.displayName}>{p.displayName}</option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FormField>
       </div>
 
-      <div>
-        <label className={labelCls}>Numer rachunku *</label>
+      <FormField label="Numer rachunku" required>
         <input
           type="text"
-          className={inputCls}
+          className={configInputCls}
           placeholder="np. 67 1140 2004 0000 3802 7450 3818"
           value={form.accountNumber}
           onChange={(e) => set('accountNumber', e.target.value)}
           required
         />
-      </div>
+      </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Właściciel rachunku (z banku)</label>
+        <FormField label="Właściciel rachunku (z banku)">
           <input
             type="text"
-            className={inputCls}
+            className={configInputCls}
             placeholder="np. JAN KOWALSKI"
             value={form.ownerNameFromBank ?? ''}
             onChange={(e) => set('ownerNameFromBank', e.target.value)}
           />
-        </div>
-        <div>
-          <label className={labelCls}>Waluta</label>
+        </FormField>
+        <FormField label="Waluta">
           <input
             type="text"
-            className={inputCls}
+            className={configInputCls}
             placeholder="PLN"
             maxLength={10}
             value={form.currency}
             onChange={(e) => set('currency', e.target.value.toUpperCase())}
           />
-        </div>
+        </FormField>
       </div>
 
       {isEdit && (

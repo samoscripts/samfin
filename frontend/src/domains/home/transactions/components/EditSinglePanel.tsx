@@ -23,7 +23,7 @@ import {
 } from '../utils/partyAssignment'
 import { DIRECTION_LABEL_BY_VALUE, EDIT_EMPTY_LABEL } from '../constants/labels'
 import { filterCategoriesForDirection, formatCategoryLabel } from '../utils/categoryOptions'
-import DictionarySelect from './selects/DictionarySelect'
+import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import { selectCls } from '@/shared/components/form/formClasses'
 
 interface ItemDraft {
@@ -49,12 +49,13 @@ const EMPTY_ITEM = (amount = 0): ItemDraft => ({
 })
 
 function txToEditDraft(tx: Transaction): EditDraft {
+  const items = tx.items ?? []
   return {
     paidFromPartyId: tx.paidFromPartyId ?? null,
     paidToPartyId: tx.paidToPartyId ?? null,
     items:
-      tx.items.length > 0
-        ? tx.items.map((item) => ({
+      items.length > 0
+        ? items.map((item) => ({
             amount: item.amount,
             walletId: item.walletId ?? null,
             concernId: item.concernId ?? null,
@@ -69,9 +70,10 @@ function isDraftDirty(draft: EditDraft, tx: Transaction): boolean {
   if ((draft.paidFromPartyId ?? null) !== (tx.paidFromPartyId ?? null)) return true
   if ((draft.paidToPartyId ?? null) !== (tx.paidToPartyId ?? null)) return true
 
+  const txItems = tx.items ?? []
   const origItems =
-    tx.items.length > 0
-      ? tx.items
+    txItems.length > 0
+      ? txItems
       : [{ amount: tx.amount, walletId: null, concernId: null, categoryId: null, description: null }]
 
   if (draft.items.length !== origItems.length) return true
@@ -119,10 +121,10 @@ export default function EditSinglePanel({
   const [error, setError] = useState<string | null>(null)
   const [savedOk, setSavedOk] = useState(false)
 
-  const isSplit = draft.items.length > 1
-  const itemsSum = sumItemAmounts(draft.items)
-  const sumOk = isSumMatching(draft.items, tx.amount)
-  const validationError = validateEditItems(draft.items, tx.amount)
+  const isSplit = (draft.items ?? []).length > 1
+  const itemsSum = sumItemAmounts(draft.items ?? [])
+  const sumOk = isSumMatching(draft.items ?? [], tx.amount)
+  const validationError = validateEditItems(draft.items ?? [], tx.amount)
 
   useEffect(() => {
     setDraft(txToEditDraft(tx))
@@ -283,13 +285,14 @@ export default function EditSinglePanel({
               <select
                 value={draft.paidFromPartyId ?? ''}
                 onChange={(e) =>
-                  setDraft((prev) =>
-                    applyPartyFieldChange(
+                  setDraft((prev) => ({
+                    ...prev,
+                    ...applyPartyFieldChange(
                       prev,
                       'paidFrom',
                       e.target.value ? Number(e.target.value) : null,
                     ),
-                  )
+                  }))
                 }
                 className={selectCls}
               >
@@ -312,13 +315,14 @@ export default function EditSinglePanel({
               <select
                 value={draft.paidToPartyId ?? ''}
                 onChange={(e) =>
-                  setDraft((prev) =>
-                    applyPartyFieldChange(
+                  setDraft((prev) => ({
+                    ...prev,
+                    ...applyPartyFieldChange(
                       prev,
                       'paidTo',
                       e.target.value ? Number(e.target.value) : null,
                     ),
-                  )
+                  }))
                 }
                 className={selectCls}
               >

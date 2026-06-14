@@ -10,7 +10,7 @@ import {
   FILTER_EMPTY_LABEL,
   STATUS_OPTIONS,
 } from '../../constants/labels'
-import DictionarySelect from '../selects/DictionarySelect'
+import DictionarySelect from '@/shared/components/form/DictionarySelect'
 
 export interface TransactionFiltersFormProps {
   draft: FlowFilters

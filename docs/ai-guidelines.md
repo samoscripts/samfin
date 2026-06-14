@@ -12,6 +12,7 @@ Dokument opisuje, jak bezpiecznie pracować z kodem SamFin — dla asystentów A
 4. **Kwoty w groszach** — w PHP/DB zawsze `amount_minor` (int). API i frontend używają decimal PLN; konwersja `round(amount * 100)` przy zapisie.
 5. **Soft delete** — `DELETE` w API ustawia `active = false`. Nie zakładaj fizycznego usuwania rekordów konfiguracyjnych.
 6. **Minimalny diff** — przy zmianach zachowuj istniejące konwencje (inline JSON validation, `toApiArray()` na encjach, camelCase w API).
+7. **Umiejscowienie UI** — formularze create/edit w **page content** lub **sidebar**; **modale** tylko na confirmy i krótkie prompty. Przy nowej funkcji — zapytaj użytkownika (page / sidebar / modal). Szczegóły: [`architecture-rules.md`](architecture-rules.md) (sekcja Frontend).
 
 ---
 

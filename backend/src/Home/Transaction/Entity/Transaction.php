@@ -76,6 +76,9 @@ class Transaction
     #[ORM\Column(length: 30)]
     private string $source = self::SOURCE_CSV;
 
+    #[ORM\Column(name: 'counterparty_account_number', length: 26, nullable: true)]
+    private ?string $counterpartyAccountNumber = null;
+
     /** @var Collection<int, TransactionItem> */
     #[ORM\OneToMany(
         targetEntity: TransactionItem::class,
@@ -132,6 +135,7 @@ class Transaction
             'paidToPartyId'    => $this->paidToParty?->getId(),
             'paidTo'           => $this->paidToParty?->getName(),
             'source'           => $this->source,
+            'counterpartyAccountNumber' => $this->counterpartyAccountNumber,
             'items'            => array_values(array_map(
                 fn(TransactionItem $i) => $i->toApiArray(),
                 $this->items->toArray(),
@@ -170,6 +174,9 @@ class Transaction
 
     public function getSource(): string { return $this->source; }
     public function setSource(string $v): static { $this->source = $v; return $this; }
+
+    public function getCounterpartyAccountNumber(): ?string { return $this->counterpartyAccountNumber; }
+    public function setCounterpartyAccountNumber(?string $v): static { $this->counterpartyAccountNumber = $v; return $this; }
 
     /** @return Collection<int, TransactionItem> */
     public function getItems(): Collection { return $this->items; }

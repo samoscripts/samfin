@@ -1,4 +1,4 @@
-import Select from '@/shared/components/form/Select'
+import Select from './Select'
 
 export interface DictionaryItem {
   id: number

@@ -6,6 +6,12 @@ export async function fetchParties(): Promise<Party[]> {
   return res.data
 }
 
+/** OWN parties with bank account and at least one import — context for classification rules. */
+export async function fetchPartiesForClassificationRules(): Promise<Party[]> {
+  const res = await api.get<Party[]>('/parties', { params: { ruleEligible: true } })
+  return res.data
+}
+
 export async function fetchParty(id: number): Promise<Party> {
   const res = await api.get<Party>(`/parties/${id}`)
   return res.data

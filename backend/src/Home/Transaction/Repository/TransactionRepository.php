@@ -224,4 +224,27 @@ class TransactionRepository extends ServiceEntityRepository
                ->setParameter('amountMax', $maxMinor);
         }
     }
+
+    /**
+     * @return int[]
+     */
+    public function findIdsForFilters(array $filters, int $limit): array
+    {
+        $needsItemJoin = !empty($filters['walletId'])
+            || !empty($filters['concernId'])
+            || !empty($filters['categoryId']);
+
+        $qb = $this->createQueryBuilder('t')
+            ->select('DISTINCT t.id')
+            ->orderBy('t.id', 'ASC')
+            ->setMaxResults($limit);
+
+        if ($needsItemJoin) {
+            $qb->leftJoin('t.items', 'ti');
+        }
+
+        $this->applyFilters($qb, $filters, $needsItemJoin);
+
+        return array_map('intval', array_column($qb->getQuery()->getScalarResult(), 'id'));
+    }
 }

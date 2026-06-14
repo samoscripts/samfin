@@ -1,4 +1,4 @@
-import { AlertCircle, Pencil } from 'lucide-react'
+import { AlertCircle, Pencil, Sparkles } from 'lucide-react'
 import type { Transaction } from '@/shared/types'
 import { formatAmount } from '@/shared/utils/format'
 
@@ -6,12 +6,14 @@ export interface TransactionMultiDetailsPanelProps {
   transactions: Transaction[]
   selectionMixed: boolean
   onEdit: () => void
+  onApplyRules: () => void
 }
 
 export default function TransactionMultiDetailsPanel({
   transactions,
   selectionMixed,
   onEdit,
+  onApplyRules,
 }: TransactionMultiDetailsPanelProps) {
   const count = transactions.length
   const countLabel =
@@ -67,7 +69,14 @@ export default function TransactionMultiDetailsPanel({
         )}
       </div>
 
-      <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0">
+      <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0 space-y-2">
+        <button
+          onClick={onApplyRules}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-[#c9a96e]/50 text-[#8a7340] dark:text-[#c9a96e] hover:bg-[#c9a96e]/10 transition-colors"
+        >
+          <Sparkles size={14} />
+          Zastosuj reguły
+        </button>
         <button
           onClick={onEdit}
           disabled={selectionMixed}

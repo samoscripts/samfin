@@ -131,3 +131,6 @@ export interface BulkUpdateResponse {
 
 export const bulkUpdateTransactions = async (payload: BulkUpdatePayload): Promise<BulkUpdateResponse> =>
   (await api.put<BulkUpdateResponse>('/transactions/bulk-update', payload)).data
+
+export type { ApplyClassificationRulesResult } from './classificationRules'
+export { applyClassificationRules } from './classificationRules'

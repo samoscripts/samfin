@@ -19,7 +19,8 @@ services:
 
   frontend:
     image: node:lts-alpine
-    container_name: samfin_frontend\
+    container_name: samfin_frontend
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /app
     ports:
       - "5173:5173"

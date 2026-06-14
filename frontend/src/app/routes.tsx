@@ -12,6 +12,7 @@ import Parties      from '@/domains/home/configuration/parties/pages/Parties'
 import Wallets      from '@/domains/home/configuration/wallets/pages/Wallets'
 import Concerns     from '@/domains/home/configuration/concerns/pages/Concerns'
 import Categories   from '@/domains/home/configuration/categories/pages/Categories'
+import ClassificationRules from '@/domains/home/configuration/classification-rules/pages/ClassificationRules'
 import ImportLayout    from '@/domains/home/import/pages/ImportLayout'
 import ImportNowy      from '@/domains/home/import/pages/ImportNowy'
 import ImportHistoria  from '@/domains/home/import/pages/ImportHistoria'
@@ -46,6 +47,7 @@ export default function AppRoutes() {
           <Route path="portfele"  element={<Wallets />} />
           <Route path="dotyczy"   element={<Concerns />} />
           <Route path="kategorie" element={<Categories />} />
+          <Route path="reguly" element={<ClassificationRules />} />
         </Route>
 
         <Route path="moje-konto" element={<MyAccount />} />

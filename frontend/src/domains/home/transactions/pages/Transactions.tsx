@@ -21,6 +21,9 @@ import { useRightPanelPortal } from '@/layout/RightPanelContext'
 import { Transaction } from '@/shared/types'
 import { formatDate } from '@/shared/utils/format'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
+import ApplyClassificationRulesDialog from '../components/ApplyClassificationRulesDialog'
+import { applyClassificationRules } from '@/shared/api/transactions'
+import { flowFiltersToTransactionFilters } from '../utils/flowFilters'
 
 const INITIAL_SORT: SortState = { field: 'date', direction: 'desc' }
 const INITIAL_PAGINATION: PaginationState = { page: 1, perPage: 25 }
@@ -58,6 +61,11 @@ export default function Transactions() {
   const [isDirty, setIsDirty]             = useState(false)
   const [editConfirm, setEditConfirm]     = useState<'save' | 'cancel' | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
+
+  const [applyRulesOpen, setApplyRulesOpen] = useState(false)
+  const [applyRulesMode, setApplyRulesMode] = useState<'selection' | 'filter' | null>(null)
+  const [applyRulesLoading, setApplyRulesLoading] = useState(false)
+  const [applyRulesMessage, setApplyRulesMessage] = useState<string | null>(null)
 
   const saveFnRef = useRef<(() => Promise<void>) | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
@@ -274,6 +282,52 @@ export default function Transactions() {
     [editTabOpen],
   )
 
+  const openApplyRulesSelection = useCallback(() => {
+    if (bulkTransactions.length === 0) return
+    setApplyRulesMode('selection')
+    setApplyRulesOpen(true)
+  }, [bulkTransactions.length])
+
+  const openApplyRulesFilter = useCallback(() => {
+    setApplyRulesMode('filter')
+    setApplyRulesOpen(true)
+  }, [])
+
+  const handleConfirmApplyRules = useCallback(
+    async (overwrite: boolean) => {
+      setApplyRulesLoading(true)
+      setApplyRulesMessage(null)
+      try {
+        const result =
+          applyRulesMode === 'filter'
+            ? await applyClassificationRules({
+                filters: flowFiltersToTransactionFilters(activeFilters),
+                overwrite,
+              })
+            : await applyClassificationRules({
+                transactionIds: bulkTransactions.map((t) => t.transactionId),
+                overwrite,
+              })
+
+        const errCount = Object.keys(result.errors).length
+        setApplyRulesMessage(
+          `Zastosowano: ${result.applied}, pominięto: ${result.skipped}, brak kontekstu podmiotu: ${result.noPartyContext}` +
+            (errCount > 0 ? `, błędy: ${errCount}` : ''),
+        )
+        setApplyRulesOpen(false)
+        setRefreshKey((k) => k + 1)
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Nie udało się zastosować reguł.'
+        setApplyRulesMessage(msg)
+      } finally {
+        setApplyRulesLoading(false)
+      }
+    },
+    [applyRulesMode, activeFilters, bulkTransactions],
+  )
+
   const activeCount = countActiveFilters(activeFilters)
 
   const filtryButton = (
@@ -321,7 +375,7 @@ export default function Transactions() {
       <div className="flex flex-col md:h-full md:overflow-hidden">
         <div className="px-4 md:px-6 pt-6 pb-0 shrink-0">
           <PageHeader
-            title="Transactions"
+            title="Przelewy / Transakcje"
             subtitle="Lista wszystkich transakcji finansowych"
             actions={filtryButton}
           />
@@ -330,6 +384,14 @@ export default function Transactions() {
         {activeCount > 0 && (
           <div className="px-4 md:px-6 pb-2 pt-3 shrink-0">
             <FilterChips filters={activeFilters} onChange={handleApplyFilters} />
+          </div>
+        )}
+
+        {applyRulesMessage && (
+          <div className="px-4 md:px-6 pb-2 shrink-0">
+            <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 px-3 py-2 rounded-lg">
+              {applyRulesMessage}
+            </p>
           </div>
         )}
 
@@ -514,6 +576,8 @@ export default function Transactions() {
             onRequestCancelEdit={requestCancelEdit}
             onDirtyChange={setIsDirty}
             onClose={handleClose}
+            onApplyRules={openApplyRulesSelection}
+            onApplyRulesToFilter={openApplyRulesFilter}
           />,
           portalRoot,
         )}
@@ -537,6 +601,23 @@ export default function Transactions() {
         cancelLabel="Zostań"
         onConfirm={handleConfirmDialog}
         onCancel={() => setEditConfirm(null)}
+      />
+
+      <ApplyClassificationRulesDialog
+        open={applyRulesOpen}
+        title={
+          applyRulesMode === 'filter'
+            ? 'Zastosuj reguły do filtra'
+            : 'Zastosuj reguły do zaznaczenia'
+        }
+        message={
+          applyRulesMode === 'filter'
+            ? 'Reguły zostaną uruchomione dla wszystkich transakcji pasujących do aktywnych filtrów (maks. 10 000).'
+            : `Reguły zostaną uruchomione dla ${bulkTransactions.length} zaznaczonych transakcji.`
+        }
+        loading={applyRulesLoading}
+        onConfirm={handleConfirmApplyRules}
+        onCancel={() => setApplyRulesOpen(false)}
       />
     </>
   )

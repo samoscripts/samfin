@@ -5,7 +5,7 @@ namespace App\Home\Transaction\Service;
 use App\Home\Import\Entity\CsvImport;
 use App\Home\Import\Entity\CsvImportRow;
 use App\Home\Import\Repository\CsvImportRowRepository;
-use App\Home\Transaction\Entity\Transaction;
+use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleEngine;
 use App\Home\Transaction\Entity\TransactionItem;
 use App\Home\Transaction\Repository\TransactionRepository;
 use App\Identity\Entity\User;
@@ -18,6 +18,7 @@ class TransactionIngestionService
         private TransactionRepository $transactionRepository,
         private CsvImportRowRepository $rowRepository,
         private TransactionStatusCalculator $statusCalculator,
+        private ClassificationRuleEngine $classificationRuleEngine,
     ) {}
 
     /**
@@ -57,6 +58,7 @@ class TransactionIngestionService
             $tx->setDescription($row->getDescriptionRaw());
             $tx->setAmountMinor($amountMinor);
             $tx->setDirection($direction);
+            $tx->setCounterpartyAccountNumber($row->getCounterpartyAccountRaw());
 
             $party = $csvImport->getParty();
             if ($party !== null) {
@@ -80,6 +82,8 @@ class TransactionIngestionService
             $tx->setStatus($this->statusCalculator->calculate($tx));
 
             $this->em->persist($tx);
+
+            $this->classificationRuleEngine->applyToTransaction($tx, $user, overwrite: false);
 
             $row->setParseStatus(CsvImportRow::STATUS_IMPORTED);
         }

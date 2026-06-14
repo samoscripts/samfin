@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, X, Loader2, ChevronRight } from 'lucide-react'
+import FormActions from '@/shared/components/form/FormActions'
+import FormError from '@/shared/components/form/FormError'
+import FormField from '@/shared/components/form/FormField'
+import Select from '@/shared/components/form/Select'
+import { configInputCls, configSelectCls, textareaCls } from '@/shared/components/form/formClasses'
+import { getApiErrorMessage } from '@/shared/utils/errors'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,18 +45,6 @@ export interface SimpleEntityPageProps<T extends SimpleEntity> {
   deactivateConfirm?: (item: T) => string
   notFoundName?: string
 }
-
-// ---------------------------------------------------------------------------
-// Shared styles
-// ---------------------------------------------------------------------------
-
-const inputCls =
-  'w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e] transition-colors placeholder:text-gray-400'
-
-const selectCls =
-  'w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e] transition-colors'
-
-const labelCls = 'block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1'
 
 // ---------------------------------------------------------------------------
 // Inline form
@@ -103,8 +97,7 @@ function EntityForm<T extends SimpleEntity>({
       const saved = isEdit ? await update(item!.id, payload) : await create(payload)
       onSaved(saved)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Wystąpił błąd podczas zapisywania.')
+      setError(getApiErrorMessage(err, 'Wystąpił błąd podczas zapisywania.'))
     } finally {
       setSaving(false)
     }
@@ -112,30 +105,24 @@ function EntityForm<T extends SimpleEntity>({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      {error && <FormError message={error} />}
 
       <div className={extraFields.length > 0 ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : ''}>
-        <div>
-          <label className={labelCls}>Nazwa *</label>
+        <FormField label="Nazwa" required>
           <input
             type="text"
-            className={inputCls}
+            className={configInputCls}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={`Nazwa ${entityLabel.toLowerCase()}…`}
             required
           />
-        </div>
+        </FormField>
 
         {extraFields.map((field) => (
-          <div key={field.key}>
-            <label className={labelCls}>{field.label}{field.required ? ' *' : ''}</label>
-            <select
-              className={selectCls}
+          <FormField key={field.key} label={field.label} required={field.required}>
+            <Select
+              className={configSelectCls}
               value={extra[field.key]}
               onChange={(e) => setExtra((prev) => ({ ...prev, [field.key]: e.target.value }))}
               required={field.required}
@@ -143,21 +130,20 @@ function EntityForm<T extends SimpleEntity>({
               {field.options.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormField>
         ))}
       </div>
 
-      <div>
-        <label className={labelCls}>Opis</label>
+      <FormField label="Opis">
         <textarea
-          className={[inputCls, 'resize-none'].join(' ')}
+          className={textareaCls}
           rows={3}
           placeholder="Opcjonalny opis…"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-      </div>
+      </FormField>
 
       {isEdit && (
         <div className="flex items-center gap-3">
@@ -174,22 +160,11 @@ function EntityForm<T extends SimpleEntity>({
         </div>
       )}
 
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-5 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] disabled:opacity-50 text-white text-sm font-medium transition-colors"
-        >
-          {saving ? 'Zapisywanie…' : isEdit ? 'Zapisz zmiany' : `Dodaj`}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-5 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          Anuluj
-        </button>
-      </div>
+      <FormActions
+        saving={saving}
+        submitLabel={isEdit ? 'Zapisz zmiany' : 'Dodaj'}
+        onCancel={onCancel}
+      />
     </form>
   )
 }

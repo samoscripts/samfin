@@ -6,6 +6,7 @@ const TABS = [
   { to: 'portfele',  label: 'Portfele'  },
   { to: 'dotyczy',   label: 'Dotyczy'   },
   { to: 'kategorie', label: 'Kategorie' },
+  { to: 'reguly',    label: 'Reguły'    },
 ]
 
 export default function Configuration() {

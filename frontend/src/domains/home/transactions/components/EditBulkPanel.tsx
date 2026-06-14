@@ -15,7 +15,7 @@ import {
 } from '../utils/partyAssignment'
 import { DIRECTION_LABEL_BY_VALUE, EDIT_EMPTY_LABEL } from '../constants/labels'
 import { filterCategoriesForDirection, formatCategoryLabel } from '../utils/categoryOptions'
-import DictionarySelect from './selects/DictionarySelect'
+import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import { selectCls } from '@/shared/components/form/formClasses'
 
 type FieldState = {

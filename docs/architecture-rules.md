@@ -214,6 +214,18 @@ Szczegóły nawigacji i struktury folderów — ADR-012, ADR-020 w [`decisions.m
 | Foldery `domains/{area}/`, współdzielone `shared/` | ZAIMPLEMENTOWANE |
 | API client w `shared/api/` — jeden plik na zasób | ZAIMPLEMENTOWANE |
 | Walidacja formularzy UX + backend jako source of truth | ZAIMPLEMENTOWANE |
+| Formularze CRUD w **page content** lub **sidebar**; modale tylko na confirmy | ZAIMPLEMENTOWANE |
+
+### Umiejscowienie UI (formularze vs modale)
+
+| Typ interakcji | Gdzie | Przykłady |
+|----------------|-------|-----------|
+| Formularz create/edit (CRUD) | **Page content** lub **sidebar** | Podmioty, Kategorie, Reguły klasyfikacji; edycja transakcji w panelu bocznym |
+| Potwierdzenie akcji destrukcyjnej | **Modal** (`ConfirmDialog`) | Usuń regułę, podmiot |
+| Krótki prompt kontekstowy (1–2 pola) | Modal dopuszczalny | Zastosuj reguły klasyfikacji (checkbox overwrite) |
+| Główne zakładki modułu | **URL** (`NavLink` + `Outlet`) | ADR-020 |
+
+Przy nowej funkcji UI — **zapytać**: page, sidebar czy modal (confirm). Nie zakładać modala dla pełnych formularzy bez uzgodnienia.
 
 Docelowy osobny dokument: `frontend-conventions.md` (opcjonalnie).
 
@@ -237,3 +249,4 @@ Docelowy osobny dokument: `frontend-conventions.md` (opcjonalnie).
 - [ ] Nowa zakładka modułu ma segment w `routes.tsx`
 - [ ] Nawigacja przez `NavLink`, nie `useState` dla głównych tabów
 - [ ] Wywołania API w `shared/api/`
+- [ ] Formularze CRUD w content/sidebar — nie w modalu (modale: confirmy)

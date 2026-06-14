@@ -29,6 +29,7 @@ Konwencje warstw i reguły kodu: [`architecture-rules.md`](architecture-rules.md
 | Kontroler | Route base | Encja |
 |-----------|------------|-------|
 | `PartyController` | `/api/parties` | Party |
+| `ClassificationRuleController` | `/api/parties/{partyId}/classification-rules` | ClassificationRule |
 | `PartyBankAccountController` | `/api/party-bank-accounts` | PartyBankAccount |
 | `WalletController` | `/api/wallets` | Wallet |
 | `ConcernController` | `/api/concerns` | Concern |
@@ -50,13 +51,14 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 
 | Plik | Opis |
 |------|------|
-| `Transaction/Controller/TransactionController.php` | Lista, stats, klasyfikacja, bulk update, historia |
+| `Transaction/Controller/TransactionController.php` | Lista, stats, klasyfikacja, bulk update, historia, apply reguł |
 | `Transaction/Service/TransactionClassificationService.php` | Klasyfikacja pojedynczej transakcji |
 | `Transaction/Service/TransactionBulkUpdateService.php` | Masowa aktualizacja pól |
 | `Transaction/Service/TransactionIngestionService.php` | Tworzenie transakcji z wierszy CSV (auto Skąd/Dokąd) |
 | `Transaction/Service/TransactionStatusCalculator.php` | Wspólna logika statusu klasyfikacji |
 | `Transaction/Service/TransactionPartyAssignmentValidator.php` | Walidacja Skąd/Dokąd wg reguł kontekstowych (ADR-017) |
 | `Transaction/Service/TransactionSnapshotLogService.php` | Snapshoty i historia |
+| `Transaction/ClassificationRule/*` | Reguły auto-klasyfikacji per party |
 | `Transaction/Repository/TransactionRepository.php` | `findPaged`, `getStats`, `findDuplicate` |
 
 **Planowane (ADR-019):** `POST /api/transactions` — tworzenie transakcji ręcznych (`source: MANUAL`); brak implementacji.
@@ -93,9 +95,10 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 | Katalog | Zawartość |
 |---------|-----------|
 | `api/` | Klient Axios + moduły endpointów (10 plików) |
-| `components/` | Avatar, Pagination, StatusBadge, ConfirmDialog, ComingSoon |
+| `components/` | Avatar, Pagination, StatusBadge, ConfirmDialog, ComingSoon, form kit (`FormField`, `FormError`, `FormActions`, `DictionarySelect`, `formClasses`, `Select`) |
 | `types/` | `Transaction`, `FlowItem`, typy auth |
 | `utils/format.ts` | Formatowanie kwot |
+| `utils/errors.ts` | `getApiErrorMessage` — wspólne wyciąganie błędów API |
 
 ### `domains/home/` — domena „Dom”
 
@@ -104,7 +107,7 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 | dashboard | `dashboard/pages/Dashboard.tsx` | Karty statystyk, ostatnie transakcje |
 | transactions | `transactions/` | `Transactions.tsx`, sidebar, edycja single/bulk, historia |
 | import | `import/pages/` | Upload, historia, szczegóły, błędy, wiersze |
-| configuration | `configuration/` | Podmioty, portfele, dotyczy, kategorie |
+| configuration | `configuration/` | Podmioty, portfele, dotyczy, kategorie, reguły klasyfikacji |
 
 ### `domains/settings/` — ustawienia
 
@@ -124,6 +127,7 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 | Portfele | `shared/api/wallets.ts` | `WalletController` |
 | Dotyczy | `shared/api/concerns.ts` | `ConcernController` |
 | Kategorie | `shared/api/categories.ts` | `CategoryController` |
+| Reguły klasyfikacji | `shared/api/classificationRules.ts` | `ClassificationRuleController` |
 | Użytkownicy | `shared/api/users.ts` | `UserController` |
 
 ---
@@ -173,6 +177,22 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 
 Dozwolone `fields`: `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`, `categoryId`. Wartość `null` czyści pole.
 
+### Apply reguł — `POST /api/transactions/apply-classification-rules`
+
+```json
+{
+  "transactionIds": [1, 2, 3],
+  "filters": null,
+  "overwrite": false
+}
+```
+
+Lub `filters` (jak lista transakcji) zamiast `transactionIds`. Odpowiedź: `{ applied, skipped, noPartyContext, errors }`.
+
+### Reguły klasyfikacji — `/api/parties/{partyId}/classification-rules`
+
+CRUD; body zawiera `name`, `description`, `priority`, `enabled`, `stopOnMatch`, `conditions`, `actions`, opcjonalnie `partyId` (przeniesienie), `createdFromTransactionId`.
+
 ### Encje konfiguracyjne — POST/PUT
 
 Typowy kształt (camelCase w JSON):
@@ -191,6 +211,67 @@ Typowy kształt (camelCase w JSON):
 ```json
 { "email": "...", "password": "..." }
 ```
+
+---
+
+## Moduł reguł klasyfikacji (frontend)
+
+Ścieżka: `domains/home/configuration/classification-rules/`.
+
+Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i komponenty domenowe (wzorzec jak `parties/`).
+
+| Plik | Odpowiedzialność |
+|------|------------------|
+| `pages/ClassificationRules.tsx` | Lista reguł (`view`: list/create/edit), wybór podmiotu, breadcrumb, usuwanie (`ConfirmDialog`) |
+| `components/ClassificationRulesTable.tsx` | Tabela reguł (priorytet, nazwa, liczba warunków, status) + akcje edytuj/usuń |
+| `components/ClassificationRuleForm.tsx` | Formularz create/edit w content (nie modal); deleguje sekcje do edytorów |
+| `components/RuleConditionsEditor.tsx` | Warunki AND (pola, operatory, wartości) |
+| `components/RuleConditionValueInput.tsx` | Kontrolka wartości warunku (tekst, data, zakres, lista) |
+| `components/RuleActionsEditor.tsx` | Akcje transakcji i pozycji (Skąd/Dokąd, split, portfel, dotyczy, kategoria) |
+| `ruleConditionMeta.ts` | Operatory dozwolone per pole, normalizacja i walidacja warunków |
+| `constants.ts` | Etykiety pól/operatorów, `defaultForm()` / `ruleToForm()` (bez klas CSS — przeniesione do `shared/components/form/formClasses.ts`) |
+
+**Shared form kit (P1, `shared/components/form/`):**
+
+| Plik | Rola |
+|------|------|
+| `formClasses.ts` | `configInputCls` / `configSelectCls` (formularze konfiguracji), `inputCls` / `selectCls` (transakcje), `labelCls`, `textareaCls`, przyciski |
+| `FormField.tsx` | Etykieta + pole (opcjonalnie `required`) |
+| `FormError.tsx` | Banner błędu zapisu |
+| `FormActions.tsx` | Submit + Anuluj (`layout`: `row` \| `modal`) |
+| `Select.tsx` | Cienki wrapper `<select>` z domyślną klasą |
+| `DictionarySelect.tsx` | Select słownikowy `{ id, name }` z opcją pustą |
+
+**Shared UI:**
+
+| Plik | Rola |
+|------|------|
+| `Modal.tsx` | Overlay dialogowy (portal, backdrop, rozmiary sm/md/lg) |
+| `ConfirmDialog.tsx` | Potwierdzenie akcji — oparty na `Modal` |
+
+**P2 (zrobione):** `DictionarySelect` przeniesiony do `shared/components/form/`; używany w `ClassificationRuleFormDialog` (paidFrom/paidTo/portfel/kategoria) oraz w module transakcji.
+
+**P3 (zrobione):** form kit wdrożony w `PartyForm`, `PartyBankAccountsSection` (pola + `FormError`), `Categories` (`CategoryForm`), `SimpleEntityPage` (`EntityForm` — Portfele, Dotyczy).
+
+**P4 (zrobione):**
+
+| Krok | Zmiana |
+|------|--------|
+| P4a | `RuleConditionsEditor`, `RuleActionsEditor` — wydzielone z `ClassificationRuleFormDialog` |
+| P4b | Pole **Dotyczy** (`concernId`) w akcjach reguły + `fetchConcerns` na stronie |
+| P4c | `shared/components/Modal.tsx` — używany w `ConfirmDialog`, `ApplyClassificationRulesDialog` (nie w formularzach CRUD konfiguracji) |
+| P4d | `categories/components/CategoryForm.tsx` — formularz wydzielony ze strony |
+| P4e | `UserForm` na form kit (`FormField`, `FormError`, `FormActions`) |
+
+**Świadomie odroczone (P5+):** `EntityListPage` scaffold; migracja `TransactionFiltersForm` na `FormField`; react-hook-form / Zod.
+
+**P5 (zrobione):** warunki reguł — operatory zależne od pola, dedykowane kontrolki wartości (`between`, `in`, kierunek, status), walidacja przed zapisem (`ruleConditionMeta.ts`).
+
+**Kolejne kroki refaktoryzacji frontendu:**
+
+1. Transakcje ręczne (ADR-019) — `POST /api/transactions` + formularz UI
+2. `EntityListPage` — wspólny scaffold listy dla modułów konfiguracji
+3. Rename Flow → Transaction w typach frontendowych (decyzja w [open-questions.md](open-questions.md) #6)
 
 ---
 

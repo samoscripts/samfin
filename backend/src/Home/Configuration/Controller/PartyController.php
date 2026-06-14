@@ -22,11 +22,17 @@ class PartyController extends AbstractController
     ) {}
 
     #[Route('', name: 'api_parties_index', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        if ($request->query->getBoolean('ruleEligible')) {
+            $parties = $this->partyRepository->findEligibleForClassificationRules();
+        } else {
+            $parties = $this->partyRepository->findBy([], ['name' => 'ASC']);
+        }
+
         return $this->json(array_map(
             fn(Party $p) => $p->toApiArray(),
-            $this->partyRepository->findBy([], ['name' => 'ASC'])
+            $parties,
         ));
     }
 

@@ -2,20 +2,18 @@ import { useState } from 'react'
 import type { Party, PartyPayload, PartyType, OwnershipType } from '../types'
 import { PARTY_TYPE_LABELS, OWNERSHIP_TYPE_LABELS } from '../types'
 import { createParty, updateParty } from '@/shared/api/parties'
+import FormActions from '@/shared/components/form/FormActions'
+import FormError from '@/shared/components/form/FormError'
+import FormField from '@/shared/components/form/FormField'
+import Select from '@/shared/components/form/Select'
+import { configInputCls, configSelectCls, textareaCls } from '@/shared/components/form/formClasses'
+import { getApiErrorMessage } from '@/shared/utils/errors'
 
 interface PartyFormProps {
   party?: Party | null
   onSaved: (party: Party) => void
   onCancel: () => void
 }
-
-const inputCls =
-  'w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e] transition-colors placeholder:text-gray-400'
-
-const selectCls =
-  'w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e] transition-colors'
-
-const labelCls = 'block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1'
 
 export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) {
   const isEdit = !!party
@@ -51,8 +49,7 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
         : await createParty(payload)
       onSaved(saved)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Wystąpił błąd podczas zapisywania.')
+      setError(getApiErrorMessage(err, 'Wystąpił błąd podczas zapisywania.'))
     } finally {
       setSaving(false)
     }
@@ -60,62 +57,54 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      {error && <FormError message={error} />}
 
-      <div>
-        <label className={labelCls}>Nazwa *</label>
+      <FormField label="Nazwa" required>
         <input
           type="text"
-          className={inputCls}
+          className={configInputCls}
           placeholder="np. Lidl, Konto wspólne, Basia"
           value={form.name}
           onChange={(e) => set('name', e.target.value)}
           required
         />
-      </div>
+      </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls}>Typ podmiotu</label>
-          <select
-            className={selectCls}
+        <FormField label="Typ podmiotu">
+          <Select
+            className={configSelectCls}
             value={form.type}
             onChange={(e) => set('type', e.target.value as PartyType)}
           >
             {(Object.entries(PARTY_TYPE_LABELS) as [PartyType, string][]).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FormField>
 
-        <div>
-          <label className={labelCls}>Własność</label>
-          <select
-            className={selectCls}
+        <FormField label="Własność">
+          <Select
+            className={configSelectCls}
             value={form.ownershipType}
             onChange={(e) => set('ownershipType', e.target.value as OwnershipType)}
           >
             {(Object.entries(OWNERSHIP_TYPE_LABELS) as [OwnershipType, string][]).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FormField>
       </div>
 
-      <div>
-        <label className={labelCls}>Opis</label>
+      <FormField label="Opis">
         <textarea
-          className={[inputCls, 'resize-none'].join(' ')}
+          className={textareaCls}
           rows={3}
           placeholder="Opcjonalny opis..."
           value={form.description ?? ''}
           onChange={(e) => set('description', e.target.value)}
         />
-      </div>
+      </FormField>
 
       {isEdit && (
         <div className="flex items-center gap-3">
@@ -132,22 +121,11 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
         </div>
       )}
 
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-5 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] disabled:opacity-50 text-white text-sm font-medium transition-colors"
-        >
-          {saving ? 'Zapisywanie…' : isEdit ? 'Zapisz zmiany' : 'Dodaj podmiot'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-5 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          Anuluj
-        </button>
-      </div>
+      <FormActions
+        saving={saving}
+        submitLabel={isEdit ? 'Zapisz zmiany' : 'Dodaj podmiot'}
+        onCancel={onCancel}
+      />
     </form>
   )
 }

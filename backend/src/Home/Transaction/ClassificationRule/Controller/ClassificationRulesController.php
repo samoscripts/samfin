@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Home\Transaction\ClassificationRule\Controller;
+
+use App\Home\Transaction\ClassificationRule\Entity\ClassificationRule;
+use App\Home\Transaction\ClassificationRule\Repository\ClassificationRuleRepository;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\Routing\Attribute\Route;
+
+#[Route('/api/classification-rules')]
+class ClassificationRulesController extends AbstractController
+{
+    public function __construct(
+        private ClassificationRuleRepository $ruleRepository,
+    ) {}
+
+    #[Route('', name: 'api_classification_rules_all', methods: ['GET'])]
+    public function index(): JsonResponse
+    {
+        return $this->json(array_map(
+            fn (ClassificationRule $r) => $r->toApiArray(),
+            $this->ruleRepository->findAllActive(),
+        ));
+    }
+}
