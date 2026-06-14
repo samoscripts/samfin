@@ -4,9 +4,7 @@ import type { Party } from '../types'
 import {
   PARTY_TYPE_LABELS,
   OWNERSHIP_TYPE_LABELS,
-  USAGE_TYPE_LABELS,
   PARTY_TYPE_COLORS,
-  USAGE_TYPE_COLORS,
 } from '../types'
 import { fetchParties, deactivateParty } from '@/shared/api/parties'
 import PartyForm from '../components/PartyForm'
@@ -231,7 +229,6 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Nazwa</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Typ</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Własność</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Użycie</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Opis</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">Akcje</th>
               </tr>
@@ -260,9 +257,6 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
                     ].join(' ')}>
                       {OWNERSHIP_TYPE_LABELS[p.ownershipType]}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <Badge className={USAGE_TYPE_COLORS[p.usageType]}>{USAGE_TYPE_LABELS[p.usageType]}</Badge>
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs max-w-xs truncate">
                     {p.description ?? '—'}
@@ -306,7 +300,6 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
                   <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{p.name}</span>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     <Badge className={PARTY_TYPE_COLORS[p.type]}>{PARTY_TYPE_LABELS[p.type]}</Badge>
-                    <Badge className={USAGE_TYPE_COLORS[p.usageType]}>{USAGE_TYPE_LABELS[p.usageType]}</Badge>
                     <span className={['text-xs font-medium', p.ownershipType === 'OWN' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'].join(' ')}>
                       {OWNERSHIP_TYPE_LABELS[p.ownershipType]}
                     </span>

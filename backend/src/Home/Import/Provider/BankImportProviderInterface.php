@@ -13,9 +13,7 @@ interface BankImportProviderInterface
     public function getDisplayName(): string;
 
     /**
-     * Parse and validate the uploaded CSV content.
-     *
-     * @param string $csvContent  Raw UTF-8 content of the uploaded file
+     * Parse and validate the uploaded CSV file (streamed line-by-line).
      */
-    public function parse(string $csvContent): ImportResult;
+    public function parseFile(string $filePath): ImportResult;
 }

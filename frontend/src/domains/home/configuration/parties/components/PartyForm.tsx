@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { Party, PartyPayload, PartyType, OwnershipType, UsageType } from '../types'
-import { PARTY_TYPE_LABELS, OWNERSHIP_TYPE_LABELS, USAGE_TYPE_LABELS } from '../types'
+import type { Party, PartyPayload, PartyType, OwnershipType } from '../types'
+import { PARTY_TYPE_LABELS, OWNERSHIP_TYPE_LABELS } from '../types'
 import { createParty, updateParty } from '@/shared/api/parties'
 
 interface PartyFormProps {
@@ -24,7 +24,6 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
     name: party?.name ?? '',
     type: party?.type ?? 'PERSON',
     ownershipType: party?.ownershipType ?? 'OWN',
-    usageType: party?.usageType ?? 'BOTH',
     description: party?.description ?? '',
     active: party?.active ?? true,
   })
@@ -67,7 +66,6 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
         </div>
       )}
 
-      {/* Name */}
       <div>
         <label className={labelCls}>Nazwa *</label>
         <input
@@ -80,8 +78,7 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
         />
       </div>
 
-      {/* Type + Ownership + Usage */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>Typ podmiotu</label>
           <select
@@ -107,22 +104,8 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
             ))}
           </select>
         </div>
-
-        <div>
-          <label className={labelCls}>Użycie</label>
-          <select
-            className={selectCls}
-            value={form.usageType}
-            onChange={(e) => set('usageType', e.target.value as UsageType)}
-          >
-            {(Object.entries(USAGE_TYPE_LABELS) as [UsageType, string][]).map(([val, label]) => (
-              <option key={val} value={val}>{label}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      {/* Description */}
       <div>
         <label className={labelCls}>Opis</label>
         <textarea
@@ -134,7 +117,6 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
         />
       </div>
 
-      {/* Active */}
       {isEdit && (
         <div className="flex items-center gap-3">
           <input
@@ -150,7 +132,6 @@ export default function PartyForm({ party, onSaved, onCancel }: PartyFormProps) 
         </div>
       )}
 
-      {/* Actions */}
       <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"

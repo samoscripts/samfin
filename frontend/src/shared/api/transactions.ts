@@ -67,3 +67,67 @@ export const classifyTransactionItems = async (
   payload: ClassifyPayload,
 ): Promise<Transaction> =>
   (await api.put<Transaction>(`/transactions/${id}/items`, payload)).data
+
+export interface TransactionSnapshotItem {
+  amount: number
+  description?: string | null
+  walletId?: number | null
+  wallet?: string | null
+  concernId?: number | null
+  concern?: string | null
+  categoryId?: number | null
+  category?: string | null
+}
+
+export interface TransactionSnapshot {
+  paidFromPartyId?: number | null
+  paidFrom?: string | null
+  paidToPartyId?: number | null
+  paidTo?: string | null
+  items: TransactionSnapshotItem[]
+}
+
+export interface TransactionChangeLogEntry {
+  id: number
+  createdAt: string
+  createdBy: string
+  snapshot: TransactionSnapshot
+}
+
+export interface TransactionHistoryResponse {
+  data: TransactionChangeLogEntry[]
+  meta: PaginationMeta
+}
+
+export const fetchTransactionHistory = async (
+  id: number,
+  page = 1,
+  perPage = 10,
+): Promise<TransactionHistoryResponse> =>
+  (await api.get<TransactionHistoryResponse>(`/transactions/${id}/history`, { params: { page, perPage } })).data
+
+export const restoreTransactionHistory = async (
+  transactionId: number,
+  changeId: number,
+): Promise<Transaction> =>
+  (await api.post<Transaction>(`/transactions/${transactionId}/history/${changeId}/restore`)).data
+
+export type BulkUpdateField =
+  | 'paidFromPartyId'
+  | 'paidToPartyId'
+  | 'walletId'
+  | 'concernId'
+  | 'categoryId'
+
+export interface BulkUpdatePayload {
+  transactionIds: number[]
+  fields: BulkUpdateField[]
+  values: Partial<Record<BulkUpdateField, number | null>>
+}
+
+export interface BulkUpdateResponse {
+  updated: number
+}
+
+export const bulkUpdateTransactions = async (payload: BulkUpdatePayload): Promise<BulkUpdateResponse> =>
+  (await api.put<BulkUpdateResponse>('/transactions/bulk-update', payload)).data

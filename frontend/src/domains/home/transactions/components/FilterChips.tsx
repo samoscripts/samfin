@@ -1,5 +1,9 @@
 import { X } from 'lucide-react'
 import { FlowFilters } from '../types'
+import {
+  DIRECTION_LABEL_BY_VALUE,
+  STATUS_LABEL_BY_VALUE,
+} from '../constants/labels'
 
 const KEY_LABELS: Record<keyof FlowFilters, string> = {
   dateFrom:        'Data od',
@@ -15,21 +19,10 @@ const KEY_LABELS: Record<keyof FlowFilters, string> = {
   amountMax:       'Kwota do',
 }
 
-const DIRECTION_LABELS: Record<string, string> = {
-  INCOME:  'Wpływ',
-  EXPENSE: 'Wydatek',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  CLASSIFIED:          'Sklasyfikowany',
-  PARTIALLY_CLASSIFIED: 'Częściowo',
-  UNCLASSIFIED:        'Nieklasyfikowany',
-}
-
 function resolveValue(key: keyof FlowFilters, value: string): string {
   switch (key) {
-    case 'direction': return DIRECTION_LABELS[value] ?? value
-    case 'status':    return STATUS_LABELS[value]    ?? value
+    case 'direction': return DIRECTION_LABEL_BY_VALUE[value] ?? value
+    case 'status':    return STATUS_LABEL_BY_VALUE[value]    ?? value
     case 'amountMin': return `${value} zł`
     case 'amountMax': return `${value} zł`
     default:          return value

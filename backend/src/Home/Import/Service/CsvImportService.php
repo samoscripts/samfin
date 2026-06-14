@@ -11,20 +11,28 @@ use App\Home\Import\Entity\CsvImportRow;
 use App\Home\Import\Provider\BankImportProviderRegistry;
 use App\Identity\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 
 class CsvImportService
 {
+    private const ROW_BATCH_SIZE = 500;
+
+    private EntityManagerInterface $em;
+
     public function __construct(
-        private EntityManagerInterface      $em,
-        private BankImportProviderRegistry  $providerRegistry,
-        private PartyBankAccountRepository  $partyBankAccountRepository,
-        private LoggerInterface             $logger,
-    ) {}
+        EntityManagerInterface              $em,
+        private readonly ManagerRegistry    $managerRegistry,
+        private readonly BankImportProviderRegistry  $providerRegistry,
+        private readonly PartyBankAccountRepository  $partyBankAccountRepository,
+        private readonly LoggerInterface             $logger,
+    ) {
+        $this->em = $em;
+    }
 
     public function import(
         string  $source,
-        string  $csvContent,
+        string  $filePath,
         ?string $originalFilename,
         User    $user,
     ): CsvImport {
@@ -32,17 +40,20 @@ class CsvImportService
         $csvImport->setSource($source);
         $csvImport->setStatus(CsvImport::STATUS_PENDING);
         $csvImport->setOriginalFilename($originalFilename);
-        $csvImport->setFileSha256(hash('sha256', $csvContent));
+        $csvImport->setFileSha256(hash_file('sha256', $filePath) ?: '');
         $csvImport->setCreatedBy($user);
         $csvImport->setUpdatedBy($user);
 
         $this->em->persist($csvImport);
         $this->em->flush();
 
+        $importId = (int)$csvImport->getId();
+
         try {
             $provider = $this->providerRegistry->get($source);
-            $result   = $provider->parse($csvContent);
+            $result   = $provider->parseFile($filePath);
 
+            $csvImport = $this->requireImport($importId);
             $csvImport->setDetectedClientName($result->detectedClientName);
             $csvImport->setDetectedAccountNumber($result->detectedAccountNumber);
             $csvImport->setDetectedAccountDisplay($result->detectedAccountDisplay);
@@ -71,17 +82,25 @@ class CsvImportService
                 $this->em->persist($err);
             }
 
+            if ($allErrors !== []) {
+                $this->em->flush();
+            }
+
             $rowsTotal   = count($result->rows);
             $rowsInvalid = 0;
+            $batchCount  = 0;
 
             foreach ($result->rows as $rowData) {
                 /** @var ImportRowData $rowData */
+                $csvImport = $this->requireImport($importId);
+
                 $row = new CsvImportRow();
                 $row->setCsvImport($csvImport);
                 $row->setLineNo($rowData->lineNo);
                 $row->setOperationDate($rowData->operationDate);
                 $row->setDescriptionRaw($rowData->descriptionRaw);
-                $row->setAccountRaw($rowData->accountRaw);
+                $row->setOwnAccountLabelRaw($rowData->ownAccountLabelRaw);
+                $row->setCounterpartyAccountRaw($rowData->counterpartyAccountRaw);
                 $row->setBankCategoryRaw($rowData->bankCategoryRaw);
                 $row->setAmountRaw($rowData->amountRaw);
                 $row->setAmountMinor($rowData->amountMinor);
@@ -97,8 +116,16 @@ class CsvImportService
                 }
 
                 $this->em->persist($row);
+                $batchCount++;
+
+                if ($batchCount >= self::ROW_BATCH_SIZE) {
+                    $this->em->flush();
+                    $this->em->clear();
+                    $batchCount = 0;
+                }
             }
 
+            $csvImport = $this->requireImport($importId);
             $csvImport->setRowsTotal($rowsTotal);
             $csvImport->setRowsParsed($rowsTotal - $rowsInvalid);
             $csvImport->setRowsInvalid($rowsInvalid);
@@ -119,7 +146,7 @@ class CsvImportService
 
         } catch (\Throwable $ex) {
             $this->logger->error('CsvImport failed with exception', [
-                'importId'         => $csvImport->getId(),
+                'importId'         => $importId,
                 'source'           => $source,
                 'originalFilename' => $originalFilename,
                 'exceptionClass'   => get_class($ex),
@@ -128,12 +155,46 @@ class CsvImportService
                 'line'             => $ex->getLine(),
             ]);
 
-            $csvImport->setStatus(CsvImport::STATUS_FAILED);
-            $csvImport->setErrorSummary('Nieoczekiwany błąd: ' . $ex->getMessage());
-            $this->em->flush();
+            $this->markImportFailed($importId, $ex);
+            $csvImport = $this->em->find(CsvImport::class, $importId) ?? $csvImport;
         }
 
         return $csvImport;
+    }
+
+    private function requireImport(int $importId): CsvImport
+    {
+        $import = $this->em->find(CsvImport::class, $importId);
+        if ($import === null) {
+            throw new \RuntimeException("CsvImport {$importId} not found.");
+        }
+
+        return $import;
+    }
+
+    private function markImportFailed(int $importId, \Throwable $ex): void
+    {
+        if (!$this->em->isOpen()) {
+            $this->em = $this->managerRegistry->resetManager();
+        }
+
+        $import = $this->em->find(CsvImport::class, $importId);
+        if ($import === null) {
+            return;
+        }
+
+        $import->setStatus(CsvImport::STATUS_FAILED);
+        $import->setErrorSummary('Nieoczekiwany błąd: ' . $ex->getMessage());
+
+        try {
+            $this->em->flush();
+        } catch (\Throwable $flushEx) {
+            $this->logger->error('Failed to persist import failure status', [
+                'importId'       => $importId,
+                'exceptionClass' => get_class($flushEx),
+                'message'        => $flushEx->getMessage(),
+            ]);
+        }
     }
 
     private function validateAgainstDatabase(

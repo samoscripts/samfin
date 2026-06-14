@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Loader2, Trash2 } from 'lucide-react'
+import { ArrowRight, Loader2, Trash2 } from 'lucide-react'
 import { fetchImport, triggerImport, deleteImport, type CsvImportResult } from '@/shared/api/csvImports'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -103,19 +103,6 @@ export default function ImportSzczegoly() {
 
   return (
     <div>
-      {/* Mini breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 mb-5">
-        <button
-          onClick={() => navigate('/import/historia')}
-          className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors flex items-center gap-1"
-        >
-          <ArrowLeft size={11} />
-          Historia importów
-        </button>
-        <span>/</span>
-        <span className="text-gray-600 dark:text-gray-400 font-medium">Import #{imp.id}</span>
-      </nav>
-
       {/* Header card */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">

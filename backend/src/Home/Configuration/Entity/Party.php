@@ -22,13 +22,8 @@ class Party
     public const OWNERSHIP_OWN      = 'OWN';
     public const OWNERSHIP_EXTERNAL = 'EXTERNAL';
 
-    public const USAGE_INCOME  = 'INCOME';
-    public const USAGE_EXPENSE = 'EXPENSE';
-    public const USAGE_BOTH    = 'BOTH';
-
     public const TYPES      = [self::TYPE_PERSON, self::TYPE_COMPANY, self::TYPE_SHOP, self::TYPE_INSTITUTION, self::TYPE_ACCOUNT, self::TYPE_CASH, self::TYPE_OTHER];
     public const OWNERSHIPS = [self::OWNERSHIP_OWN, self::OWNERSHIP_EXTERNAL];
-    public const USAGES     = [self::USAGE_INCOME, self::USAGE_EXPENSE, self::USAGE_BOTH];
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -43,9 +38,6 @@ class Party
 
     #[ORM\Column(name: 'ownership_type', length: 20)]
     private string $ownershipType = self::OWNERSHIP_EXTERNAL;
-
-    #[ORM\Column(name: 'usage_type', length: 20)]
-    private string $usageType = self::USAGE_BOTH;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
@@ -88,7 +80,6 @@ class Party
             'name'          => $this->name,
             'type'          => $this->type,
             'ownershipType' => $this->ownershipType,
-            'usageType'     => $this->usageType,
             'description'   => $this->description,
             'active'        => $this->active,
             'createdById'   => $this->createdBy?->getId(),
@@ -108,9 +99,6 @@ class Party
 
     public function getOwnershipType(): string { return $this->ownershipType; }
     public function setOwnershipType(string $ownershipType): static { $this->ownershipType = $ownershipType; return $this; }
-
-    public function getUsageType(): string { return $this->usageType; }
-    public function setUsageType(string $usageType): static { $this->usageType = $usageType; return $this; }
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }

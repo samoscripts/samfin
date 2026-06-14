@@ -21,7 +21,7 @@ export default function Concerns() {
       entityLabel="Dotyczy"
       addLabel="Nowy obszar"
       editLabel={(c) => `Edycja: ${c.name}`}
-      description="Obszary i budżety, których mogą dotyczyć transakcje finansowe."
+      description="Kogo lub czego dotyczy wydatek lub wpływ (np. Basia, wspólne, Maciek)."
       fetchAll={fetchConcerns as () => Promise<ConcernEntity[]>}
       create={create}
       update={update}

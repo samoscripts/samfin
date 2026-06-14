@@ -122,6 +122,34 @@ class TransactionRepository extends ServiceEntityRepository
         ];
     }
 
+    public function countAll(): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return Transaction[]
+     */
+    public function findBatchForExport(int $offset, int $limit): array
+    {
+        return $this->createQueryBuilder('t')
+            ->addSelect('ti', 'pfp', 'ptp', 'w', 'con', 'cat')
+            ->leftJoin('t.items', 'ti')
+            ->leftJoin('t.paidFromParty', 'pfp')
+            ->leftJoin('t.paidToParty', 'ptp')
+            ->leftJoin('ti.wallet', 'w')
+            ->leftJoin('ti.concern', 'con')
+            ->leftJoin('ti.category', 'cat')
+            ->orderBy('t.id', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findDuplicate(
         ?Party $party,
         ?\DateTimeImmutable $operationDate,

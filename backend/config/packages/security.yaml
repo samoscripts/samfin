@@ -31,6 +31,7 @@ security:
 
         # Admin only
         - { path: ^/api/users,               roles: ROLE_ADMIN }
+        - { path: ^/api/system,              roles: ROLE_ADMIN }
 
         # Everything else requires a valid token
         - { path: ^/api,                      roles: IS_AUTHENTICATED_FULLY }

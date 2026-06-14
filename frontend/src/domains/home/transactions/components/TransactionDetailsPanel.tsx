@@ -2,13 +2,15 @@ import { Pencil } from 'lucide-react'
 import type { Transaction } from '@/shared/types'
 import StatusBadge from '@/shared/components/StatusBadge'
 import { formatAmount } from '@/shared/utils/format'
+import TransactionHistorySection from './TransactionHistorySection'
 
 export interface TransactionDetailsPanelProps {
   tx: Transaction
   onEdit: () => void
+  onRestored: (updated: Transaction) => void
 }
 
-export default function TransactionDetailsPanel({ tx, onEdit }: TransactionDetailsPanelProps) {
+export default function TransactionDetailsPanel({ tx, onEdit, onRestored }: TransactionDetailsPanelProps) {
   const directionLabel = tx.direction === 'INCOME' ? 'Wpływ' : 'Wydatek'
   const directionCls =
     tx.direction === 'INCOME'
@@ -70,6 +72,8 @@ export default function TransactionDetailsPanel({ tx, onEdit }: TransactionDetai
             {item.description && <DetailRow label="Opis pozycji" value={item.description} />}
           </div>
         ))}
+
+        <TransactionHistorySection tx={tx} onRestored={onRestored} />
       </div>
 
       <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0">

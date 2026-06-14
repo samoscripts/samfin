@@ -43,7 +43,8 @@ export interface CsvImportRow {
   lineNo: number
   operationDate: string | null
   descriptionRaw: string | null
-  accountRaw: string | null
+  ownAccountLabelRaw: string | null
+  counterpartyAccountRaw: string | null
   bankCategoryRaw: string | null
   amountRaw: string | null
   amountMinor: number | null

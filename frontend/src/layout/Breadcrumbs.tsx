@@ -15,6 +15,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   dotyczy:      'Dotyczy',
   kategorie:    'Kategorie',
   ustawienia:   'Ustawienia',
+  uzytkownicy:  'Użytkownicy',
+  system:       'System',
   'moje-konto': 'Moje konto',
 }
 

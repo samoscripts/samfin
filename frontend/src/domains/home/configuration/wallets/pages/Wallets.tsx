@@ -21,7 +21,7 @@ export default function Wallets() {
       entityLabel="Portfele"
       addLabel="Nowy portfel"
       editLabel={(w) => `Edycja: ${w.name}`}
-      description="Konta i portfele, z których fizycznie wychodzą lub na które wpływają środki."
+      description="Kontekst rozliczeniowy transakcji (np. budżet domowy, salon fryzjerski, firma)."
       fetchAll={fetchWallets as () => Promise<WalletEntity[]>}
       create={create}
       update={update}

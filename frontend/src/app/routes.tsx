@@ -4,6 +4,8 @@ import Dashboard    from '@/domains/home/dashboard/pages/Dashboard'
 import Transactions from '@/domains/home/transactions/pages/Transactions'
 import ComingSoon   from '@/shared/components/ComingSoon'
 import Settings     from '@/domains/settings/pages/Settings'
+import UsersPage    from '@/domains/settings/users/pages/Users'
+import SystemSettings from '@/domains/settings/system/pages/SystemSettings'
 import MyAccount    from '@/domains/settings/pages/MyAccount'
 import Configuration from '@/domains/home/configuration/pages/Configuration'
 import Parties      from '@/domains/home/configuration/parties/pages/Parties'
@@ -47,7 +49,11 @@ export default function AppRoutes() {
         </Route>
 
         <Route path="moje-konto" element={<MyAccount />} />
-        <Route path="ustawienia" element={<Settings />} />
+        <Route path="ustawienia" element={<Settings />}>
+          <Route index element={<Navigate to="uzytkownicy" replace />} />
+          <Route path="uzytkownicy" element={<UsersPage />} />
+          <Route path="system" element={<SystemSettings />} />
+        </Route>
       </Route>
     </Routes>
   )

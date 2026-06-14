@@ -4,7 +4,9 @@ namespace App\Home\Transaction\Controller;
 
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Repository\TransactionRepository;
+use App\Home\Transaction\Service\TransactionBulkUpdateService;
 use App\Home\Transaction\Service\TransactionClassificationService;
+use App\Home\Transaction\Service\TransactionSnapshotLogService;
 use App\Identity\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -18,6 +20,8 @@ class TransactionController extends AbstractController
     public function __construct(
         private TransactionRepository            $repository,
         private TransactionClassificationService $classificationService,
+        private TransactionBulkUpdateService     $bulkUpdateService,
+        private TransactionSnapshotLogService    $snapshotLogService,
         private Security                         $security,
     ) {}
 
@@ -70,12 +74,89 @@ class TransactionController extends AbstractController
         ]);
     }
 
+    #[Route('/bulk-update', name: 'api_transactions_bulk_update', methods: ['PUT'])]
+    public function bulkUpdate(Request $request): JsonResponse
+    {
+        $body = json_decode($request->getContent(), true) ?? [];
+
+        $transactionIds = $body['transactionIds'] ?? [];
+        $fields         = $body['fields'] ?? [];
+        $values         = $body['values'] ?? [];
+
+        if (!is_array($transactionIds) || empty($transactionIds)) {
+            return $this->json(['message' => 'Pole transactionIds jest wymagane.'], 422);
+        }
+        if (!is_array($fields) || empty($fields)) {
+            return $this->json(['message' => 'Wybierz co najmniej jedno pole do aktualizacji.'], 422);
+        }
+        if (!is_array($values)) {
+            return $this->json(['message' => 'Pole values jest wymagane.'], 422);
+        }
+
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        try {
+            $updated = $this->bulkUpdateService->bulkUpdate($transactionIds, $fields, $values, $user);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['message' => $e->getMessage()], 422);
+        }
+
+        return $this->json(['updated' => $updated]);
+    }
+
     #[Route('/{id}', name: 'api_transactions_show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(int $id): JsonResponse
     {
         $tx = $this->repository->find($id);
         if (!$tx) {
             return $this->json(['message' => 'Nie znaleziono transakcji.'], 404);
+        }
+
+        return $this->json($tx->toApiArray());
+    }
+
+    #[Route('/{id}/history', name: 'api_transactions_history', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function history(int $id, Request $request): JsonResponse
+    {
+        $tx = $this->repository->find($id);
+        if (!$tx) {
+            return $this->json(['message' => 'Nie znaleziono transakcji.'], 404);
+        }
+
+        $page    = max(1, (int) $request->query->get('page', 1));
+        $perPage = min(50, max(1, (int) $request->query->get('perPage', 10)));
+
+        return $this->json($this->snapshotLogService->getHistory($tx, $page, $perPage));
+    }
+
+    #[Route('/{id}/history/{changeId}/restore', name: 'api_transactions_history_restore', methods: ['POST'], requirements: ['id' => '\d+', 'changeId' => '\d+'])]
+    public function restoreHistory(int $id, int $changeId): JsonResponse
+    {
+        $tx = $this->repository->find($id);
+        if (!$tx) {
+            return $this->json(['message' => 'Nie znaleziono transakcji.'], 404);
+        }
+
+        $entry = $this->snapshotLogService->findEntry($tx, $changeId);
+        if (!$entry) {
+            return $this->json(['message' => 'Nie znaleziono wpisu historii.'], 404);
+        }
+
+        /** @var User $user */
+        $user = $this->security->getUser();
+        $payload = $this->snapshotLogService->snapshotToClassifyPayload($entry->getSnapshotJson());
+
+        try {
+            $this->classificationService->classifyTransaction(
+                $tx,
+                $payload['items'],
+                $payload['paidFromPartyId'],
+                $payload['paidToPartyId'],
+                $user,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['message' => $e->getMessage()], 422);
         }
 
         return $this->json($tx->toApiArray());
@@ -91,9 +172,19 @@ class TransactionController extends AbstractController
 
         $body = json_decode($request->getContent(), true) ?? [];
 
-        $itemsPayload    = $body['items']          ?? [];
-        $paidFromPartyId = isset($body['paidFromPartyId']) ? (int) $body['paidFromPartyId'] : null;
-        $paidToPartyId   = isset($body['paidToPartyId'])   ? (int) $body['paidToPartyId']   : null;
+        $itemsPayload = $body['items'] ?? [];
+
+        $paidFromPartyId = array_key_exists('paidFromPartyId', $body)
+            ? ($body['paidFromPartyId'] !== null && $body['paidFromPartyId'] !== ''
+                ? (int) $body['paidFromPartyId']
+                : null)
+            : null;
+
+        $paidToPartyId = array_key_exists('paidToPartyId', $body)
+            ? ($body['paidToPartyId'] !== null && $body['paidToPartyId'] !== ''
+                ? (int) $body['paidToPartyId']
+                : null)
+            : null;
 
         if (!is_array($itemsPayload) || empty($itemsPayload)) {
             return $this->json(['message' => 'Pole items jest wymagane i nie może być puste.'], 422);

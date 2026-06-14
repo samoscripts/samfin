@@ -15,8 +15,9 @@ class TransactionIngestionService
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private TransactionRepository  $transactionRepository,
+        private TransactionRepository $transactionRepository,
         private CsvImportRowRepository $rowRepository,
+        private TransactionStatusCalculator $statusCalculator,
     ) {}
 
     /**
@@ -56,7 +57,16 @@ class TransactionIngestionService
             $tx->setDescription($row->getDescriptionRaw());
             $tx->setAmountMinor($amountMinor);
             $tx->setDirection($direction);
-            $tx->setStatus(Transaction::STATUS_UNCLASSIFIED);
+
+            $party = $csvImport->getParty();
+            if ($party !== null) {
+                if ($direction === Transaction::DIRECTION_EXPENSE) {
+                    $tx->setPaidFromParty($party);
+                } else {
+                    $tx->setPaidToParty($party);
+                }
+            }
+
             $tx->setSource(Transaction::SOURCE_CSV);
             $tx->setCreatedBy($user);
             $tx->setUpdatedBy($user);
@@ -66,6 +76,8 @@ class TransactionIngestionService
             $item->setCreatedBy($user);
             $item->setUpdatedBy($user);
             $tx->addItem($item);
+
+            $tx->setStatus($this->statusCalculator->calculate($tx));
 
             $this->em->persist($tx);
 

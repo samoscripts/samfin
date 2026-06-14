@@ -33,8 +33,11 @@ class CsvImportRow
     #[ORM\Column(name: 'description_raw', type: 'text', nullable: true)]
     private ?string $descriptionRaw = null;
 
-    #[ORM\Column(name: 'account_raw', length: 255, nullable: true)]
-    private ?string $accountRaw = null;
+    #[ORM\Column(name: 'own_account_label_raw', length: 255, nullable: true)]
+    private ?string $ownAccountLabelRaw = null;
+
+    #[ORM\Column(name: 'counterparty_account_raw', length: 26, nullable: true)]
+    private ?string $counterpartyAccountRaw = null;
 
     #[ORM\Column(name: 'bank_category_raw', length: 255, nullable: true)]
     private ?string $bankCategoryRaw = null;
@@ -68,7 +71,8 @@ class CsvImportRow
             'lineNo'          => $this->lineNo,
             'operationDate'   => $this->operationDate?->format('Y-m-d'),
             'descriptionRaw'  => $this->descriptionRaw,
-            'accountRaw'      => $this->accountRaw,
+            'ownAccountLabelRaw'      => $this->ownAccountLabelRaw,
+            'counterpartyAccountRaw'  => $this->counterpartyAccountRaw,
             'bankCategoryRaw' => $this->bankCategoryRaw,
             'amountRaw'       => $this->amountRaw,
             'amountMinor'     => $this->amountMinor,
@@ -91,8 +95,11 @@ class CsvImportRow
     public function getDescriptionRaw(): ?string { return $this->descriptionRaw; }
     public function setDescriptionRaw(?string $v): static { $this->descriptionRaw = $v; return $this; }
 
-    public function getAccountRaw(): ?string { return $this->accountRaw; }
-    public function setAccountRaw(?string $v): static { $this->accountRaw = $v; return $this; }
+    public function getOwnAccountLabelRaw(): ?string { return $this->ownAccountLabelRaw; }
+    public function setOwnAccountLabelRaw(?string $v): static { $this->ownAccountLabelRaw = $v; return $this; }
+
+    public function getCounterpartyAccountRaw(): ?string { return $this->counterpartyAccountRaw; }
+    public function setCounterpartyAccountRaw(?string $v): static { $this->counterpartyAccountRaw = $v; return $this; }
 
     public function getBankCategoryRaw(): ?string { return $this->bankCategoryRaw; }
     public function setBankCategoryRaw(?string $v): static { $this->bankCategoryRaw = $v; return $this; }

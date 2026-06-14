@@ -118,6 +118,8 @@ export default function ImportWiersze() {
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-12">#</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-24">Data</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400">Opis</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-36">Własny rachunek</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-44">Konto kontrahenta</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-32">Kategoria banku</th>
                   <th className="px-3 py-2.5 text-right font-semibold text-gray-500 dark:text-gray-400 w-36">Kwota</th>
                   <th className="px-3 py-2.5 text-center font-semibold text-gray-500 dark:text-gray-400 w-20">Status</th>
@@ -145,6 +147,12 @@ export default function ImportWiersze() {
                           {row.parseError}
                         </p>
                       )}
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[140px] truncate" title={row.ownAccountLabelRaw ?? ''}>
+                      {row.ownAccountLabelRaw ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[180px] truncate font-mono text-[11px]" title={row.counterpartyAccountRaw ?? ''}>
+                      {row.counterpartyAccountRaw ?? '—'}
                     </td>
                     <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[120px] truncate">
                       {row.bankCategoryRaw ?? '—'}
@@ -185,6 +193,19 @@ export default function ImportWiersze() {
                 <p className="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">
                   {row.descriptionRaw ?? '—'}
                 </p>
+                {(row.ownAccountLabelRaw || row.counterpartyAccountRaw) && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                    {row.ownAccountLabelRaw && (
+                      <span title={row.ownAccountLabelRaw}>{row.ownAccountLabelRaw}</span>
+                    )}
+                    {row.ownAccountLabelRaw && row.counterpartyAccountRaw && (
+                      <span className="mx-1 text-gray-300 dark:text-gray-600">·</span>
+                    )}
+                    {row.counterpartyAccountRaw && (
+                      <span className="font-mono" title={row.counterpartyAccountRaw}>{row.counterpartyAccountRaw}</span>
+                    )}
+                  </p>
+                )}
                 <div className="flex items-center gap-3 mt-1">
                   <span className={[
                     'text-sm font-mono font-semibold',

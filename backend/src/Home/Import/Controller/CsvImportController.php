@@ -189,11 +189,14 @@ class CsvImportController extends AbstractController
             return $this->json(['message' => 'Plik CSV jest wymagany.'], 422);
         }
 
-        $originalFilename = $file->getClientOriginalName();
-        $csvContent       = file_get_contents($file->getRealPath());
-
-        if ($csvContent === false || $csvContent === '') {
+        $filePath = $file->getRealPath();
+        if ($filePath === false || !is_readable($filePath)) {
             return $this->json(['message' => 'Nie udało się odczytać pliku CSV.'], 422);
+        }
+
+        $fileSize = filesize($filePath);
+        if ($fileSize === false || $fileSize === 0) {
+            return $this->json(['message' => 'Plik CSV jest pusty lub nieczytelny.'], 422);
         }
 
         /** @var User $user */
@@ -201,8 +204,8 @@ class CsvImportController extends AbstractController
 
         $csvImport = $this->importService->import(
             source: $source,
-            csvContent: $csvContent,
-            originalFilename: $originalFilename,
+            filePath: $filePath,
+            originalFilename: $file->getClientOriginalName(),
             user: $user,
         );
 

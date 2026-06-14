@@ -17,8 +17,8 @@ class PartyController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private PartyRepository        $partyRepository,
-        private Security               $security,
+        private PartyRepository $partyRepository,
+        private Security $security,
     ) {}
 
     #[Route('', name: 'api_parties_index', methods: ['GET'])]
@@ -60,11 +60,6 @@ class PartyController extends AbstractController
             return $this->json(['message' => 'Nieprawidłowy typ własności.'], 422);
         }
 
-        $usageType = $data['usageType'] ?? Party::USAGE_BOTH;
-        if (!in_array($usageType, Party::USAGES, true)) {
-            return $this->json(['message' => 'Nieprawidłowy typ użycia.'], 422);
-        }
-
         /** @var User $user */
         $user = $this->security->getUser();
 
@@ -72,7 +67,6 @@ class PartyController extends AbstractController
         $party->setName($name);
         $party->setType($type);
         $party->setOwnershipType($ownershipType);
-        $party->setUsageType($usageType);
         $party->setDescription(($data['description'] ?? '') !== '' ? $data['description'] : null);
         $party->setActive((bool)($data['active'] ?? true));
         $party->setCreatedBy($user);
@@ -113,12 +107,7 @@ class PartyController extends AbstractController
             }
             $party->setOwnershipType($data['ownershipType']);
         }
-        if (array_key_exists('usageType', $data)) {
-            if (!in_array($data['usageType'], Party::USAGES, true)) {
-                return $this->json(['message' => 'Nieprawidłowy typ użycia.'], 422);
-            }
-            $party->setUsageType($data['usageType']);
-        }
+
         if (array_key_exists('description', $data)) {
             $party->setDescription(($data['description'] ?? '') !== '' ? $data['description'] : null);
         }

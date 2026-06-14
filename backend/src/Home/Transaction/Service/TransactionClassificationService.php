@@ -15,6 +15,9 @@ class TransactionClassificationService
 {
     public function __construct(
         private EntityManagerInterface $em,
+        private TransactionSnapshotLogService $snapshotLogService,
+        private TransactionPartyAssignmentValidator $partyAssignmentValidator,
+        private TransactionStatusCalculator $statusCalculator,
     ) {}
 
     /**
@@ -30,6 +33,14 @@ class TransactionClassificationService
         ?int        $paidToPartyId,
         User        $user,
     ): void {
+        $itemCount = count($itemsPayload);
+        if ($itemCount < 1) {
+            throw new \InvalidArgumentException('Wymagana co najmniej 1 pozycja.');
+        }
+        if ($itemCount > 5) {
+            throw new \InvalidArgumentException('Maksymalnie 5 pozycji.');
+        }
+
         $sumMinor = array_reduce(
             $itemsPayload,
             fn(int $carry, array $item) => $carry + (int) round((float) ($item['amount'] ?? 0) * 100),
@@ -44,20 +55,27 @@ class TransactionClassificationService
             ));
         }
 
+        $paidFromParty = null;
+        $paidToParty   = null;
+
         if ($paidFromPartyId !== null) {
-            $party = $this->em->find(Party::class, $paidFromPartyId);
-            if (!$party) {
+            $paidFromParty = $this->em->find(Party::class, $paidFromPartyId);
+            if (!$paidFromParty) {
                 throw new \InvalidArgumentException("Nie znaleziono podmiotu paidFrom id={$paidFromPartyId}.");
             }
-            $tx->setPaidFromParty($party);
         }
+
         if ($paidToPartyId !== null) {
-            $party = $this->em->find(Party::class, $paidToPartyId);
-            if (!$party) {
+            $paidToParty = $this->em->find(Party::class, $paidToPartyId);
+            if (!$paidToParty) {
                 throw new \InvalidArgumentException("Nie znaleziono podmiotu paidTo id={$paidToPartyId}.");
             }
-            $tx->setPaidToParty($party);
         }
+
+        $this->partyAssignmentValidator->assertAssignment($tx, $paidFromParty, $paidToParty);
+
+        $tx->setPaidFromParty($paidFromParty);
+        $tx->setPaidToParty($paidToParty);
 
         foreach ($tx->getItems()->toArray() as $old) {
             $tx->removeItem($old);
@@ -97,40 +115,10 @@ class TransactionClassificationService
             $tx->addItem($item);
         }
 
-        $tx->setStatus($this->calculateStatus($tx));
+        $tx->setStatus($this->statusCalculator->calculate($tx));
         $tx->setUpdatedBy($user);
 
         $this->em->flush();
-    }
-
-    private function calculateStatus(Transaction $tx): string
-    {
-        $items = $tx->getItems()->toArray();
-
-        if (empty($items)) {
-            return Transaction::STATUS_UNCLASSIFIED;
-        }
-
-        $hasBothParties = $tx->getPaidFromParty() !== null && $tx->getPaidToParty() !== null;
-
-        $classifiedCount = count(array_filter(
-            $items,
-            fn(TransactionItem $i) => $i->getWallet() !== null
-                || $i->getConcern() !== null
-                || $i->getCategory() !== null,
-        ));
-
-        $allClassified = $classifiedCount === count($items);
-        $anyClassified = $classifiedCount > 0;
-
-        if ($allClassified && $hasBothParties) {
-            return Transaction::STATUS_CLASSIFIED;
-        }
-
-        if ($anyClassified) {
-            return Transaction::STATUS_PARTIALLY_CLASSIFIED;
-        }
-
-        return Transaction::STATUS_UNCLASSIFIED;
+        $this->snapshotLogService->log($tx, $user);
     }
 }

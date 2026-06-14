@@ -21,7 +21,7 @@ const labelCls = 'block text-xs font-medium text-gray-500 dark:text-gray-400 mb-
 
 const TYPE_LABEL: Record<CategoryType, string> = {
   EXPENSE: 'Wydatek',
-  INCOME: 'Przychód',
+  INCOME: 'Wpływ',
 }
 
 const TYPE_BADGE_CLASS: Record<CategoryType, string> = {
@@ -125,7 +125,7 @@ function CategoryForm({ item, allCategories, onSaved, onCancel }: CategoryFormPr
             required
           >
             <option value="EXPENSE">Wydatek</option>
-            <option value="INCOME">Przychód</option>
+            <option value="INCOME">Wpływ</option>
           </select>
         </div>
       </div>
