@@ -1,0 +1,49 @@
+---
+description: Padding i szerokość stron React renderowanych bezpośrednio pod Layout (Outlet)
+globs: frontend/src/domains/**/pages/**/*.tsx
+alwaysApply: false
+---
+
+# Padding stron (page content)
+
+`Layout` (`layout/Layout.tsx`) renderuje `<Outlet />` **bez** paddingu — tylko `<main className="flex-1 overflow-y-auto">`.
+
+## Kiedy dodać wrapper
+
+Strony wstawione **bezpośrednio** pod `Layout` w `routes.tsx` muszą same dodać padding, np.:
+
+- `/transactions/:id/edit` → `TransactionEdit.tsx`
+- `/` (dashboard) → `Dashboard.tsx`
+
+Strony zagnieżdżone w layoutach modułowych **nie** powtarzają paddingu — dostają go od rodzica:
+
+- `Configuration.tsx` → `p-4 md:p-6 max-w-screen-xl` (reguły, podmioty, …)
+- `ImportLayout.tsx` → to samo
+- `Settings.tsx` → analogicznie
+
+## Wzorzec (standalone page)
+
+```tsx
+const PAGE_CLS = 'p-4 md:p-6 max-w-screen-xl'
+
+export default function MyPage() {
+  return (
+    <div className={PAGE_CLS}>
+      {/* breadcrumb, nagłówek, formularz */}
+    </div>
+  )
+}
+```
+
+Wszystkie gałęzie renderowania (loading, error, success) powinny używać tego samego wrappera.
+
+## Wyjątki
+
+- `Transactions.tsx` — pełnoekranowy układ z panelem bocznym; padding tylko na sekcjach (`px-4 md:px-6`), nie na całym `<div>` strony.
+- Strony „edge-to-edge” — tylko gdy świadomie rezygnujemy z marginesu (rzadko).
+
+## Checklist przy nowej trasie
+
+1. Czy route jest bezpośrednim dzieckiem `Layout`, czy `<Outlet />` layoutu modułu?
+2. Jeśli bezpośrednio pod `Layout` → `p-4 md:p-6 max-w-screen-xl` (lub `max-w-screen-2xl` jak dashboard).
+3. Formularze create/edit w content — spójnie z `ClassificationRules` / `TransactionEdit`.
