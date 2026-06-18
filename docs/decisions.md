@@ -238,7 +238,7 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 **Decyzja:** Tabela `classification_rule` z FK `party_id`. Warunki i akcje w JSON (`conditions_json`, `actions_json`). `party_id` można zmienić (przeniesienie reguły). Pole `created_from_transaction_id` (nullable) — informacja o proweniencji, bez wpływu na logikę.
 
-**Konsekwencje:** API CRUD pod `/api/parties/{partyId}/classification-rules`. Wykonanie reguł używa party z kontekstu własnej strony transakcji.
+**Konsekwencje:** API CRUD pod `/api/parties/{partyId}/classification-rules`; lista globalna `GET /api/classification-rules`. Wykonanie reguł używa party z kontekstu własnej strony transakcji.
 
 ---
 
@@ -257,6 +257,16 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 **Decyzja:** `ClassificationRuleApplier` buduje payload jak `PUT /transactions/{id}/items` i wywołuje `classifyTransaction()`. Zakaz bezpośredniej mutacji encji i własnego `flush()` poza tą ścieżką. Przechodzą ADR-009, ADR-015, ADR-017.
 
 **Pliki:** `ClassificationRuleApplier`, `TransactionClassificationService`.
+
+---
+
+### ADR-024: Pozycje reguły — wyłącznie `percent` (suma = 100)
+
+**Kontekst:** Wcześniejszy model `split: { type: FULL | PERCENT | REMAINDER }` był zbędnie złożony; UI i logika i tak operują na procentach.
+
+**Decyzja:** Każda pozycja w `actions.items` ma pole `percent` (int, 1–100). Suma procentów wszystkich pozycji musi wynosić 100 (jedna pozycja → zawsze 100). Stary format `split` nie jest wspierany.
+
+**Konsekwencje:** Przy apply kwoty liczone algorytmem „ostatnia pozycja = reszta w groszach” (jak przy edycji transakcji). Walidacja w `ClassificationRuleDefinitionValidator` i przy zapisie formularza (`validatePercents`).
 
 ---
 
@@ -332,3 +342,4 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-13 | ADR-017: usunięcie direction_usage_*; reguły kontekstowe Skąd/Dokąd |
 | 2026-06-13 | ADR-018 (portfel), ADR-019 (transakcje ręczne MVP — plan) |
 | 2026-06-14 | ADR-021..023: reguły klasyfikacji per party, fill_empty, classify service |
+| 2026-06-14 | ADR-024: pozycje reguły — percent zamiast split.type |

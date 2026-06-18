@@ -3,6 +3,7 @@
 namespace App\Home\Transaction\Repository;
 
 use App\Home\Configuration\Entity\Party;
+use App\Home\Import\Entity\CsvImportRow;
 use App\Home\Transaction\Entity\Transaction;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -173,6 +174,11 @@ class TransactionRepository extends ServiceEntityRepository
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    public function findByImportRow(CsvImportRow $row): ?Transaction
+    {
+        return $this->findOneBy(['importRow' => $row]);
     }
 
     private function applyFilters(QueryBuilder $qb, array $f, bool $itemJoined): void

@@ -128,7 +128,7 @@ make sf CMD="debug:router"   # Lista tras
 make npm CMD="run build"     # Build frontendu
 ```
 
-Health check: `GET http://localhost:3001/api/health`
+Health check: `GET http://localhost:3001/api/health` — zwraca m.in. `version`, `build`, `commit` (z `backend/config/build_info.json`, generowany przez `frontend/scripts/generate-build-info.mjs` przy `npm run build`).
 
 ---
 

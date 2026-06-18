@@ -42,6 +42,10 @@ export interface ClassificationItemsEditorProps {
   totalAmount?: number
   direction?: Direction
   emptyDictLabel?: string
+  readOnly?: boolean
+  showSectionLabel?: boolean
+  allowCategoryQuickAdd?: boolean
+  onCategoryCreated?: (category: Category) => void
 }
 
 export default function ClassificationItemsEditor({
@@ -54,6 +58,10 @@ export default function ClassificationItemsEditor({
   totalAmount = 0,
   direction = 'EXPENSE',
   emptyDictLabel = EDIT_EMPTY_LABEL,
+  readOnly = false,
+  showSectionLabel = true,
+  allowCategoryQuickAdd = false,
+  onCategoryCreated,
 }: ClassificationItemsEditorProps) {
   const isSplit = items.length > 1
 
@@ -135,8 +143,8 @@ export default function ClassificationItemsEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <SectionLabel>Klasyfikacja</SectionLabel>
-        {items.length < MAX_SPLIT_ITEMS && (
+        {showSectionLabel ? <SectionLabel>Klasyfikacja</SectionLabel> : <span />}
+        {items.length < MAX_SPLIT_ITEMS && !readOnly && (
           <button
             type="button"
             onClick={handleAddItem}
@@ -186,6 +194,7 @@ export default function ClassificationItemsEditor({
                       onChange={(e) => handlePercentChange(0, e.target.value)}
                       className={splitInputCls}
                       title="Procent"
+                      disabled={readOnly}
                     />
                   ) : (
                     <div className={`${readOnlyFieldCls} text-center font-mono`}>
@@ -193,7 +202,7 @@ export default function ClassificationItemsEditor({
                     </div>
                   )}
                 </div>
-                {items.length > MIN_SPLIT_ITEMS && (
+                {items.length > MIN_SPLIT_ITEMS && !readOnly && (
                   <button
                     type="button"
                     onClick={() => handleRemoveItem(i)}
@@ -216,6 +225,7 @@ export default function ClassificationItemsEditor({
                 emptyLabel={emptyDictLabel}
                 valueType="number"
                 filterItem={(w) => w.active !== false}
+                disabled={readOnly}
               />
             </FieldRow>
 
@@ -227,6 +237,7 @@ export default function ClassificationItemsEditor({
                 emptyLabel={emptyDictLabel}
                 valueType="number"
                 filterItem={(c) => c.active !== false}
+                disabled={readOnly}
               />
             </FieldRow>
 
@@ -238,6 +249,9 @@ export default function ClassificationItemsEditor({
                 emptyLabel={emptyDictLabel}
                 valueType="number"
                 direction={direction}
+                disabled={readOnly}
+                allowQuickAdd={allowCategoryQuickAdd}
+                onCategoryCreated={onCategoryCreated}
               />
             </FieldRow>
           </div>

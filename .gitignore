@@ -1,17 +1,22 @@
 # Backend
 /backend/vendor/
 /backend/var/
+/backend/.env
 /backend/.env.local
 /backend/.env.*.local
-/backend/composer.lock
 /backend/config/build_info.json
 
 # Frontend
 /frontend/node_modules/
+/frontend/.npm-cache/
 /frontend/dist/
 /frontend/tsconfig.tsbuildinfo
 /backend/public/app/*
 !/backend/public/app/.gitkeep
+
+# Deploy
+/deploy.env
+/composer.phar
 
 # IDE
 .idea/

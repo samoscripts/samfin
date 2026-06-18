@@ -60,11 +60,12 @@ export function validatePercents(percents: number[]): string | null {
     if (!Number.isInteger(p)) {
       return `Pozycja ${i + 1}: procent musi być liczbą całkowitą.`
     }
-    if (p < 0) {
-      return `Pozycja ${i + 1}: procent nie może być ujemny.`
+    if (p < 1 || p > 100) {
+      return `Pozycja ${i + 1}: procent musi być z zakresu 1–100.`
     }
   }
-  if (percents.length === 2 && percents[0] + percents[1] !== 100) {
+  const sum = percents.reduce((a, b) => a + b, 0)
+  if (sum !== 100) {
     return 'Suma procentów musi wynosić 100%.'
   }
   return null

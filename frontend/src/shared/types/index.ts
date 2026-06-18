@@ -26,5 +26,6 @@ export interface Transaction {
   direction: Direction
   status: Status
   source?: string
+  counterpartyAccountNumber?: string | null
   items: FlowItem[]
 }

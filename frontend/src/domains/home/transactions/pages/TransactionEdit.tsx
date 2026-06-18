@@ -58,6 +58,14 @@ export default function TransactionEdit() {
     navigate('/transactions', { state: { selectedTxId: updated.transactionId } })
   }
 
+  async function handlePartyCreated() {
+    setParties(await fetchParties())
+  }
+
+  async function handleCategoryCreated() {
+    setCategories(await fetchCategories())
+  }
+
   if (loading) {
     return (
       <div className={PAGE_CLS}>
@@ -90,6 +98,8 @@ export default function TransactionEdit() {
         parties={parties}
         onSaved={handleSaved}
         onCancel={backToList}
+        onPartyCreated={handlePartyCreated}
+        onCategoryCreated={handleCategoryCreated}
       />
     </div>
   )

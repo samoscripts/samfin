@@ -220,7 +220,7 @@ Szczegóły nawigacji i struktury folderów — ADR-012, ADR-020 w [`decisions.m
 
 | Typ interakcji | Gdzie | Przykłady |
 |----------------|-------|-----------|
-| Formularz create/edit (CRUD) | **Page content** lub **sidebar** | Podmioty, Kategorie, Reguły klasyfikacji; edycja transakcji w panelu bocznym |
+| Formularz create/edit (CRUD) | **Page content** lub **sidebar** | Podmioty, Kategorie, Reguły klasyfikacji; edycja bulk transakcji w panelu bocznym; edycja pojedynczej transakcji na `/transactions/:id/edit` |
 | Potwierdzenie akcji destrukcyjnej | **Modal** (`ConfirmDialog`) | Usuń regułę, podmiot |
 | Krótki prompt kontekstowy (1–2 pola) | Modal dopuszczalny | Zastosuj reguły klasyfikacji (checkbox overwrite) |
 | Główne zakładki modułu | **URL** (`NavLink` + `Outlet`) | ADR-020 |

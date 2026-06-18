@@ -1,17 +1,25 @@
 import type { RuleActionsPayload } from '@/shared/api/classificationRules'
+
 import type { Party } from '@/domains/home/configuration/parties/types'
+
 import type { Category } from '@/shared/api/categories'
+
 import ClassificationItemsEditor, {
   type ClassificationItemDraft,
 } from '@/shared/components/classification/ClassificationItemsEditor'
-import DictionarySelect from '@/shared/components/form/DictionarySelect'
-import { FieldRow, ReadOnlyField, SectionLabel } from '@/shared/components/form/FormSection'
+
+import PartySelect from '@/shared/components/form/PartySelect'
+
+import { FieldRow, ReadOnlyField } from '@/shared/components/form/FormSection'
+
 import { configSelectCls } from '@/shared/components/form/formClasses'
-import { filterCategoriesForDirection } from '@/domains/home/transactions/utils/categoryOptions'
+
 import { draftToRuleItems, ruleItemsToDraft, type RuleDirection } from '../constants'
 
 const NO_CHANGE_LABEL = '— bez zmiany —'
+
 const EMPTY_DICT_LABEL = '—'
+
 const OWN_SIDE_HINT = 'Wynika z podmiotu i kierunku reguły'
 
 export interface RuleActionsEditorProps {
@@ -24,6 +32,14 @@ export interface RuleActionsEditorProps {
   concerns: { id: number; name: string }[]
   categories: Category[]
   onChange: (actions: RuleActionsPayload) => void
+  actionsLocked?: boolean
+  onPartyCreated?: (party: Party) => void
+  onCategoryCreated?: (category: Category) => void
+}
+
+function partyName(parties: Party[], id: number | null | undefined): string {
+  if (id == null) return '—'
+  return parties.find((p) => p.id === id)?.name ?? '—'
 }
 
 export default function RuleActionsEditor({
@@ -36,6 +52,9 @@ export default function RuleActionsEditor({
   concerns,
   categories,
   onChange,
+  actionsLocked = false,
+  onPartyCreated,
+  onCategoryCreated,
 }: RuleActionsEditorProps) {
   const ownSideName =
     contextPartyId !== null
@@ -43,10 +62,9 @@ export default function RuleActionsEditor({
       : '—'
 
   const itemDraft = ruleItemsToDraft(actions.items)
-  const relevantCategories =
-    direction === 'EXPENSE' || direction === 'INCOME'
-      ? filterCategoriesForDirection(categories, direction)
-      : categories
+
+  const categoryDirection =
+    direction === 'EXPENSE' || direction === 'INCOME' ? direction : undefined
 
   function setTransactionParty(
     field: 'paidFromPartyId' | 'paidToPartyId',
@@ -66,42 +84,58 @@ export default function RuleActionsEditor({
   }
 
   return (
-    <>
-      <div className="space-y-3 mb-6">
-        <SectionLabel>Strony transakcji</SectionLabel>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FieldRow label="Skąd (wpłacający)">
-            {direction === 'EXPENSE' ? (
-              <ReadOnlyField value={ownSideName} hint={OWN_SIDE_HINT} />
-            ) : (
-              <DictionarySelect
-                items={parties}
-                value={actions.transaction.paidFromPartyId}
-                onChange={(v) => setTransactionParty('paidFromPartyId', v)}
-                emptyLabel={NO_CHANGE_LABEL}
-                valueType="number"
-                className={configSelectCls}
-              />
-            )}
-          </FieldRow>
-          <FieldRow label="Dokąd (odbiorca)">
-            {direction === 'INCOME' ? (
-              <ReadOnlyField value={ownSideName} hint={OWN_SIDE_HINT} />
-            ) : (
-              <DictionarySelect
-                items={parties}
-                value={actions.transaction.paidToPartyId}
-                onChange={(v) => setTransactionParty('paidToPartyId', v)}
-                emptyLabel={NO_CHANGE_LABEL}
-                valueType="number"
-                className={configSelectCls}
-              />
-            )}
-          </FieldRow>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <FieldRow label="Skąd (wpłacający)">
+          {actionsLocked ? (
+            <ReadOnlyField
+              value={
+                direction === 'EXPENSE'
+                  ? ownSideName
+                  : partyName(parties, actions.transaction.paidFromPartyId)
+              }
+              hint={direction === 'EXPENSE' ? OWN_SIDE_HINT : undefined}
+            />
+          ) : direction === 'EXPENSE' ? (
+            <ReadOnlyField value={ownSideName} hint={OWN_SIDE_HINT} />
+          ) : (
+            <PartySelect
+              parties={parties}
+              value={actions.transaction.paidFromPartyId ?? null}
+              onChange={(v) => setTransactionParty('paidFromPartyId', v)}
+              emptyLabel={NO_CHANGE_LABEL}
+              className={configSelectCls}
+              excludePartyId={actions.transaction.paidToPartyId ?? null}
+              onPartyCreated={onPartyCreated}
+            />
+          )}
+        </FieldRow>
 
-      <div className="border-t border-gray-100 dark:border-gray-800 mb-6" />
+        <FieldRow label="Dokąd (odbiorca)">
+          {actionsLocked ? (
+            <ReadOnlyField
+              value={
+                direction === 'INCOME'
+                  ? ownSideName
+                  : partyName(parties, actions.transaction.paidToPartyId)
+              }
+              hint={direction === 'INCOME' ? OWN_SIDE_HINT : undefined}
+            />
+          ) : direction === 'INCOME' ? (
+            <ReadOnlyField value={ownSideName} hint={OWN_SIDE_HINT} />
+          ) : (
+            <PartySelect
+              parties={parties}
+              value={actions.transaction.paidToPartyId ?? null}
+              onChange={(v) => setTransactionParty('paidToPartyId', v)}
+              emptyLabel={NO_CHANGE_LABEL}
+              className={configSelectCls}
+              excludePartyId={actions.transaction.paidFromPartyId ?? null}
+              onPartyCreated={onPartyCreated}
+            />
+          )}
+        </FieldRow>
+      </div>
 
       <ClassificationItemsEditor
         mode="rule"
@@ -109,9 +143,14 @@ export default function RuleActionsEditor({
         onChange={handleItemsChange}
         wallets={wallets}
         concerns={concerns}
-        categories={relevantCategories}
+        categories={categories}
+        direction={categoryDirection}
         emptyDictLabel={EMPTY_DICT_LABEL}
+        readOnly={actionsLocked}
+        showSectionLabel={false}
+        allowCategoryQuickAdd={!actionsLocked}
+        onCategoryCreated={onCategoryCreated}
       />
-    </>
+    </div>
   )
 }

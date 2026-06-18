@@ -8,6 +8,7 @@ SamFin to system budżetu domowego (home finance). Umożliwia:
 - przeglądanie i filtrowanie transakcji,
 - klasyfikację transakcji (podział na pozycje, przypisanie podmiotów, portfeli, obszarów i kategorii),
 - zarządzanie słownikami konfiguracyjnymi (podmioty, rachunki bankowe, portfele, obszary, kategorie),
+- reguły auto-klasyfikacji transakcji (warunki + akcje per podmiot),
 - podstawowe statystyki na dashboardzie.
 
 Aplikacja jest wieloużytkownikowa (logowanie e-mail + hasło, token API w nagłówku `Authorization: Bearer`).
@@ -26,7 +27,7 @@ Aplikacja jest wieloużytkownikowa (logowanie e-mail + hasło, token API w nagł
 fin/
 ├── backend/          # API Symfony (namespace App\)
 │   ├── config/       # konfiguracja frameworka, security, doctrine
-│   ├── migrations/   # migracje Doctrine (14 plików)
+│   ├── migrations/   # migracje Doctrine (18 plików)
 │   ├── public/       # document root Apache; frontend buduje się do public/app/
 │   └── src/
 │       ├── Home/     # domena finansowa (konfiguracja, import, transakcje)
@@ -85,8 +86,9 @@ flowchart LR
 1. **Konfiguracja** — użytkownik definiuje podmioty, rachunki bankowe, portfele, obszary (`concern`), kategorie.
 2. **Import CSV** — upload pliku → parsowanie → walidacja względem konfiguracji → status VALIDATED/FAILED → ręczne uruchomienie importu → utworzenie transakcji z auto Skąd/Dokąd (podmiot z rachunku bankowego).
 3. **Klasyfikacja** — użytkownik uzupełnia Skąd/Dokąd oraz pozycje (portfel, dotyczy, kategoria); status `CLASSIFIED` wymaga wszystkich pięciu pól; walidacja podmiotów wg kierunku transakcji.
-4. **Dashboard** — agregaty przychodów, wydatków, salda i liczby niesklasyfikowanych transakcji.
-5. **Transakcje ręczne (planowane)** — formularz tworzenia ze `source: MANUAL`; klasyfikacja opcjonalna; reguły Skąd/Dokąd jak przy edycji (ADR-017, ADR-019).
+4. **Reguły klasyfikacji** — zestaw reguł per podmiot OWN; ręczne uruchomienie na zaznaczeniu lub filtrze; opcjonalne tworzenie reguły z istniejącej transakcji.
+5. **Dashboard** — agregaty przychodów, wydatków, salda i liczby niesklasyfikowanych transakcji.
+6. **Transakcje ręczne (planowane)** — formularz tworzenia ze `source: MANUAL`; klasyfikacja opcjonalna; reguły Skąd/Dokąd jak przy edycji (ADR-017, ADR-019).
 
 ## Konwencje globalne
 

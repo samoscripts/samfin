@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronRight, Loader2, Plus } from 'lucide-react'
 
 import { fetchParties, fetchPartiesForClassificationRules } from '@/shared/api/parties'
@@ -24,10 +24,16 @@ import type { Category } from '@/shared/api/categories'
 import type { Party } from '@/domains/home/configuration/parties/types'
 
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
+import type { Transaction } from '@/shared/types'
+import TransactionSummaryCard from '@/domains/home/transactions/components/TransactionSummaryCard'
 
 import ClassificationRuleForm from '../components/ClassificationRuleForm'
-
 import ClassificationRulesTable from '../components/ClassificationRulesTable'
+import {
+  buildRuleDraftFromTransaction,
+  type CreateRuleFromTransactionState,
+  type RuleFromTransactionDraft,
+} from '../utils/ruleFromTransaction'
 
 
 
@@ -36,6 +42,8 @@ type View = 'list' | 'create' | 'edit'
 
 
 export default function ClassificationRules() {
+  const location = useLocation()
+  const navigate = useNavigate()
 
   const [parties, setParties] = useState<Party[]>([])
 
@@ -61,7 +69,8 @@ export default function ClassificationRules() {
 
   const [categories, setCategories] = useState<Category[]>([])
 
-
+  const [createFromTx, setCreateFromTx] = useState<Transaction | null>(null)
+  const [ruleDraft, setRuleDraft] = useState<RuleFromTransactionDraft | null>(null)
 
   const loadRules = useCallback(async () => {
 
@@ -103,7 +112,20 @@ export default function ClassificationRules() {
 
   }, [])
 
+  useEffect(() => {
+    const state = location.state as CreateRuleFromTransactionState | null
+    if (!state?.fromTransaction) return
 
+    const draft = buildRuleDraftFromTransaction(state.fromTransaction)
+    if (draft) {
+      setCreateFromTx(state.fromTransaction)
+      setRuleDraft(draft)
+      setEditingRule(null)
+      setView('create')
+    }
+
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.pathname, location.state, navigate])
 
   useEffect(() => {
 
@@ -118,11 +140,10 @@ export default function ClassificationRules() {
 
 
   function openCreate() {
-
     setEditingRule(null)
-
+    setCreateFromTx(null)
+    setRuleDraft(null)
     setView('create')
-
   }
 
 
@@ -138,11 +159,18 @@ export default function ClassificationRules() {
 
 
   function backToList() {
-
     setEditingRule(null)
-
+    setCreateFromTx(null)
+    setRuleDraft(null)
     setView('list')
+  }
 
+  async function handlePartyCreated() {
+    setParties(await fetchParties())
+  }
+
+  async function handleCategoryCreated() {
+    setCategories(await fetchCategories())
   }
 
 
@@ -206,9 +234,11 @@ export default function ClassificationRules() {
           <ChevronRight size={12} className="shrink-0" />
 
           <span className="text-gray-600 dark:text-gray-400 font-medium">
-
-            {view === 'create' ? 'Nowa reguła' : `Edycja: ${editingRule?.name ?? ''}`}
-
+            {view === 'create'
+              ? createFromTx
+                ? 'Nowa reguła z transakcji'
+                : 'Nowa reguła'
+              : `Edycja: ${editingRule?.name ?? ''}`}
           </span>
 
         </>
@@ -232,20 +262,32 @@ export default function ClassificationRules() {
         <div className="w-full space-y-6">
 
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-
-            {view === 'create' ? 'Nowa reguła' : `Edycja: ${editingRule?.name ?? ''}`}
-
+            {view === 'create'
+              ? createFromTx
+                ? 'Nowa reguła z transakcji'
+                : 'Nowa reguła'
+              : `Edycja: ${editingRule?.name ?? ''}`}
           </h2>
 
-
+          {createFromTx && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Transakcja źródłowa
+              </h3>
+              <TransactionSummaryCard tx={createFromTx} layout="grid" />
+            </div>
+          )}
 
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-
             <ClassificationRuleForm
-
-              key={editingRule?.id ?? 'new'}
-
+              key={
+                createFromTx
+                  ? `from-tx-${createFromTx.transactionId}`
+                  : (editingRule?.id ?? 'new')
+              }
               rule={editingRule}
+              initialDraft={view === 'create' ? ruleDraft : null}
+              allRules={rules}
 
               ruleContextParties={ruleContextParties}
 
@@ -260,6 +302,10 @@ export default function ClassificationRules() {
               onSaved={handleFormSaved}
 
               onCancel={backToList}
+
+              onPartyCreated={handlePartyCreated}
+
+              onCategoryCreated={handleCategoryCreated}
 
             />
 

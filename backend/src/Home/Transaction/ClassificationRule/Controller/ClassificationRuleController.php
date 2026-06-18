@@ -187,8 +187,15 @@ class ClassificationRuleController extends AbstractController
             if (!is_array($data['conditions'])) {
                 throw new \InvalidArgumentException('Pole conditions musi być obiektem.');
             }
-            $this->validator->validateConditions($data['conditions']);
-            $rule->setConditionsJson($data['conditions']);
+            $fallbackDirection = null;
+            if (array_key_exists('actions', $data) && is_array($data['actions'])) {
+                $fallbackDirection = $this->validator->inferDirectionFromActions(
+                    $party->getId(),
+                    $data['actions'],
+                );
+            }
+            $normalized = $this->validator->normalizeConditions($data['conditions'], $fallbackDirection);
+            $rule->setConditionsJson($normalized);
         } elseif ($isCreate) {
             throw new \InvalidArgumentException('Pole conditions jest wymagane.');
         }
@@ -218,6 +225,22 @@ class ClassificationRuleController extends AbstractController
 
         $rule->setParty($party);
 
+        $this->normalizeRuleConditionsIfNeeded($rule);
+
         return $rule;
+    }
+
+    private function normalizeRuleConditionsIfNeeded(ClassificationRule $rule): void
+    {
+        $partyId = $rule->getParty()?->getId();
+        if ($partyId === null) {
+            return;
+        }
+
+        $normalized = $this->validator->normalizeConditions(
+            $rule->getConditionsJson(),
+            $this->validator->inferDirectionFromActions($partyId, $rule->getActionsJson()),
+        );
+        $rule->setConditionsJson($normalized);
     }
 }

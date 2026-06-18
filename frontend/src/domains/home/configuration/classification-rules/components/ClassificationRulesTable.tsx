@@ -1,6 +1,16 @@
 import { Pencil, Trash2 } from 'lucide-react'
 import type { ClassificationRule } from '@/shared/api/classificationRules'
+import { DIRECTION_LABEL_BY_VALUE } from '@/domains/home/transactions/constants/labels'
 import Pill from '@/shared/components/Pill'
+import { extractDirectionFromConditions, additionalConditionsCount } from '../ruleConditionMeta'
+
+function formatConditionsSummary(rule: ClassificationRule): string {
+  const direction = extractDirectionFromConditions(rule.conditions.conditions)
+  const extra = additionalConditionsCount(rule.conditions.conditions)
+  const directionLabel = direction ? (DIRECTION_LABEL_BY_VALUE[direction] ?? direction) : '—'
+  if (extra === 0) return directionLabel
+  return `${directionLabel} · ${extra} dodatk.`
+}
 
 export interface ClassificationRulesTableProps {
   rules: ClassificationRule[]
@@ -46,7 +56,7 @@ export default function ClassificationRulesTable({
                   )}
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                  {rule.conditions.conditions.length} warunków
+                  {formatConditionsSummary(rule)}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <RuleStatusBadge enabled={rule.enabled} />
@@ -76,7 +86,7 @@ export default function ClassificationRulesTable({
                   {rule.partyName ?? '—'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {rule.conditions.conditions.length} warunków
+                  {formatConditionsSummary(rule)}
                 </p>
                 {rule.description && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{rule.description}</p>

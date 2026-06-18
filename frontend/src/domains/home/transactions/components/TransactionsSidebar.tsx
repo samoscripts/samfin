@@ -14,9 +14,11 @@ import { fetchConcerns, type Concern } from '@/shared/api/concerns'
 
 import { fetchCategories, type Category } from '@/shared/api/categories'
 
-import { fetchParties } from '@/shared/api/parties'
+import { fetchParties, fetchPartiesForClassificationRules } from '@/shared/api/parties'
 
 import type { Party } from '@/domains/home/configuration/parties/types'
+
+import { canCreateRuleFromTransaction } from '@/domains/home/configuration/classification-rules/utils/ruleFromTransaction'
 
 import EditBulkPanel from './EditBulkPanel'
 
@@ -92,6 +94,8 @@ export interface TransactionsSidebarProps {
 
   onApplyRulesToFilter: () => void
 
+  onCreateRule: (tx: Transaction) => void
+
 }
 
 
@@ -144,6 +148,8 @@ export default function TransactionsSidebar({
 
   onApplyRulesToFilter,
 
+  onCreateRule,
+
 }: TransactionsSidebarProps) {
 
   const isMobile = useIsMobile()
@@ -160,6 +166,16 @@ export default function TransactionsSidebar({
 
   const [parties, setParties] = useState<Party[]>([])
 
+  const [ruleContextParties, setRuleContextParties] = useState<Party[]>([])
+
+  async function handlePartyCreated() {
+    setParties(await fetchParties())
+  }
+
+  async function handleCategoryCreated() {
+    setCategories(await fetchCategories())
+  }
+
 
 
   useEffect(() => {
@@ -171,6 +187,8 @@ export default function TransactionsSidebar({
     fetchCategories().then(setCategories).catch(() => {})
 
     fetchParties().then(setParties).catch(() => {})
+
+    fetchPartiesForClassificationRules().then(setRuleContextParties).catch(() => {})
 
   }, [])
 
@@ -516,7 +534,13 @@ export default function TransactionsSidebar({
 
     ) : detailsList.length === 1 ? (
 
-      <TransactionDetailsPanel tx={detailsList[0]} onEdit={onStartEdit} onRestored={onRestored} />
+      <TransactionDetailsPanel
+        tx={detailsList[0]}
+        onEdit={onStartEdit}
+        onRestored={onRestored}
+        onCreateRule={() => onCreateRule(detailsList[0])}
+        canCreateRule={canCreateRuleFromTransaction(detailsList[0], ruleContextParties)}
+      />
 
     ) : (
 
@@ -559,6 +583,10 @@ export default function TransactionsSidebar({
         onRegisterSave={onRegisterSave}
 
         onDirtyChange={onDirtyChange}
+
+        onPartyCreated={handlePartyCreated}
+
+        onCategoryCreated={handleCategoryCreated}
 
       />
 

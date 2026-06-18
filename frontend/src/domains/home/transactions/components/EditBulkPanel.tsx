@@ -19,6 +19,7 @@ import { DIRECTION_LABEL_BY_VALUE, EDIT_EMPTY_LABEL } from '../constants/labels'
 import { formatCategoryLabel } from '../utils/categoryOptions'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import CategorySelect from '@/shared/components/form/CategorySelect'
+import PartySelect from '@/shared/components/form/PartySelect'
 import { selectCls } from '@/shared/components/form/formClasses'
 
 type FieldState = {
@@ -59,6 +60,8 @@ export interface EditBulkPanelProps {
   onCancelClick: () => void
   onRegisterSave: (fn: () => Promise<void>) => void
   onDirtyChange: (dirty: boolean) => void
+  onPartyCreated?: (party: Party) => void
+  onCategoryCreated?: (category: Category) => void
 }
 
 export default function EditBulkPanel({
@@ -72,6 +75,8 @@ export default function EditBulkPanel({
   onCancelClick,
   onRegisterSave,
   onDirtyChange,
+  onPartyCreated,
+  onCategoryCreated,
 }: EditBulkPanelProps) {
   const [draft, setDraft] = useState<BulkDraft>(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
@@ -176,6 +181,11 @@ export default function EditBulkPanel({
     draft.paidFromPartyId.enabled ? draft.paidFromPartyId.value : null,
   )
 
+  const manualOwnFrom =
+    bulkTxContext.source === 'MANUAL' && direction === 'EXPENSE'
+  const manualOwnTo =
+    bulkTxContext.source === 'MANUAL' && direction === 'INCOME'
+
   const previewLines = enabledFields.map((f) => {
     const val = draft[f.key].value
     const display = resolveFieldDisplay(f.key, val, wallets, concerns, categories, parties)
@@ -233,10 +243,10 @@ export default function EditBulkPanel({
               {draft[field.key].enabled && !partyBlocked && (
                 <div className="pl-6">
                   {field.key === 'paidFromPartyId' && (
-                    <select
-                      value={draft[field.key].value ?? ''}
-                      onChange={(e) => {
-                        const partyId = e.target.value ? Number(e.target.value) : null
+                    <PartySelect
+                      parties={paidFromParties}
+                      value={draft[field.key].value}
+                      onChange={(partyId) => {
                         setDraft((prev) => ({
                           ...prev,
                           paidFromPartyId: { ...prev.paidFromPartyId, value: partyId },
@@ -245,22 +255,28 @@ export default function EditBulkPanel({
                               ? { ...prev.paidToPartyId, value: null }
                               : prev.paidToPartyId,
                         }))
+                        setError(null)
                       }}
+                      emptyLabel={EDIT_EMPTY_LABEL}
                       className={selectCls}
-                    >
-                      <option value="">{EDIT_EMPTY_LABEL}</option>
-                      {paidFromParties.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      excludePartyId={
+                        draft.paidToPartyId.enabled ? draft.paidToPartyId.value : null
+                      }
+                      onPartyCreated={onPartyCreated}
+                      allowedTypes={manualOwnFrom ? ['CASH'] : undefined}
+                      allowedOwnerships={manualOwnFrom ? ['OWN'] : undefined}
+                      quickAddDefaults={
+                        manualOwnFrom
+                          ? { type: 'CASH', ownershipType: 'OWN' }
+                          : { type: 'OTHER', ownershipType: 'EXTERNAL' }
+                      }
+                    />
                   )}
                   {field.key === 'paidToPartyId' && (
-                    <select
-                      value={draft[field.key].value ?? ''}
-                      onChange={(e) => {
-                        const partyId = e.target.value ? Number(e.target.value) : null
+                    <PartySelect
+                      parties={paidToParties}
+                      value={draft[field.key].value}
+                      onChange={(partyId) => {
                         setDraft((prev) => ({
                           ...prev,
                           paidToPartyId: { ...prev.paidToPartyId, value: partyId },
@@ -269,16 +285,22 @@ export default function EditBulkPanel({
                               ? { ...prev.paidFromPartyId, value: null }
                               : prev.paidFromPartyId,
                         }))
+                        setError(null)
                       }}
+                      emptyLabel={EDIT_EMPTY_LABEL}
                       className={selectCls}
-                    >
-                      <option value="">{EDIT_EMPTY_LABEL}</option>
-                      {paidToParties.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      excludePartyId={
+                        draft.paidFromPartyId.enabled ? draft.paidFromPartyId.value : null
+                      }
+                      onPartyCreated={onPartyCreated}
+                      allowedTypes={manualOwnTo ? ['CASH'] : undefined}
+                      allowedOwnerships={manualOwnTo ? ['OWN'] : undefined}
+                      quickAddDefaults={
+                        manualOwnTo
+                          ? { type: 'CASH', ownershipType: 'OWN' }
+                          : { type: 'OTHER', ownershipType: 'EXTERNAL' }
+                      }
+                    />
                   )}
                   {field.key === 'walletId' && (
                     <DictionarySelect
@@ -308,6 +330,8 @@ export default function EditBulkPanel({
                       emptyLabel={EDIT_EMPTY_LABEL}
                       valueType="number"
                       direction={direction}
+                      allowQuickAdd
+                      onCategoryCreated={onCategoryCreated}
                     />
                   )}
                 </div>

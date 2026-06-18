@@ -3,7 +3,42 @@ import type {
   RuleConditionField,
   RuleOperator,
 } from '@/shared/api/classificationRules'
+import type { RuleDirection } from './constants'
 import { OPERATORS } from './constants'
+
+export function createDirectionCondition(direction: RuleDirection | string = ''): RuleCondition {
+  return {
+    field: 'direction',
+    operator: 'equals',
+    value: direction,
+  }
+}
+
+export function isDirectionCondition(condition: RuleCondition): boolean {
+  return condition.field === 'direction'
+}
+
+export function extractDirectionFromConditions(conditions: RuleCondition[]): RuleDirection {
+  const value = conditions.find(isDirectionCondition)?.value
+  if (value === 'EXPENSE' || value === 'INCOME') return value
+  return ''
+}
+
+export function stripDirectionCondition(conditions: RuleCondition[]): RuleCondition[] {
+  return conditions.filter((c) => !isDirectionCondition(c))
+}
+
+export function ensureDirectionCondition(
+  conditions: RuleCondition[],
+  direction?: RuleDirection,
+): RuleCondition[] {
+  const resolved = direction ?? extractDirectionFromConditions(conditions)
+  return [createDirectionCondition(resolved), ...stripDirectionCondition(conditions)]
+}
+
+export function additionalConditionsCount(conditions: RuleCondition[]): number {
+  return stripDirectionCondition(conditions).length
+}
 
 const TEXT_FIELDS: RuleConditionField[] = ['description', 'counterparty_account_number']
 
@@ -127,9 +162,17 @@ export function validateConditions(conditions: RuleCondition[]): string | null {
     return 'Dodaj co najmniej jeden warunek.'
   }
 
-  for (let i = 0; i < conditions.length; i++) {
+  const first = conditions[0]
+  if (!isDirectionCondition(first) || first.operator !== 'equals') {
+    return 'Pierwszy warunek musi być kierunkiem transakcji.'
+  }
+  if (first.value !== 'EXPENSE' && first.value !== 'INCOME') {
+    return 'Wybierz kierunek transakcji (wydatek lub wpływ).'
+  }
+
+  for (let i = 1; i < conditions.length; i++) {
     const c = conditions[i]
-    const label = `Warunek ${i + 1}`
+    const label = `Warunek dodatkowy ${i}`
 
     if (!OPERATORS_BY_FIELD[c.field].includes(c.operator)) {
       return `${label}: operator „${c.operator}" nie jest dozwolony dla tego pola.`

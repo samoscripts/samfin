@@ -192,7 +192,10 @@ class Transaction
 
     public function removeItem(TransactionItem $item): static
     {
-        $this->items->removeElement($item);
+        if ($this->items->removeElement($item)) {
+            $item->setTransaction(null);
+        }
+
         return $this;
     }
 

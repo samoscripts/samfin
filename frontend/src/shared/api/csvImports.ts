@@ -91,8 +91,24 @@ export const fetchImportRows = async (
 ): Promise<PagedResponse<CsvImportRow>> =>
   (await api.get<PagedResponse<CsvImportRow>>(`/csv-imports/${id}/rows`, { params })).data
 
-export const triggerImport = async (id: number): Promise<CsvImportResult> =>
-  (await api.post<CsvImportResult>(`/csv-imports/${id}/import`)).data
+export type ImportIngestionMode = 'strict' | 'skip_imported' | 'reimport'
+
+export interface ImportIngestionStats {
+  imported: number
+  skipped: number
+  duplicates: number
+}
+
+export interface TriggerImportResponse {
+  import: CsvImportResult
+  stats: ImportIngestionStats
+}
+
+export const triggerImport = async (
+  id: number,
+  mode: ImportIngestionMode = 'strict',
+): Promise<TriggerImportResponse> =>
+  (await api.post<TriggerImportResponse>(`/csv-imports/${id}/import`, { mode })).data
 
 export const deleteImport = async (id: number): Promise<void> => {
   await api.delete(`/csv-imports/${id}`)

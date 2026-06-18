@@ -2,7 +2,7 @@
 
 Silnik: **MariaDB 11**, charset `utf8mb4_unicode_ci`, silnik InnoDB.
 
-ORM: Doctrine 3. Migracje w `backend/migrations/` (14 plików, chronologicznie od `Version20260607125328`).
+ORM: Doctrine 3. Migracje w `backend/migrations/` (18 plików, chronologicznie od `Version20260607125328`).
 
 ## Lista tabel
 
@@ -147,6 +147,7 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260608120000` | `transactions_change_log` |
 | `20260613120000` | `party`: `direction_usage_income`, `direction_usage_expense` (zastępuje `usage_type`) |
 | `20260613140000` | Usunięcie `direction_usage_*` z `party` |
+| `20260614120000` | `csv_import_row`: rename `account_raw` → `own_account_label_raw`; `counterparty_account_raw` |
 | `20260614150000` | `classification_rule`; `transactions.counterparty_account_number` |
 
 ## Konwencja kwot

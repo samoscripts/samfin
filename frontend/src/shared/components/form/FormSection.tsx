@@ -1,3 +1,12 @@
+export function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="pt-6 border-t border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+      {children}
+    </section>
+  )
+}
+
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">

@@ -10,11 +10,12 @@ use App\Identity\Entity\User;
 class ClassificationRuleEngine
 {
     public function __construct(
-        private ClassificationRulePartyResolver   $partyResolver,
-        private ClassificationRuleRepository      $ruleRepository,
-        private ClassificationRuleJsonMapper      $mapper,
-        private ClassificationRuleMatcher         $matcher,
-        private ClassificationRuleApplier           $applier,
+        private ClassificationRulePartyResolver        $partyResolver,
+        private ClassificationRuleRepository           $ruleRepository,
+        private ClassificationRuleJsonMapper           $mapper,
+        private ClassificationRuleMatcher              $matcher,
+        private ClassificationRuleApplier              $applier,
+        private ClassificationRuleConditionsNormalizer   $conditionsNormalizer,
     ) {}
 
     /**
@@ -35,7 +36,16 @@ class ClassificationRuleEngine
         $applied = false;
 
         foreach ($rules as $rule) {
-            $conditions = $this->mapper->mapConditions($rule->getConditionsJson());
+            $partyId = $rule->getParty()?->getId();
+            if ($partyId === null) {
+                continue;
+            }
+
+            $conditionsJson = $this->conditionsNormalizer->normalize(
+                $rule->getConditionsJson(),
+                $this->conditionsNormalizer->inferDirectionFromActions($partyId, $rule->getActionsJson()),
+            );
+            $conditions = $this->mapper->mapConditions($conditionsJson);
             if (!$this->matcher->matches($tx, $conditions)) {
                 continue;
             }

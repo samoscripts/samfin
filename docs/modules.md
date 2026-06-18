@@ -8,7 +8,7 @@ Konwencje warstw i reguły kodu: [`architecture-rules.md`](architecture-rules.md
 
 | Plik | Route | Opis |
 |------|-------|------|
-| `System/Controller/HealthController.php` | `GET /api/health` | Status aplikacji (publiczny) |
+| `System/Controller/HealthController.php` | `GET /api/health` | Status aplikacji (publiczny); odpowiedź przez `AppInfoProvider`: `status`, `version`, `build`, `commit`, `environment`, `debug`, `profilerUrl` (dev) |
 
 ### Identity
 
@@ -29,7 +29,8 @@ Konwencje warstw i reguły kodu: [`architecture-rules.md`](architecture-rules.md
 | Kontroler | Route base | Encja |
 |-----------|------------|-------|
 | `PartyController` | `/api/parties` | Party |
-| `ClassificationRuleController` | `/api/parties/{partyId}/classification-rules` | ClassificationRule |
+| `ClassificationRuleController` | `/api/parties/{partyId}/classification-rules` | ClassificationRule (CRUD per podmiot) |
+| `ClassificationRulesController` | `GET /api/classification-rules` | Lista wszystkich aktywnych reguł (wszystkie podmioty) |
 | `PartyBankAccountController` | `/api/party-bank-accounts` | PartyBankAccount |
 | `WalletController` | `/api/wallets` | Wallet |
 | `ConcernController` | `/api/concerns` | Concern |
@@ -88,14 +89,16 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 
 ### `layout/` — szkielet UI
 
-`Layout`, `Sidebar`, `Topbar`, `Breadcrumbs`, `PageHeader`, `RightPanelContext` (portal na panel boczny).
+`Layout`, `Sidebar`, `Topbar`, `Breadcrumbs`, `PageHeader`, `AppFooter` (wersja/build z `/api/health`), `RightPanelContext` (portal na panel boczny).
 
 ### `shared/` — współdzielone
 
 | Katalog | Zawartość |
 |---------|-----------|
-| `api/` | Klient Axios + moduły endpointów (10 plików) |
-| `components/` | Avatar, Pagination, StatusBadge, ConfirmDialog, ComingSoon, form kit (`FormField`, `FormError`, `FormActions`, `DictionarySelect`, `formClasses`, `Select`) |
+| `api/` | Klient Axios (`client.ts`) + moduły endpointów (`auth`, `transactions`, `parties`, `classificationRules`, `system`, …) |
+| `components/` | `Pill`, `Pagination`, `ConfirmDialog`, `Modal`, `ComingSoon`, `ListTextTooltip`, `ExpandableText`, form kit (`FormField`, `FormError`, `FormActions`, `DictionarySelect`, `CategorySelect`, `formClasses`, `Select`) |
+| `hooks/` | `useAppInfo` — dane wersji z health API |
+| `constants/` | `pillMaps.ts` — mapowanie wariantów `Pill` (kierunek, status, typ podmiotu) |
 | `types/` | `Transaction`, `FlowItem`, typy auth |
 | `utils/format.ts` | Formatowanie kwot |
 | `utils/errors.ts` | `getApiErrorMessage` — wspólne wyciąganie błędów API |
@@ -105,7 +108,7 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 | Moduł | Ścieżka | Strony / komponenty |
 |-------|---------|---------------------|
 | dashboard | `dashboard/pages/Dashboard.tsx` | Karty statystyk, ostatnie transakcje |
-| transactions | `transactions/` | `Transactions.tsx`, sidebar, edycja single/bulk, historia |
+| transactions | `transactions/` | `Transactions.tsx`, sidebar (filtry/szczegóły/bulk), `TransactionEdit.tsx` (edycja pojedyncza), historia |
 | import | `import/pages/` | Upload, historia, szczegóły, błędy, wiersze |
 | configuration | `configuration/` | Podmioty, portfele, dotyczy, kategorie, reguły klasyfikacji |
 
@@ -127,7 +130,8 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 | Portfele | `shared/api/wallets.ts` | `WalletController` |
 | Dotyczy | `shared/api/concerns.ts` | `ConcernController` |
 | Kategorie | `shared/api/categories.ts` | `CategoryController` |
-| Reguły klasyfikacji | `shared/api/classificationRules.ts` | `ClassificationRuleController` |
+| Reguły klasyfikacji | `shared/api/classificationRules.ts` | `ClassificationRuleController`, `ClassificationRulesController` |
+| System (admin) | `shared/api/system.ts` | `SystemController` |
 | Użytkownicy | `shared/api/users.ts` | `UserController` |
 
 ---
@@ -189,9 +193,15 @@ Dozwolone `fields`: `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`,
 
 Lub `filters` (jak lista transakcji) zamiast `transactionIds`. Odpowiedź: `{ applied, skipped, noPartyContext, errors }`.
 
-### Reguły klasyfikacji — `/api/parties/{partyId}/classification-rules`
+### Reguły klasyfikacji
 
-CRUD; body zawiera `name`, `description`, `priority`, `enabled`, `stopOnMatch`, `conditions`, `actions`, opcjonalnie `partyId` (przeniesienie), `createdFromTransactionId`.
+**Lista globalna:** `GET /api/classification-rules` — wszystkie aktywne reguły (z `partyId`, `partyName`).
+
+**CRUD per podmiot:** `/api/parties/{partyId}/classification-rules`
+
+Body zawiera `name`, `description`, `priority`, `enabled`, `stopOnMatch`, `conditions`, `actions`, opcjonalnie `partyId` (przeniesienie), `createdFromTransactionId`.
+
+**Podmioty kontekstu reguł:** `GET /api/parties?ruleEligible=true` — OWN + konto bankowe + co najmniej jeden import (używane w UI reguł i przy „Utwórz regułę z transakcji”).
 
 ### Encje konfiguracyjne — POST/PUT
 
@@ -222,12 +232,13 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 
 | Plik | Odpowiedzialność |
 |------|------------------|
-| `pages/ClassificationRules.tsx` | Lista reguł (`view`: list/create/edit), wybór podmiotu, breadcrumb, usuwanie (`ConfirmDialog`) |
-| `components/ClassificationRulesTable.tsx` | Tabela reguł (priorytet, nazwa, liczba warunków, status) + akcje edytuj/usuń |
+| `pages/ClassificationRules.tsx` | Lista reguł (`view`: list/create/edit), breadcrumb, usuwanie (`ConfirmDialog`); obsługa nawigacji z transakcji (`state.fromTransaction`) |
+| `components/ClassificationRulesTable.tsx` | Tabela reguł (desktop) + karty (mobile); priorytet, nazwa, podmiot, liczba warunków, status |
 | `components/ClassificationRuleForm.tsx` | Formularz create/edit w content (nie modal); deleguje sekcje do edytorów |
 | `components/RuleConditionsEditor.tsx` | Warunki AND (pola, operatory, wartości) |
 | `components/RuleConditionValueInput.tsx` | Kontrolka wartości warunku (tekst, data, zakres, lista) |
 | `components/RuleActionsEditor.tsx` | Akcje transakcji i pozycji (Skąd/Dokąd, split, portfel, dotyczy, kategoria) |
+| `utils/ruleFromTransaction.ts` | `buildRuleDraftFromTransaction`, `canCreateRuleFromTransaction`; warunki: opis (`contains`, wartość ręczna) + opcjonalny NRB |
 | `ruleConditionMeta.ts` | Operatory dozwolone per pole, normalizacja i walidacja warunków |
 | `constants.ts` | Etykiety pól/operatorów, `defaultForm()` / `ruleToForm()` (bez klas CSS — przeniesione do `shared/components/form/formClasses.ts`) |
 
@@ -249,7 +260,7 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 | `Modal.tsx` | Overlay dialogowy (portal, backdrop, rozmiary sm/md/lg) |
 | `ConfirmDialog.tsx` | Potwierdzenie akcji — oparty na `Modal` |
 
-**P2 (zrobione):** `DictionarySelect` przeniesiony do `shared/components/form/`; używany w `ClassificationRuleFormDialog` (paidFrom/paidTo/portfel/kategoria) oraz w module transakcji.
+**P2 (zrobione):** `DictionarySelect` przeniesiony do `shared/components/form/`; używany w `ClassificationRuleForm` (paidFrom/paidTo/portfel) oraz w module transakcji.
 
 **P3 (zrobione):** form kit wdrożony w `PartyForm`, `PartyBankAccountsSection` (pola + `FormError`), `Categories` (`CategoryForm`), `SimpleEntityPage` (`EntityForm` — Portfele, Dotyczy).
 
@@ -257,7 +268,7 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 
 | Krok | Zmiana |
 |------|--------|
-| P4a | `RuleConditionsEditor`, `RuleActionsEditor` — wydzielone z `ClassificationRuleFormDialog` |
+| P4a | `RuleConditionsEditor`, `RuleActionsEditor` — wydzielone z `ClassificationRuleForm` |
 | P4b | Pole **Dotyczy** (`concernId`) w akcjach reguły + `fetchConcerns` na stronie |
 | P4c | `shared/components/Modal.tsx` — używany w `ConfirmDialog`, `ApplyClassificationRulesDialog` (nie w formularzach CRUD konfiguracji) |
 | P4d | `categories/components/CategoryForm.tsx` — formularz wydzielony ze strony |
@@ -279,10 +290,14 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 
 | Komponent | Rola |
 |-----------|------|
-| `Transactions.tsx` | Tabela, selekcja, orchestracja panelu |
-| `TransactionsSidebar` | Zakładki Filtry / Szczegóły / Edycja |
-| `EditSinglePanel` | Podział pozycji, klasyfikacja |
-| `EditBulkPanel` | Masowa edycja wybranych pól |
+| `Transactions.tsx` | Tabela, selekcja, orchestracja panelu, nawigacja do edycji / tworzenia reguły |
+| `TransactionsSidebar` | Zakładki Filtry / Szczegóły / Edycja (bulk) |
+| `TransactionDetailsPanel` | Szczegóły pojedynczej transakcji; przyciski Edytuj i Utwórz regułę |
+| `TransactionSummaryCard` | Karta transakcji (szczegóły + formularz reguły z transakcji) |
+| `TransactionEdit.tsx` / `TransactionEditForm.tsx` | Edycja pojedynczej transakcji (strona `/transactions/:id/edit`) |
+| `EditBulkPanel` | Masowa edycja wybranych pól (sidebar) |
+| `ApplyClassificationRulesDialog` | Potwierdzenie zastosowania reguł (zaznaczenie / filtr) |
+| `TransactionMultiDetailsPanel` | Szczegóły wielu zaznaczonych transakcji |
 | `TransactionHistorySection` | Lista snapshotów, restore |
 | `useFlowsQuery` | Pobieranie listy z anulowaniem requestów |
 
@@ -295,8 +310,3 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 | `mock/` | Statyczne prototypy HTML; **nie podłączone** do React |
 | `scripts/` | Skrypty pomocnicze (np. portproxy) |
 | `docker/` | Konfiguracja kontenera |
-
-## Martwy kod (DO POTWIERDZENIA czy usunąć)
-
-- `frontend/.../FilterDrawer.tsx` — brak importów
-- `frontend/.../mockData.ts` — brak importów

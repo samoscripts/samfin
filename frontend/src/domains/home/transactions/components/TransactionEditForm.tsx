@@ -12,6 +12,7 @@ import ClassificationItemsEditor, {
 import FormActions from '@/shared/components/form/FormActions'
 import FormError from '@/shared/components/form/FormError'
 import { FieldRow, ReadOnlyField, SectionLabel } from '@/shared/components/form/FormSection'
+import PartySelect from '@/shared/components/form/PartySelect'
 import { selectCls } from '@/shared/components/form/formClasses'
 import { formatAmount } from '@/shared/utils/format'
 import { DEFAULT_SPLIT_PERCENT } from '@/shared/utils/splitAllocation'
@@ -74,6 +75,8 @@ export interface TransactionEditFormProps {
   parties: Party[]
   onSaved: (updated: Transaction) => void
   onCancel: () => void
+  onPartyCreated?: (party: Party) => void
+  onCategoryCreated?: (category: Category) => void
 }
 
 export default function TransactionEditForm({
@@ -84,6 +87,8 @@ export default function TransactionEditForm({
   parties,
   onSaved,
   onCancel,
+  onPartyCreated,
+  onCategoryCreated,
 }: TransactionEditFormProps) {
   const [draft, setDraft] = useState<EditDraft>(() => txToEditDraft(tx))
   const [saving, setSaving] = useState(false)
@@ -109,6 +114,9 @@ export default function TransactionEditForm({
   const paidFromParties = filterPartiesForField(parties, tx, 'paidFrom', draft.paidToPartyId)
   const paidToParties = filterPartiesForField(parties, tx, 'paidTo', draft.paidFromPartyId)
   const relevantCategories = filterCategoriesForDirection(categories, tx.direction)
+
+  const manualOwnFrom = tx.source === 'MANUAL' && tx.direction === 'EXPENSE'
+  const manualOwnTo = tx.source === 'MANUAL' && tx.direction === 'INCOME'
 
   const directionLabel = DIRECTION_LABEL_BY_VALUE[tx.direction] ?? tx.direction
   const directionCls =
@@ -187,27 +195,27 @@ export default function TransactionEditForm({
                   hint="Ustalone przy imporcie"
                 />
               ) : (
-                <select
-                  value={draft.paidFromPartyId ?? ''}
-                  onChange={(e) =>
+                <PartySelect
+                  parties={paidFromParties}
+                  value={draft.paidFromPartyId}
+                  onChange={(partyId) =>
                     setDraft((prev) => ({
                       ...prev,
-                      ...applyPartyFieldChange(
-                        prev,
-                        'paidFrom',
-                        e.target.value ? Number(e.target.value) : null,
-                      ),
+                      ...applyPartyFieldChange(prev, 'paidFrom', partyId),
                     }))
                   }
+                  emptyLabel={EDIT_EMPTY_LABEL}
                   className={selectCls}
-                >
-                  <option value="">{EDIT_EMPTY_LABEL}</option>
-                  {paidFromParties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  excludePartyId={draft.paidToPartyId}
+                  onPartyCreated={onPartyCreated}
+                  allowedTypes={manualOwnFrom ? ['CASH'] : undefined}
+                  allowedOwnerships={manualOwnFrom ? ['OWN'] : undefined}
+                  quickAddDefaults={
+                    manualOwnFrom
+                      ? { type: 'CASH', ownershipType: 'OWN' }
+                      : { type: 'OTHER', ownershipType: 'EXTERNAL' }
+                  }
+                />
               )}
             </FieldRow>
             <FieldRow label="Dokąd (odbiorca)">
@@ -217,27 +225,27 @@ export default function TransactionEditForm({
                   hint="Ustalone przy imporcie"
                 />
               ) : (
-                <select
-                  value={draft.paidToPartyId ?? ''}
-                  onChange={(e) =>
+                <PartySelect
+                  parties={paidToParties}
+                  value={draft.paidToPartyId}
+                  onChange={(partyId) =>
                     setDraft((prev) => ({
                       ...prev,
-                      ...applyPartyFieldChange(
-                        prev,
-                        'paidTo',
-                        e.target.value ? Number(e.target.value) : null,
-                      ),
+                      ...applyPartyFieldChange(prev, 'paidTo', partyId),
                     }))
                   }
+                  emptyLabel={EDIT_EMPTY_LABEL}
                   className={selectCls}
-                >
-                  <option value="">{EDIT_EMPTY_LABEL}</option>
-                  {paidToParties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  excludePartyId={draft.paidFromPartyId}
+                  onPartyCreated={onPartyCreated}
+                  allowedTypes={manualOwnTo ? ['CASH'] : undefined}
+                  allowedOwnerships={manualOwnTo ? ['OWN'] : undefined}
+                  quickAddDefaults={
+                    manualOwnTo
+                      ? { type: 'CASH', ownershipType: 'OWN' }
+                      : { type: 'OTHER', ownershipType: 'EXTERNAL' }
+                  }
+                />
               )}
             </FieldRow>
           </div>
@@ -254,6 +262,8 @@ export default function TransactionEditForm({
           categories={relevantCategories}
           totalAmount={tx.amount}
           direction={tx.direction}
+          allowCategoryQuickAdd
+          onCategoryCreated={onCategoryCreated}
         />
 
         {draft.items.length > 1 && (

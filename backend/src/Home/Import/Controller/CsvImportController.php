@@ -6,7 +6,11 @@ use App\Home\Import\Provider\BankImportProviderRegistry;
 use App\Home\Import\Repository\CsvImportErrorRepository;
 use App\Home\Import\Repository\CsvImportRepository;
 use App\Home\Import\Repository\CsvImportRowRepository;
+use App\Home\Import\DTO\ImportIngestionMode;
+use App\Home\Import\Entity\CsvImport;
+use App\Home\Import\Exception\CsvImportDuplicateRowException;
 use App\Home\Import\Service\CsvImportService;
+use App\Home\Transaction\ClassificationRule\Exception\ClassificationRuleApplicationException;
 use App\Home\Transaction\Service\TransactionIngestionService;
 use App\Identity\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -150,16 +154,25 @@ class CsvImportController extends AbstractController
     }
 
     #[Route('/{id}/import', name: 'api_csv_imports_trigger_import', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function triggerImport(int $id): JsonResponse
+    public function triggerImport(int $id, Request $request): JsonResponse
     {
         $import = $this->importRepository->find($id);
         if (!$import) {
             return $this->json(['message' => 'Nie znaleziono importu.'], 404);
         }
 
-        if ($import->getStatus() !== \App\Home\Import\Entity\CsvImport::STATUS_VALIDATED) {
+        $payload = json_decode($request->getContent(), true);
+        $mode    = ImportIngestionMode::tryFrom(is_array($payload) ? (string) ($payload['mode'] ?? '') : '')
+            ?? ImportIngestionMode::Strict;
+
+        $allowedStatuses = [CsvImport::STATUS_VALIDATED];
+        if ($mode !== ImportIngestionMode::Strict) {
+            $allowedStatuses[] = CsvImport::STATUS_IMPORTED;
+        }
+
+        if (!in_array($import->getStatus(), $allowedStatuses, true)) {
             return $this->json([
-                'message' => 'Import można przenieść tylko ze statusu VALIDATED.',
+                'message' => 'Import w tym statusie nie może być przeniesiony do transakcji.',
                 'status'  => $import->getStatus(),
             ], 409);
         }
@@ -167,9 +180,26 @@ class CsvImportController extends AbstractController
         /** @var User $user */
         $user = $this->security->getUser();
 
-        $this->ingestionService->ingestFromImport($import, $user);
+        try {
+            $stats = $this->ingestionService->ingestFromImport($import, $user, $mode);
+        } catch (ClassificationRuleApplicationException $e) {
+            return $this->json([
+                'message' => $e->getMessage(),
+                'context' => $e->getContext(),
+            ], 400);
+        } catch (CsvImportDuplicateRowException $e) {
+            return $this->json([
+                'message' => $e->getMessage(),
+                'context' => $e->getContext(),
+            ], 400);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['message' => $e->getMessage()], 400);
+        }
 
-        return $this->json($import->toApiArray());
+        return $this->json([
+            'import' => $import->toApiArray(),
+            'stats'  => $stats->toApiArray(),
+        ]);
     }
 
     #[Route('', name: 'api_csv_imports_upload', methods: ['POST'])]

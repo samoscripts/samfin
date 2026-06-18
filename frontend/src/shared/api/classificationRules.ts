@@ -37,10 +37,8 @@ export interface RuleConditionsPayload {
   conditions: RuleCondition[]
 }
 
-export type RuleSplitType = 'FULL' | 'PERCENT' | 'REMAINDER'
-
 export interface RuleItemAction {
-  split: { type: RuleSplitType; value?: number }
+  percent: number
   walletId?: number | null
   concernId?: number | null
   categoryId?: number | null

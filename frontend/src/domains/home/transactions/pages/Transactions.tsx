@@ -247,6 +247,13 @@ export default function Transactions() {
     setSelectedTx(updated)
   }, [])
 
+  const handleCreateRule = useCallback(
+    (tx: Transaction) => {
+      navigate('/konfiguracja/reguly', { state: { fromTransaction: tx } })
+    },
+    [navigate],
+  )
+
   const requestSaveEdit = useCallback(() => {
     setEditConfirm('save')
   }, [])
@@ -576,6 +583,7 @@ export default function Transactions() {
             onClose={handleClose}
             onApplyRules={openApplyRulesSelection}
             onApplyRulesToFilter={openApplyRulesFilter}
+            onCreateRule={handleCreateRule}
           />,
           portalRoot,
         )}

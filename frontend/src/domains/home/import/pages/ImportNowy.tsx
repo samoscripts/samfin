@@ -7,6 +7,7 @@ import {
   type BankProvider,
   type CsvImportResult,
 } from '@/shared/api/csvImports'
+import { getApiErrorMessage } from '@/shared/utils/errors'
 
 const selectCls =
   'w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e] transition-colors'
@@ -58,9 +59,7 @@ export default function ImportNowy() {
         setResult(apiErr.response.data.import)
         setErrors(apiErr.response.data.errors ?? [])
       } else {
-        setGlobalError(
-          apiErr?.response?.data?.message ?? 'Wystąpił nieoczekiwany błąd podczas importu.',
-        )
+        setGlobalError(getApiErrorMessage(err, 'Wystąpił nieoczekiwany błąd podczas importu.'))
       }
     } finally {
       setUploading(false)

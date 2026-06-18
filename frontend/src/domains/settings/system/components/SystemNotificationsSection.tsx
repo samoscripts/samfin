@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import SystemSection from './SystemSection'
 import SystemOptionRow from './SystemOptionRow'
-import ToggleSwitch from './ToggleSwitch'
+import ToggleSwitch from '@/shared/components/form/ToggleSwitch'
 
 export default function SystemNotificationsSection() {
   const [importEmails, setImportEmails] = useState(false)
