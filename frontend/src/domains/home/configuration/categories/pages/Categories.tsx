@@ -3,14 +3,16 @@ import { ChevronRight, Loader2, Pencil, Plus, X } from 'lucide-react'
 import {
   deactivateCategory,
   fetchCategories,
+  fetchCategory,
   type Category,
   type CategoryType,
 } from '@/shared/api/categories'
 import Pill from '@/shared/components/Pill'
 import { CATEGORY_TYPE_PILL } from '@/shared/constants/pillMaps'
+import { useCrudRoute } from '@/shared/hooks/useCrudRoute'
 import CategoryForm from '../components/CategoryForm'
 
-type View = 'list' | 'create' | 'edit'
+const ROUTE_BASE = '/konfiguracja/kategorie'
 
 const TYPE_LABEL: Record<CategoryType, string> = {
   EXPENSE: 'Wydatek',
@@ -18,44 +20,54 @@ const TYPE_LABEL: Record<CategoryType, string> = {
 }
 
 export default function Categories() {
-  const [view, setView] = useState<View>('list')
+  const { isList, isCreate, isEdit, entityId, goList, goCreate, goEdit } = useCrudRoute(ROUTE_BASE)
+
   const [items, setItems] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editingItem, setEditingItem] = useState<Category | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
   const [deactivating, setDeactivating] = useState<number | null>(null)
 
-  async function loadCategories() {
+  useEffect(() => {
+    if (!isList) return
     setIsLoading(true)
-    try {
-      setItems(await fetchCategories())
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    fetchCategories()
+      .then(setItems)
+      .finally(() => setIsLoading(false))
+  }, [isList])
 
   useEffect(() => {
-    if (view === 'list') {
-      loadCategories()
+    if (!isEdit || entityId === null) {
+      setEditingItem(null)
+      return
     }
-  }, [view])
 
-  function openCreate() {
-    setEditingItem(null)
-    setView('create')
-  }
+    const fromList = items.find((i) => i.id === entityId)
+    if (fromList) {
+      setEditingItem(fromList)
+      return
+    }
 
-  function openEdit(item: Category) {
-    setEditingItem(item)
-    setView('edit')
-  }
+    let cancelled = false
+    setEditLoading(true)
+    fetchCategory(entityId)
+      .then((item) => {
+        if (!cancelled) setEditingItem(item)
+      })
+      .catch(() => {
+        if (!cancelled) setEditingItem(null)
+      })
+      .finally(() => {
+        if (!cancelled) setEditLoading(false)
+      })
 
-  function backToList() {
-    setEditingItem(null)
-    setView('list')
-  }
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, entityId, items])
 
   async function handleDeactivate(item: Category) {
-    if (!confirm(`Dezaktywować kategorię „${item.name}”?`)) return
+    if (!confirm(`Dezaktywować kategorię „${item.name}"?`)) return
     setDeactivating(item.id)
     try {
       await deactivateCategory(item.id)
@@ -65,45 +77,65 @@ export default function Categories() {
     }
   }
 
-  const active = items.filter((i) => i.active)
-  const inactive = items.filter((i) => !i.active)
-
   const breadcrumb = (
     <nav className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 mb-6">
-      <button onClick={backToList} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+      <button type="button" onClick={goList} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
         Kategorie
       </button>
-      {view !== 'list' && (
+      {!isList && (
         <>
           <ChevronRight size={12} className="shrink-0" />
           <span className="text-gray-600 dark:text-gray-400 font-medium">
-            {view === 'create' ? 'Nowa kategoria' : `Edycja: ${editingItem?.name ?? ''}`}
+            {isCreate ? 'Nowa kategoria' : `Edycja: ${editingItem?.name ?? ''}`}
           </span>
         </>
       )}
     </nav>
   )
 
-  if (view === 'create' || view === 'edit') {
+  if (isCreate || isEdit) {
+    if (isEdit && editLoading) {
+      return (
+        <div>
+          {breadcrumb}
+          <div className="flex items-center justify-center py-16 text-gray-400">
+            <Loader2 size={24} className="animate-spin" />
+          </div>
+        </div>
+      )
+    }
+
+    if (isEdit && !editingItem) {
+      return (
+        <div>
+          {breadcrumb}
+          <p className="text-sm text-red-600 dark:text-red-400">Nie znaleziono kategorii.</p>
+        </div>
+      )
+    }
+
     return (
       <div>
         {breadcrumb}
         <div className="w-full space-y-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {view === 'create' ? 'Nowa kategoria' : `Edycja: ${editingItem?.name ?? ''}`}
+            {isCreate ? 'Nowa kategoria' : `Edycja: ${editingItem?.name ?? ''}`}
           </h2>
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
             <CategoryForm
-              item={editingItem}
+              item={isCreate ? null : editingItem}
               allCategories={items}
-              onSaved={backToList}
-              onCancel={backToList}
+              onSaved={goList}
+              onCancel={goList}
             />
           </div>
         </div>
       </div>
     )
   }
+
+  const active = items.filter((i) => i.active)
+  const inactive = items.filter((i) => !i.active)
 
   return (
     <div>
@@ -116,7 +148,7 @@ export default function Categories() {
           </p>
         </div>
         <button
-          onClick={openCreate}
+          onClick={goCreate}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] text-white text-sm font-medium transition-colors"
         >
           <Plus size={15} />
@@ -140,7 +172,7 @@ export default function Categories() {
             title="Aktywne"
             items={active}
             deactivating={deactivating}
-            onEdit={openEdit}
+            onEdit={goEdit}
             onDeactivate={handleDeactivate}
           />
           {inactive.length > 0 && (
@@ -148,7 +180,7 @@ export default function Categories() {
               title="Nieaktywne"
               items={inactive}
               deactivating={deactivating}
-              onEdit={openEdit}
+              onEdit={goEdit}
               onDeactivate={handleDeactivate}
             />
           )}
@@ -162,7 +194,7 @@ interface CategoryTableProps {
   title: string
   items: Category[]
   deactivating: number | null
-  onEdit: (item: Category) => void
+  onEdit: (id: number) => void
   onDeactivate: (item: Category) => void
 }
 
@@ -198,7 +230,7 @@ function CategoryTable({ title, items, deactivating, onEdit, onDeactivate }: Cat
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => onEdit(item)}
+                        onClick={() => onEdit(item.id)}
                         title="Edytuj"
                         className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
@@ -237,7 +269,7 @@ function CategoryTable({ title, items, deactivating, onEdit, onDeactivate }: Cat
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => onEdit(item)} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                  <button onClick={() => onEdit(item.id)} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                     <Pencil size={14} />
                   </button>
                   {item.active && (

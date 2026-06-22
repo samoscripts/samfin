@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowUp, ArrowDown, ArrowUpDown, PanelRight, ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowUp, ArrowDown, ArrowUpDown, PanelRight, ArrowRight, Plus } from 'lucide-react'
 import PageHeader from '@/layout/PageHeader'
 import Pill from '@/shared/components/Pill'
 import Pagination from '@/shared/components/Pagination'
@@ -19,19 +19,23 @@ import {
   toggleIdInSet,
 } from '../utils/bulkSelection'
 import { useFlowsQuery } from '../hooks/useFlowsQuery'
-import { FlowFilters, SortState, PaginationState, countActiveFilters } from '../types'
+import { useTransactionListUrl } from '../hooks/useTransactionListUrl'
+import { isPanelOpenFromUrl } from '../utils/transactionUrlParams'
+import {
+  computeExpandedPanelWidth,
+  loadStoredPanelWidth,
+  storePanelWidth,
+} from '../constants/panelLayout'
+import { FlowFilters, SortState, countActiveFilters } from '../types'
 import { useRightPanelPortal } from '@/layout/RightPanelContext'
 import { Transaction } from '@/shared/types'
 import { formatDate } from '@/shared/utils/format'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import ListTextTooltip from '@/shared/components/ListTextTooltip'
 import ApplyClassificationRulesDialog from '../components/ApplyClassificationRulesDialog'
-import { applyClassificationRules } from '@/shared/api/transactions'
+import { applyClassificationRules, fetchTransaction } from '@/shared/api/transactions'
 import { fetchCategories, type Category } from '@/shared/api/categories'
 import { flowFiltersToTransactionFilters } from '../utils/flowFilters'
-
-const INITIAL_SORT: SortState = { field: 'date', direction: 'desc' }
-const INITIAL_PAGINATION: PaginationState = { page: 1, perPage: 25 }
 
 type SortableCol = 'date' | 'amount'
 
@@ -50,13 +54,28 @@ const COLUMNS: { key: string; label: string; sortable?: SortableCol }[] = [
 
 export default function Transactions() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const [activeFilters, setActiveFilters] = useState<FlowFilters>({})
-  const [sort, setSort]                   = useState<SortState>(INITIAL_SORT)
-  const [pagination, setPagination]       = useState<PaginationState>(INITIAL_PAGINATION)
-  const [panelOpen, setPanelOpen]         = useState(false)
-  const [panelWidth, setPanelWidth]       = useState(360)
-  const [activeTab, setActiveTab]         = useState<SidebarTab>('filters')
+  const {
+    filters: activeFilters,
+    sort,
+    pagination,
+    tx: urlTxId,
+    tab: urlTab,
+    createPrefill,
+    setFilters,
+    setSort,
+    setPagination,
+    openTx,
+    openFiltersTab,
+    openEdit,
+    openCreate,
+    exitEditMode,
+    setTab,
+    closePanel,
+  } = useTransactionListUrl()
+
+  const [panelWidth, setPanelWidth] = useState(loadStoredPanelWidth)
+  const [panelExpanded, setPanelExpanded] = useState(false)
+  const effectivePanelWidth = panelExpanded ? computeExpandedPanelWidth() : panelWidth
   const [refreshKey, setRefreshKey]       = useState(0)
 
   const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null)
@@ -64,7 +83,7 @@ export default function Transactions() {
   const [focusIndex, setFocusIndex]       = useState(-1)
   const [selectionAnchor, setSelectionAnchor] = useState(-1)
   const [editMode, setEditMode]           = useState<EditMode>(null)
-  const [editTabOpen, setEditTabOpen]     = useState(false)
+  const isEditing = editMode !== null
   const [isDirty, setIsDirty]             = useState(false)
   const [editConfirm, setEditConfirm]     = useState<'save' | 'cancel' | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
@@ -82,6 +101,11 @@ export default function Transactions() {
 
   const { data, isLoading, meta } = useFlowsQuery(activeFilters, sort, pagination, refreshKey)
 
+  const panelOpen = isPanelOpenFromUrl({ filters: activeFilters, sort, pagination, tx: urlTxId, tab: urlTab, createPrefill }) || isEditing
+  const activeTab: SidebarTab = isEditing
+    ? (editMode === 'create' ? 'create' : 'edit')
+    : (urlTab ?? (urlTxId ? 'details' : 'filters'))
+
   const bulkTransactions = useMemo(
     () => getSelectedTransactions(data, selectedIds),
     [data, selectedIds],
@@ -93,16 +117,52 @@ export default function Transactions() {
   }, [])
 
   useEffect(() => {
-    const selectedTxId = (location.state as { selectedTxId?: number } | null)?.selectedTxId
-    if (!selectedTxId || data.length === 0) return
-    const tx = data.find((t) => t.transactionId === selectedTxId)
-    if (tx) {
-      setSelectedTx(tx)
-      setPanelOpen(true)
-      setActiveTab('details')
+    if (urlTab === 'create') {
+      setEditMode('create')
+      return
     }
-    navigate(location.pathname, { replace: true, state: {} })
-  }, [data, location.pathname, location.state, navigate])
+    if (urlTab === 'edit' && urlTxId) {
+      setEditMode((prev) => (prev === 'bulk' ? 'bulk' : 'single'))
+      return
+    }
+    if (urlTab === 'edit' && editMode === 'bulk') {
+      return
+    }
+    if (urlTab === 'filters' || urlTab === 'details' || urlTab === null) {
+      setEditMode(null)
+    }
+  }, [urlTab, urlTxId, editMode])
+
+  const handlePanelWidthChange = useCallback((w: number) => {
+    setPanelWidth(w)
+    storePanelWidth(w)
+  }, [])
+
+  useEffect(() => {
+    if (!urlTxId) {
+      setSelectedTx(null)
+      return
+    }
+
+    const inList = data.find((t) => t.transactionId === urlTxId)
+    if (inList) {
+      setSelectedTx(inList)
+      return
+    }
+
+    let cancelled = false
+    fetchTransaction(urlTxId)
+      .then((tx) => {
+        if (!cancelled) setSelectedTx(tx)
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedTx(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [urlTxId, data])
 
   useEffect(() => {
     setSelectedIds(new Set())
@@ -115,29 +175,30 @@ export default function Transactions() {
     rowRefs.current[focusIndex]?.scrollIntoView({ block: 'nearest' })
   }, [focusIndex])
 
-  const handleApplyFilters = useCallback((filters: FlowFilters) => {
-    setActiveFilters(filters)
-    setPagination((p) => ({ ...p, page: 1 }))
-  }, [])
+  const handleApplyFilters = useCallback(
+    (filters: FlowFilters) => {
+      setFilters(filters)
+      setRefreshKey((k) => k + 1)
+    },
+    [setFilters],
+  )
 
   const handleSortColumn = (field: SortableCol) => {
-    setSort((prev) =>
-      prev.field === field
-        ? { field, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+    setSort(
+      sort.field === field
+        ? { field, direction: sort.direction === 'asc' ? 'desc' : 'asc' }
         : { field, direction: 'desc' },
     )
-    setPagination((p) => ({ ...p, page: 1 }))
   }
 
   const handleOpenFilters = useCallback(() => {
-    if (editTabOpen) return
-    setActiveTab('filters')
-    setPanelOpen(true)
-  }, [editTabOpen])
+    if (isEditing) return
+    openFiltersTab()
+  }, [isEditing, openFiltersTab])
 
   const handleRowActivate = useCallback(
     (tx: Transaction, index: number, e?: React.MouseEvent) => {
-      if (editTabOpen) return
+      if (isEditing) return
 
       tableRef.current?.focus()
 
@@ -146,24 +207,21 @@ export default function Transactions() {
         setSelectedTx(null)
         setFocusIndex(index)
         setSelectionAnchor(index)
-        setPanelOpen(true)
-        setActiveTab('details')
+        setTab('details')
         return
       }
 
       setSelectedIds(new Set())
-      setSelectedTx(tx)
       setFocusIndex(index)
       setSelectionAnchor(index)
-      setPanelOpen(true)
-      setActiveTab('details')
+      openTx(tx.transactionId, 'details')
     },
-    [editTabOpen],
+    [isEditing, openTx, setTab],
   )
 
   const handleArrowNavigate = useCallback(
     (delta: number, extend: boolean) => {
-      if (editTabOpen || data.length === 0) return
+      if (isEditing || data.length === 0) return
 
       tableRef.current?.focus()
 
@@ -182,24 +240,21 @@ export default function Transactions() {
         setSelectedTx(null)
         setFocusIndex(next)
         if (selectionAnchor < 0) setSelectionAnchor(current)
-        setPanelOpen(true)
-        setActiveTab('details')
+        setTab('details')
         return
       }
 
       setFocusIndex(next)
       setSelectionAnchor(next)
       setSelectedIds(new Set())
-      setSelectedTx(data[next])
-      setPanelOpen(true)
-      setActiveTab('details')
+      openTx(data[next].transactionId, 'details')
     },
-    [data, editTabOpen, focusIndex, selectionAnchor],
+    [data, isEditing, focusIndex, selectionAnchor, openTx, setTab],
   )
 
   const handleTableKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (editTabOpen || data.length === 0) return
+      if (isEditing || data.length === 0) return
 
       if (e.key === 'ArrowUp') {
         e.preventDefault()
@@ -209,38 +264,61 @@ export default function Transactions() {
         handleArrowNavigate(1, e.shiftKey)
       }
     },
-    [data.length, editTabOpen, handleArrowNavigate],
+    [data.length, isEditing, handleArrowNavigate],
   )
 
   const handleStartEdit = useCallback(() => {
     if (bulkTransactions.length > 1) {
       if (selectionMixed) return
       setEditMode('bulk')
-      setEditTabOpen(true)
-      setActiveTab('edit')
+      setTab('edit')
       return
     }
     const tx = bulkTransactions[0] ?? selectedTx
     if (tx) {
-      navigate(`/transactions/${tx.transactionId}/edit`)
+      openEdit(tx.transactionId)
+      setEditMode('single')
     }
-  }, [bulkTransactions, selectedTx, selectionMixed, navigate])
+  }, [bulkTransactions, selectedTx, selectionMixed, openEdit, setTab])
 
   const handleCancelEdit = useCallback(() => {
-    setEditTabOpen(false)
     setEditMode(null)
-    setActiveTab(selectedTx || bulkTransactions.length > 0 ? 'details' : 'filters')
+    const returnTxId =
+      editMode === 'create'
+        ? null
+        : (selectedTx?.transactionId ?? urlTxId ?? null)
+    exitEditMode(returnTxId)
     setIsDirty(false)
-  }, [selectedTx, bulkTransactions.length])
+  }, [selectedTx, urlTxId, editMode, exitEditMode])
 
   const handleBulkSaved = useCallback(() => {
     setRefreshKey((k) => k + 1)
     setSelectedIds(new Set())
-    setEditTabOpen(false)
     setEditMode(null)
-    setActiveTab(selectedTx ? 'details' : 'filters')
+    exitEditMode(selectedTx?.transactionId ?? urlTxId ?? null)
     setIsDirty(false)
-  }, [selectedTx])
+  }, [selectedTx, urlTxId, exitEditMode])
+
+  const handleSingleSaved = useCallback(
+    (updated: Transaction) => {
+      setRefreshKey((k) => k + 1)
+      setSelectedTx(updated)
+      setEditMode(null)
+      exitEditMode(updated.transactionId)
+      setIsDirty(false)
+    },
+    [exitEditMode],
+  )
+
+  const handleCreated = useCallback(
+    (tx: Transaction) => {
+      setRefreshKey((k) => k + 1)
+      setEditMode(null)
+      openTx(tx.transactionId, 'details')
+      setIsDirty(false)
+    },
+    [openTx],
+  )
 
   const handleRestored = useCallback((updated: Transaction) => {
     setRefreshKey((k) => k + 1)
@@ -249,7 +327,7 @@ export default function Transactions() {
 
   const handleCreateRule = useCallback(
     (tx: Transaction) => {
-      navigate('/konfiguracja/reguly', { state: { fromTransaction: tx } })
+      navigate(`/konfiguracja/reguly/nowy?fromTx=${tx.transactionId}`)
     },
     [navigate],
   )
@@ -259,8 +337,12 @@ export default function Transactions() {
   }, [])
 
   const requestCancelEdit = useCallback(() => {
-    setEditConfirm('cancel')
-  }, [])
+    if (isDirty) {
+      setEditConfirm('cancel')
+      return
+    }
+    handleCancelEdit()
+  }, [isDirty, handleCancelEdit])
 
   const handleRegisterSave = useCallback((fn: () => Promise<void>) => {
     saveFnRef.current = fn
@@ -287,19 +369,19 @@ export default function Transactions() {
   }, [editConfirm, handleCancelEdit])
 
   const handleClose = useCallback(() => {
-    if (editTabOpen) {
+    if (isEditing) {
       requestCancelEdit()
       return
     }
-    setPanelOpen(false)
-  }, [editTabOpen, requestCancelEdit])
+    closePanel()
+  }, [isEditing, requestCancelEdit, closePanel])
 
   const handleTabChange = useCallback(
     (tab: SidebarTab) => {
-      if (editTabOpen) return
-      setActiveTab(tab)
+      if (isEditing) return
+      setTab(tab)
     },
-    [editTabOpen],
+    [isEditing, setTab],
   )
 
   const openApplyRulesSelection = useCallback(() => {
@@ -350,37 +432,58 @@ export default function Transactions() {
 
   const activeCount = countActiveFilters(activeFilters)
 
+  const handleOpenCreate = useCallback(() => {
+    setEditMode('create')
+    openCreate()
+  }, [openCreate])
+
   const filtryButton = (
-    <button
-      onClick={handleOpenFilters}
-      disabled={editTabOpen}
-      className={[
-        'relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors shadow-sm',
-        panelOpen && activeTab === 'filters'
-          ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100'
-          : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
-        editTabOpen ? 'opacity-50 cursor-not-allowed' : '',
-      ].join(' ')}
-      aria-label="Pokaż filtry"
-    >
-      <PanelRight size={15} />
-      Filtry
-      {activeCount > 0 && (
-        <span
-          className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1"
-          style={{ backgroundColor: '#c9a96e' }}
-        >
-          {activeCount}
-        </span>
-      )}
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => handleOpenCreate()}
+        disabled={isEditing}
+        className={[
+          'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg text-white hover:opacity-90 transition-opacity',
+          isEditing ? 'opacity-50 cursor-not-allowed' : '',
+        ].join(' ')}
+        style={{ backgroundColor: '#1c4230' }}
+      >
+        <Plus size={15} />
+        Nowa transakcja
+      </button>
+      <button
+        type="button"
+        onClick={handleOpenFilters}
+        disabled={isEditing}
+        className={[
+          'relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors shadow-sm',
+          panelOpen && activeTab === 'filters'
+            ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100'
+            : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
+          isEditing ? 'opacity-50 cursor-not-allowed' : '',
+        ].join(' ')}
+        aria-label="Pokaż filtry"
+      >
+        <PanelRight size={15} />
+        Filtry
+        {activeCount > 0 && (
+          <span
+            className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1"
+            style={{ backgroundColor: '#c9a96e' }}
+          >
+            {activeCount}
+          </span>
+        )}
+      </button>
+    </div>
   )
 
   const saveConfirmMessage = `Zostanie zaktualizowanych ${bulkTransactions.length} transakcji. Kontynuować?`
 
   const cancelConfirmMessage = isDirty
-    ? 'Niezapisane zmiany zostaną utracone. Wrócisz do listy transakcji.'
-    : 'Wrócisz do listy transakcji bez zapisywania.'
+    ? 'Niezapisane zmiany zostaną utracone. Wrócisz do poprzedniego widoku listy.'
+    : 'Wrócisz do poprzedniego widoku listy.'
 
   return (
     <>
@@ -432,7 +535,7 @@ export default function Transactions() {
                   bulkSelected={selectedIds.has(tx.transactionId)}
                   selected={selectedTx?.transactionId === tx.transactionId}
                   onActivate={(e) => handleRowActivate(tx, index, e)}
-                  selectionBlocked={editTabOpen}
+                  selectionBlocked={isEditing}
                 />
               ))}
             </div>
@@ -503,10 +606,10 @@ export default function Transactions() {
                           onClick={(e) => handleRowActivate(tx, index, e)}
                           className={[
                             'transition-colors',
-                            editTabOpen ? 'cursor-not-allowed' : 'cursor-pointer',
+                            isEditing ? 'cursor-not-allowed' : 'cursor-pointer',
                             isBulkSelected || isDetailSelected
                               ? 'bg-amber-50/80 dark:bg-amber-950/20'
-                              : editTabOpen
+                              : isEditing
                                 ? ''
                                 : 'hover:bg-gray-50 dark:hover:bg-gray-800/40',
                           ].join(' ')}
@@ -561,8 +664,11 @@ export default function Transactions() {
         createPortal(
           <TransactionsSidebar
             open={panelOpen}
-            width={panelWidth}
-            onWidthChange={setPanelWidth}
+            width={effectivePanelWidth}
+            expanded={panelExpanded}
+            resizable={!panelExpanded}
+            onWidthChange={handlePanelWidthChange}
+            onToggleExpand={() => setPanelExpanded((v) => !v)}
             activeTab={activeTab}
             onTabChange={handleTabChange}
             activeFilters={activeFilters}
@@ -571,9 +677,12 @@ export default function Transactions() {
             selectionMixed={selectionMixed}
             editMode={editMode}
             bulkTransactions={bulkTransactions}
-            editTabOpen={editTabOpen}
+            isEditing={isEditing}
+            createPrefill={createPrefill}
             onStartEdit={handleStartEdit}
             onBulkSaved={handleBulkSaved}
+            onSingleSaved={handleSingleSaved}
+            onCreated={handleCreated}
             onRestored={handleRestored}
             onSaveClick={requestSaveEdit}
             onCancelClick={requestCancelEdit}
@@ -589,7 +698,7 @@ export default function Transactions() {
         )}
 
       <ConfirmDialog
-        open={editConfirm === 'save'}
+        open={editConfirm === 'save' && editMode === 'bulk'}
         title="Zapisać zmiany?"
         message={saveConfirmMessage}
         confirmLabel="Zapisz"

@@ -6,42 +6,59 @@ import {
   OWNERSHIP_TYPE_LABELS,
 } from '../types'
 import Pill from '@/shared/components/Pill'
-import { fetchParties, deactivateParty } from '@/shared/api/parties'
+import { fetchParties, fetchParty, deactivateParty } from '@/shared/api/parties'
+import { useCrudRoute } from '@/shared/hooks/useCrudRoute'
 import PartyForm from '../components/PartyForm'
 import PartyBankAccountsSection from '../components/PartyBankAccountsSection'
 
-type View = 'list' | 'create' | 'edit'
+const ROUTE_BASE = '/konfiguracja/podmioty'
 
 export default function Parties() {
+  const { isList, isCreate, isEdit, entityId, goList, goCreate, goEdit } = useCrudRoute(ROUTE_BASE)
+
   const [parties, setParties] = useState<Party[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [view, setView] = useState<View>('list')
   const [editingParty, setEditingParty] = useState<Party | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
   const [deactivating, setDeactivating] = useState<number | null>(null)
 
   useEffect(() => {
-    if (view === 'list') {
-      setIsLoading(true)
-      fetchParties()
-        .then(setParties)
-        .finally(() => setIsLoading(false))
+    if (!isList) return
+    setIsLoading(true)
+    fetchParties()
+      .then(setParties)
+      .finally(() => setIsLoading(false))
+  }, [isList])
+
+  useEffect(() => {
+    if (!isEdit || entityId === null) {
+      setEditingParty(null)
+      return
     }
-  }, [view])
 
-  function openCreate() {
-    setEditingParty(null)
-    setView('create')
-  }
+    const fromList = parties.find((p) => p.id === entityId)
+    if (fromList) {
+      setEditingParty(fromList)
+      return
+    }
 
-  function openEdit(party: Party) {
-    setEditingParty(party)
-    setView('edit')
-  }
+    let cancelled = false
+    setEditLoading(true)
+    fetchParty(entityId)
+      .then((party) => {
+        if (!cancelled) setEditingParty(party)
+      })
+      .catch(() => {
+        if (!cancelled) setEditingParty(null)
+      })
+      .finally(() => {
+        if (!cancelled) setEditLoading(false)
+      })
 
-  function backToList() {
-    setEditingParty(null)
-    setView('list')
-  }
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, entityId, parties])
 
   async function handleDeactivate(party: Party) {
     if (!confirm(`Dezaktywować podmiot „${party.name}"?`)) return
@@ -55,8 +72,8 @@ export default function Parties() {
   }
 
   function handleSaved(saved: Party) {
-    if (view === 'create') {
-      backToList()
+    if (isCreate) {
+      goList()
     } else {
       setEditingParty(saved)
       setParties((prev) => {
@@ -71,39 +88,53 @@ export default function Parties() {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Breadcrumb
-  // -------------------------------------------------------------------------
   const breadcrumb = (
     <nav className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 mb-6">
-      <button onClick={backToList} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+      <button type="button" onClick={goList} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
         Podmioty
       </button>
-      {view !== 'list' && (
+      {!isList && (
         <>
           <ChevronRight size={12} className="shrink-0" />
           <span className="text-gray-600 dark:text-gray-400 font-medium">
-            {view === 'create' ? 'Nowy podmiot' : `Edycja: ${editingParty?.name}`}
+            {isCreate ? 'Nowy podmiot' : `Edycja: ${editingParty?.name}`}
           </span>
         </>
       )}
     </nav>
   )
 
-  // -------------------------------------------------------------------------
-  // Create / Edit view
-  // -------------------------------------------------------------------------
-  if (view === 'create' || view === 'edit') {
+  if (isCreate || isEdit) {
+    if (isEdit && editLoading) {
+      return (
+        <div>
+          {breadcrumb}
+          <div className="flex items-center justify-center py-16 text-gray-400">
+            <Loader2 size={24} className="animate-spin" />
+          </div>
+        </div>
+      )
+    }
+
+    if (isEdit && !editingParty) {
+      return (
+        <div>
+          {breadcrumb}
+          <p className="text-sm text-red-600 dark:text-red-400">Nie znaleziono podmiotu.</p>
+        </div>
+      )
+    }
+
     return (
       <div>
         {breadcrumb}
         <div className="w-full space-y-6">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {view === 'create' ? 'Nowy podmiot' : `Edycja: ${editingParty?.name}`}
+              {isCreate ? 'Nowy podmiot' : `Edycja: ${editingParty?.name}`}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {view === 'create'
+              {isCreate
                 ? 'Dodaj osobę, firmę, sklep lub rachunek bankowy uczestniczący w operacjach finansowych.'
                 : 'Zaktualizuj dane podmiotu.'}
             </p>
@@ -111,14 +142,13 @@ export default function Parties() {
 
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
             <PartyForm
-              party={editingParty}
+              party={isCreate ? null : editingParty}
               onSaved={handleSaved}
-              onCancel={backToList}
+              onCancel={goList}
             />
           </div>
 
-          {/* Bank accounts section — only for ACCOUNT type in edit mode */}
-          {view === 'edit' && editingParty?.type === 'ACCOUNT' && (
+          {isEdit && editingParty?.type === 'ACCOUNT' && (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
               <PartyBankAccountsSection partyId={editingParty.id} />
             </div>
@@ -128,9 +158,6 @@ export default function Parties() {
     )
   }
 
-  // -------------------------------------------------------------------------
-  // List view
-  // -------------------------------------------------------------------------
   const active = parties.filter((p) => p.active)
   const inactive = parties.filter((p) => !p.active)
 
@@ -146,7 +173,7 @@ export default function Parties() {
           </p>
         </div>
         <button
-          onClick={openCreate}
+          onClick={goCreate}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] text-white text-sm font-medium transition-colors"
         >
           <Plus size={15} />
@@ -171,7 +198,7 @@ export default function Parties() {
               <PartiesTable
                 parties={active}
                 title="Aktywne"
-                onEdit={openEdit}
+                onEdit={goEdit}
                 onDeactivate={handleDeactivate}
                 deactivating={deactivating}
               />
@@ -179,7 +206,7 @@ export default function Parties() {
                 <PartiesTable
                   parties={inactive}
                   title="Nieaktywne"
-                  onEdit={openEdit}
+                  onEdit={goEdit}
                   onDeactivate={handleDeactivate}
                   deactivating={deactivating}
                 />
@@ -192,14 +219,10 @@ export default function Parties() {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Table sub-component
-// ---------------------------------------------------------------------------
-
 interface PartiesTableProps {
   parties: Party[]
   title: string
-  onEdit: (p: Party) => void
+  onEdit: (id: number) => void
   onDeactivate: (p: Party) => void
   deactivating: number | null
 }
@@ -213,7 +236,6 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
         {title}
       </h3>
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
@@ -256,7 +278,7 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => onEdit(p)}
+                        onClick={() => onEdit(p.id)}
                         title="Edytuj"
                         className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
@@ -283,7 +305,6 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
           </table>
         </div>
 
-        {/* Mobile cards */}
         <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
           {parties.map((p) => (
             <div key={p.id} className="p-4 space-y-2">
@@ -301,7 +322,7 @@ function PartiesTable({ parties, title, onEdit, onDeactivate, deactivating }: Pa
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => onEdit(p)} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                  <button onClick={() => onEdit(p.id)} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                     <Pencil size={14} />
                   </button>
                   {p.active && (

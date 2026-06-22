@@ -2,6 +2,9 @@
 
 namespace App\Home\Import\Controller;
 
+use App\Home\Import\DTO\CsvImportErrorsQuery;
+use App\Home\Import\DTO\CsvImportListQuery;
+use App\Home\Import\DTO\CsvImportRowsQuery;
 use App\Home\Import\Provider\BankImportProviderRegistry;
 use App\Home\Import\Repository\CsvImportErrorRepository;
 use App\Home\Import\Repository\CsvImportRepository;
@@ -13,6 +16,7 @@ use App\Home\Import\Service\CsvImportService;
 use App\Home\Transaction\ClassificationRule\Exception\ClassificationRuleApplicationException;
 use App\Home\Transaction\Service\TransactionIngestionService;
 use App\Identity\Entity\User;
+use App\Shared\DTO\QueryValidationErrors;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -43,30 +47,26 @@ class CsvImportController extends AbstractController
     #[Route('', name: 'api_csv_imports_index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
-        $page   = max(1, (int)$request->query->get('page', 1));
-        $limit  = min(100, max(1, (int)$request->query->get('limit', 20)));
-        $source = $request->query->get('source');
-        $status = $request->query->get('status');
+        $query = CsvImportListQuery::fromInputBag($request->query);
+        if ($query instanceof QueryValidationErrors) {
+            return $this->json($query->toArray(), 422);
+        }
 
-        $criteria = [];
-        if ($source) $criteria['source'] = $source;
-        if ($status) $criteria['status'] = $status;
-
-        $total = $this->importRepository->count($criteria);
-        $items = $this->importRepository->findBy(
+        $criteria = $query->toCriteria();
+        $total    = $this->importRepository->count($criteria);
+        $items    = $this->importRepository->findBy(
             $criteria,
             ['createdAt' => 'DESC'],
-            $limit,
-            ($page - 1) * $limit,
+            $query->perPage,
+            ($query->page - 1) * $query->perPage,
         );
 
-        return $this->json([
-            'items' => array_map(fn($i) => $i->toApiArray(), $items),
-            'total' => $total,
-            'page'  => $page,
-            'limit' => $limit,
-            'pages' => (int)ceil($total / $limit),
-        ]);
+        return $this->json($this->pagedResponse(
+            array_map(fn ($i) => $i->toApiArray(), $items),
+            $total,
+            $query->page,
+            $query->perPage,
+        ));
     }
 
     #[Route('/{id}', name: 'api_csv_imports_show', methods: ['GET'], requirements: ['id' => '\d+'])]
@@ -87,23 +87,30 @@ class CsvImportController extends AbstractController
             return $this->json(['message' => 'Nie znaleziono importu.'], 404);
         }
 
-        $page  = max(1, (int)$request->query->get('page', 1));
-        $limit = min(200, max(1, (int)$request->query->get('limit', 50)));
-        $scope = $request->query->get('scope');
+        $query = CsvImportErrorsQuery::fromInputBag($request->query);
+        if ($query instanceof QueryValidationErrors) {
+            return $this->json($query->toArray(), 422);
+        }
 
         $criteria = ['csvImport' => $import];
-        if ($scope) $criteria['scope'] = $scope;
+        if ($query->scope !== null) {
+            $criteria['scope'] = $query->scope;
+        }
 
         $total = $this->errorRepository->count($criteria);
-        $items = $this->errorRepository->findBy($criteria, ['id' => 'ASC'], $limit, ($page - 1) * $limit);
+        $items = $this->errorRepository->findBy(
+            $criteria,
+            ['id' => 'ASC'],
+            $query->perPage,
+            ($query->page - 1) * $query->perPage,
+        );
 
-        return $this->json([
-            'items' => array_map(fn($e) => $e->toApiArray(), $items),
-            'total' => $total,
-            'page'  => $page,
-            'limit' => $limit,
-            'pages' => (int)ceil($total / $limit),
-        ]);
+        return $this->json($this->pagedResponse(
+            array_map(fn ($e) => $e->toApiArray(), $items),
+            $total,
+            $query->page,
+            $query->perPage,
+        ));
     }
 
     #[Route('/{id}/rows', name: 'api_csv_imports_rows', methods: ['GET'], requirements: ['id' => '\d+'])]
@@ -114,23 +121,30 @@ class CsvImportController extends AbstractController
             return $this->json(['message' => 'Nie znaleziono importu.'], 404);
         }
 
-        $page        = max(1, (int)$request->query->get('page', 1));
-        $limit       = min(200, max(1, (int)$request->query->get('limit', 100)));
-        $parseStatus = $request->query->get('parseStatus');
+        $query = CsvImportRowsQuery::fromInputBag($request->query);
+        if ($query instanceof QueryValidationErrors) {
+            return $this->json($query->toArray(), 422);
+        }
 
         $criteria = ['csvImport' => $import];
-        if ($parseStatus) $criteria['parseStatus'] = $parseStatus;
+        if ($query->parseStatus !== null) {
+            $criteria['parseStatus'] = $query->parseStatus;
+        }
 
         $total = $this->rowRepository->count($criteria);
-        $items = $this->rowRepository->findBy($criteria, ['lineNo' => 'ASC'], $limit, ($page - 1) * $limit);
+        $items = $this->rowRepository->findBy(
+            $criteria,
+            ['lineNo' => 'ASC'],
+            $query->perPage,
+            ($query->page - 1) * $query->perPage,
+        );
 
-        return $this->json([
-            'items' => array_map(fn($r) => $r->toApiArray(), $items),
-            'total' => $total,
-            'page'  => $page,
-            'limit' => $limit,
-            'pages' => (int)ceil($total / $limit),
-        ]);
+        return $this->json($this->pagedResponse(
+            array_map(fn ($r) => $r->toApiArray(), $items),
+            $total,
+            $query->page,
+            $query->perPage,
+        ));
     }
 
     #[Route('/{id}', name: 'api_csv_imports_delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
@@ -252,5 +266,22 @@ class CsvImportController extends AbstractController
             'import' => $csvImport->toApiArray(),
             'errors' => $errors,
         ], $csvImport->getStatus() === 'FAILED' ? 422 : 201);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     * @return array{data: list<array<string, mixed>>, meta: array{total: int, page: int, perPage: int, lastPage: int}}
+     */
+    private function pagedResponse(array $items, int $total, int $page, int $perPage): array
+    {
+        return [
+            'data' => $items,
+            'meta' => [
+                'total'    => $total,
+                'page'     => $page,
+                'perPage'  => $perPage,
+                'lastPage' => max(1, (int) ceil($total / $perPage)),
+            ],
+        ];
     }
 }

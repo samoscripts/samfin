@@ -4,6 +4,7 @@ import {
   createWallet,
   updateWallet,
   deactivateWallet,
+  fetchWallet,
   type Wallet,
 } from '@/shared/api/wallets'
 
@@ -18,11 +19,13 @@ const update = (id: number, p: Record<string, unknown>) =>
 export default function Wallets() {
   return (
     <SimpleEntityPage<WalletEntity>
+      routeBase="/konfiguracja/portfele"
       entityLabel="Portfele"
       addLabel="Nowy portfel"
       editLabel={(w) => `Edycja: ${w.name}`}
       description="Kontekst rozliczeniowy transakcji (np. budżet domowy, salon fryzjerski, firma)."
       fetchAll={fetchWallets as () => Promise<WalletEntity[]>}
+      fetchOne={fetchWallet as (id: number) => Promise<WalletEntity>}
       create={create}
       update={update}
       deactivate={deactivateWallet}

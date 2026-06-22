@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import ListTextTooltip from '@/shared/components/ListTextTooltip'
 import { fetchImportRows, type CsvImportRow } from '@/shared/api/csvImports'
+import { buildSearchParams, parseOptionalString, parsePositiveInt } from '@/shared/utils/urlQuery'
 
 type ParseFilter = 'ALL' | 'VALIDATED' | 'IMPORTED' | 'DUPLICATE' | 'PARSE_ERROR'
+
+const VALID_FILTERS = new Set<ParseFilter>(['ALL', 'VALIDATED', 'IMPORTED', 'DUPLICATE', 'PARSE_ERROR'])
 
 const ROW_STATUS_LABEL: Record<string, string> = {
   VALIDATED:   'Zwalidowany',
@@ -40,37 +43,61 @@ function formatAmount(minor: number | null): string {
 export default function ImportWiersze() {
   const { id } = useParams<{ id: string }>()
   const importId = parseInt(id ?? '0')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const page = useMemo(
+    () => parsePositiveInt(searchParams.get('page')) ?? 1,
+    [searchParams],
+  )
+
+  const filter = useMemo((): ParseFilter => {
+    const raw = parseOptionalString(searchParams.get('parseStatus'))
+    return raw && VALID_FILTERS.has(raw as ParseFilter) ? (raw as ParseFilter) : 'ALL'
+  }, [searchParams])
 
   const [items, setItems]         = useState<CsvImportRow[]>([])
   const [total, setTotal]         = useState(0)
-  const [page, setPage]           = useState(1)
   const [pages, setPages]         = useState(1)
   const [loading, setLoading]     = useState(true)
-  const [filter, setFilter]       = useState<ParseFilter>('ALL')
-  const limit = 100
+  const perPage = 100
 
-  async function load(p = 1, f: ParseFilter = filter) {
-    setLoading(true)
-    try {
-      const resp = await fetchImportRows(importId, {
-        page: p,
-        limit,
-        parseStatus: f === 'ALL' ? undefined : f,
+  const updateQuery = useCallback(
+    (patch: { page?: number; parseStatus?: ParseFilter }) => {
+      const nextPage = patch.page ?? page
+      const nextFilter = patch.parseStatus ?? filter
+      const params = buildSearchParams({
+        page: nextPage > 1 ? nextPage : undefined,
+        parseStatus: nextFilter !== 'ALL' ? nextFilter : undefined,
       })
-      setItems(resp.items)
-      setTotal(resp.total)
-      setPages(resp.pages)
-      setPage(p)
-    } finally {
-      setLoading(false)
-    }
-  }
+      setSearchParams(params, { replace: true })
+    },
+    [page, filter, setSearchParams],
+  )
 
-  useEffect(() => { load(1, 'ALL') }, [importId])
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetchImportRows(importId, {
+      page,
+      perPage,
+      parseStatus: filter === 'ALL' ? undefined : filter,
+    })
+      .then((resp) => {
+        if (cancelled) return
+        setItems(resp.data)
+        setTotal(resp.meta.total)
+        setPages(resp.meta.lastPage)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [importId, page, filter])
 
   function handleFilter(f: ParseFilter) {
-    setFilter(f)
-    load(1, f)
+    updateQuery({ page: 1, parseStatus: f })
   }
 
   if (loading && items.length === 0) {
@@ -227,7 +254,7 @@ export default function ImportWiersze() {
         </div>
       )}
 
-      <SimplePagination page={page} pages={pages} loading={loading} onPage={(p) => load(p)} />
+      <SimplePagination page={page} pages={pages} loading={loading} onPage={(p) => updateQuery({ page: p })} />
     </div>
   )
 }

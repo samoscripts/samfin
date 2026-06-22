@@ -14,6 +14,8 @@ import FormError from '@/shared/components/form/FormError'
 import { FieldRow, ReadOnlyField, SectionLabel } from '@/shared/components/form/FormSection'
 import PartySelect from '@/shared/components/form/PartySelect'
 import { selectCls } from '@/shared/components/form/formClasses'
+import Pill from '@/shared/components/Pill'
+import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
 import { formatAmount } from '@/shared/utils/format'
 import { DEFAULT_SPLIT_PERCENT } from '@/shared/utils/splitAllocation'
 import { getApiErrorMessage } from '@/shared/utils/errors'
@@ -119,10 +121,6 @@ export default function TransactionEditForm({
   const manualOwnTo = tx.source === 'MANUAL' && tx.direction === 'INCOME'
 
   const directionLabel = DIRECTION_LABEL_BY_VALUE[tx.direction] ?? tx.direction
-  const directionCls =
-    tx.direction === 'INCOME'
-      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -172,9 +170,7 @@ export default function TransactionEditForm({
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{tx.date}</span>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${directionCls}`}>
-            {directionLabel}
-          </span>
+          <Pill variant={DIRECTION_PILL[tx.direction]}>{directionLabel}</Pill>
         </div>
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2 mb-1">
           {tx.description ?? '—'}

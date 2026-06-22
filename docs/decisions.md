@@ -189,9 +189,9 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
-### ADR-019: Transakcje ręczne — specyfikacja MVP (planowane)
+### ADR-019: Transakcje ręczne — specyfikacja MVP
 
-**Kontekst:** Stała `Transaction::SOURCE_MANUAL` istnieje; walidator obsługuje reguły Skąd/Dokąd dla źródła MANUAL, ale brak endpointu tworzenia.
+**Kontekst:** Stała `Transaction::SOURCE_MANUAL` istnieje; walidator obsługuje reguły Skąd/Dokąd dla źródła MANUAL.
 
 **Decyzja (produktowa, do implementacji):**
 
@@ -204,11 +204,11 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | Skąd / Dokąd | opcjonalne przy tworzeniu; reguły jak ADR-017 (OWN+CASH po stronie własnej) |
 | Pozycje (portfel, dotyczy, kategoria) | opcjonalne; status liczy `TransactionStatusCalculator` |
 
-**Przepływ:** Formularz „Nowa transakcja” → `POST /api/transactions` ze `source: MANUAL` → jedna domyślna pozycja (jak import) → dalsza klasyfikacja przez istniejące `PUT /{id}/items`.
+**Przepływ:** Formularz „Nowa transakcja” (`/app/transactions/new`) → `POST /api/transactions` ze `source: MANUAL` → jedna domyślna pozycja (jak import) → dalsza klasyfikacja przez istniejące `PUT /{id}/items`.
 
-**Stan implementacji:** **NIE ZAIMPLEMENTOWANE** (brak `POST`, brak UI tworzenia). Walidator gotowy: `assertManualOwnSideRules`.
+**Stan implementacji:** **ZAIMPLEMENTOWANE** — `TransactionCreateService`, `POST /api/transactions`, strona `TransactionNew.tsx` z prefill z query params (`direction`, `date`, `amount`, `description`, `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`, `categoryId`).
 
-**Pliki (plan):** `TransactionController`, serwis tworzenia, frontend formularz.
+**Pliki:** `TransactionCreateService.php`, `TransactionController::create()`, `TransactionCreateForm.tsx`, `TransactionNew.tsx`, `transactionNewUrlParams.ts`.
 
 ---
 
@@ -267,6 +267,26 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 **Decyzja:** Każda pozycja w `actions.items` ma pole `percent` (int, 1–100). Suma procentów wszystkich pozycji musi wynosić 100 (jedna pozycja → zawsze 100). Stary format `split` nie jest wspierany.
 
 **Konsekwencje:** Przy apply kwoty liczone algorytmem „ostatnia pozycja = reszta w groszach” (jak przy edycji transakcji). Walidacja w `ClassificationRuleDefinitionValidator` i przy zapisie formularza (`validatePercents`).
+
+---
+
+### ADR-025: Query params jako źródło prawdy widoku listy
+
+**Kontekst:** API odczytów używa GET + query params, ale stan filtrów, sortowania i paginacji w przeglądarce był trzymany w `useState` i `location.state` — brak deep linków, zakładek i historii przeglądarki.
+
+**Decyzja:**
+
+- Filtry, sort, paginacja i kontekst panelu (np. `tx`, `tab`) synchronizujemy z adresem URL przez `useSearchParams`.
+- Path segmenty (ADR-020) dla tożsamości zasobu i trybu (`/transactions/:id/edit`, zakładki modułu).
+- Wartości słownikowe w URL po **ID numerycznym** (`walletId=3`), zgodnie z API.
+- Wielowartościowe filtry: format przecinkowy (`direction=EXPENSE,INCOME`).
+- Opcjonalny skrót `month=YYYY-MM` w URL UI (rozwijany do `dateFrom`/`dateTo`).
+- GET nie mutuje danych; zapis pozostaje POST/PUT/DELETE.
+- Wspólne DTO filtrów na backendzie (`TransactionFilterCriteria`, `TransactionListQuery`).
+
+**Konsekwencje:** `location.state` zastępowane query params tam, gdzie stan ma być trwały (powrót z edycji, reguła z transakcji). Złożone raporty w przyszłości mogą użyć `viewId` zamiast bardzo długiego URL.
+
+**Pliki:** `useCrudRoute.ts`, `useTransactionListUrl.ts`, `transactionUrlParams.ts`, `TransactionListQuery.php`, trasy CRUD w `routes.tsx`.
 
 ---
 
@@ -330,7 +350,7 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ### ADR-P08: ~~API tworzenia transakcji ręcznych~~
 
-**Status:** Specyfikacja w ADR-019; implementacja oczekuje.
+**Status:** Zaimplementowane wg ADR-019 (`POST /api/transactions`, UI `/transactions/new`).
 
 ---
 

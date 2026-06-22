@@ -88,7 +88,8 @@ flowchart LR
 3. **Klasyfikacja** — użytkownik uzupełnia Skąd/Dokąd oraz pozycje (portfel, dotyczy, kategoria); status `CLASSIFIED` wymaga wszystkich pięciu pól; walidacja podmiotów wg kierunku transakcji.
 4. **Reguły klasyfikacji** — zestaw reguł per podmiot OWN; ręczne uruchomienie na zaznaczeniu lub filtrze; opcjonalne tworzenie reguły z istniejącej transakcji.
 5. **Dashboard** — agregaty przychodów, wydatków, salda i liczby niesklasyfikowanych transakcji.
-6. **Transakcje ręczne (planowane)** — formularz tworzenia ze `source: MANUAL`; klasyfikacja opcjonalna; reguły Skąd/Dokąd jak przy edycji (ADR-017, ADR-019).
+6. **Transakcje ręczne** — formularz `/transactions/new` ze `source: MANUAL`; klasyfikacja opcjonalna; reguły Skąd/Dokąd jak przy edycji (ADR-017, ADR-019).
+7. **Raport miesięczny** — `/raporty/miesieczny` z filtrami w URL; API `GET /api/reports/monthly`.
 
 ## Konwencje globalne
 
@@ -99,8 +100,7 @@ flowchart LR
 
 ## Co nie jest jeszcze zaimplementowane
 
-- Moduł raportów (strona `/raporty` to placeholder `ComingSoon`).
-- Ręczne tworzenie transakcji — specyfikacja ADR-019; stała `SOURCE_MANUAL` i walidator w kodzie, brak `POST /api/transactions` i UI.
+- Rozszerzone raporty (per kategoria, wykresy, eksport) — poza raportem miesięcznym cashflow.
 - Osobne encje na cele, beneficjentów, zakresy budżetu — nie występują w kodzie (beneficjent → `concern`; cele poza MVP).
 
 Szczegóły: [open-questions.md](open-questions.md), [reporting.md](reporting.md).

@@ -92,21 +92,34 @@ class TransactionRepository extends ServiceEntityRepository
     /** @return array{income: float, expenses: float, balance: float, unclassifiedCount: int} */
     public function getStats(?string $dateFrom, ?string $dateTo): array
     {
+        return $this->getPeriodStats([
+            'dateFrom' => $dateFrom,
+            'dateTo'   => $dateTo,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     */
+    public function getPeriodStats(array $filters): array
+    {
+        $needsItemJoin = !empty($filters['walletId'])
+            || !empty($filters['concernId'])
+            || !empty($filters['categoryId']);
+
         $qb = $this->createQueryBuilder('t');
 
-        if ($dateFrom) {
-            $qb->andWhere('t.operationDate >= :df')
-               ->setParameter('df', new \DateTimeImmutable($dateFrom));
+        if ($needsItemJoin) {
+            $qb->leftJoin('t.items', 'ti');
         }
-        if ($dateTo) {
-            $qb->andWhere('t.operationDate <= :dt')
-               ->setParameter('dt', new \DateTimeImmutable($dateTo));
-        }
+
+        $this->applyFilters($qb, $filters, $needsItemJoin);
 
         $rows = $qb->select(
             "SUM(CASE WHEN t.direction = 'INCOME'  THEN t.amountMinor ELSE 0 END) AS income_minor",
             "SUM(CASE WHEN t.direction = 'EXPENSE' THEN ABS(t.amountMinor) ELSE 0 END) AS expense_minor",
             "SUM(CASE WHEN t.status = 'UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified",
+            'COUNT(DISTINCT t.id) AS tx_count',
         )
             ->getQuery()
             ->getOneOrNullResult();
@@ -114,12 +127,14 @@ class TransactionRepository extends ServiceEntityRepository
         $incomeMinor  = (int) ($rows['income_minor']  ?? 0);
         $expenseMinor = (int) ($rows['expense_minor'] ?? 0);
         $unclassified = (int) ($rows['unclassified']  ?? 0);
+        $txCount      = (int) ($rows['tx_count']      ?? 0);
 
         return [
             'income'            => round($incomeMinor / 100, 2),
             'expenses'          => round($expenseMinor / 100, 2),
             'balance'           => round(($incomeMinor - $expenseMinor) / 100, 2),
             'unclassifiedCount' => $unclassified,
+            'transactionCount'  => $txCount,
         ];
     }
 
@@ -192,12 +207,18 @@ class TransactionRepository extends ServiceEntityRepository
                ->setParameter('dateTo', new \DateTimeImmutable($f['dateTo']));
         }
         if (!empty($f['direction'])) {
-            $qb->andWhere('t.direction = :direction')
-               ->setParameter('direction', $f['direction']);
+            $directions = $this->parseFilterList($f['direction']);
+            if ($directions !== []) {
+                $qb->andWhere('t.direction IN (:directions)')
+                   ->setParameter('directions', $directions);
+            }
         }
         if (!empty($f['status'])) {
-            $qb->andWhere('t.status = :status')
-               ->setParameter('status', $f['status']);
+            $statuses = $this->parseFilterList($f['status']);
+            if ($statuses !== []) {
+                $qb->andWhere('t.status IN (:statuses)')
+                   ->setParameter('statuses', $statuses);
+            }
         }
         if (!empty($f['paidFromPartyId'])) {
             $qb->andWhere('t.paidFromParty = :paidFromPartyId')
@@ -229,6 +250,10 @@ class TransactionRepository extends ServiceEntityRepository
             $qb->andWhere('ABS(t.amountMinor) <= :amountMax')
                ->setParameter('amountMax', $maxMinor);
         }
+        if (!empty($f['description'])) {
+            $qb->andWhere('LOWER(t.description) LIKE LOWER(:description)')
+               ->setParameter('description', '%' . trim((string) $f['description']) . '%');
+        }
     }
 
     /**
@@ -252,5 +277,22 @@ class TransactionRepository extends ServiceEntityRepository
         $this->applyFilters($qb, $filters, $needsItemJoin);
 
         return array_map('intval', array_column($qb->getQuery()->getScalarResult(), 'id'));
+    }
+
+    /** @return list<string> */
+    private function parseFilterList(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $items = is_array($value)
+            ? $value
+            : explode(',', (string) $value);
+
+        return array_values(array_filter(
+            array_map('trim', array_map('strval', $items)),
+            static fn (string $v) => $v !== '',
+        ));
     }
 }

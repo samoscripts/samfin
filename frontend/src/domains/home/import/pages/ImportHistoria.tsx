@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 import Pill from '@/shared/components/Pill'
 import { IMPORT_STATUS_PILL } from '@/shared/constants/pillMaps'
 import { fetchImports, type CsvImportResult } from '@/shared/api/csvImports'
+import { buildSearchParams, parsePositiveInt } from '@/shared/utils/urlQuery'
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING:   'W trakcie',
@@ -21,32 +22,50 @@ function formatDate(iso: string) {
 
 export default function ImportHistoria() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const page = useMemo(
+    () => parsePositiveInt(searchParams.get('page')) ?? 1,
+    [searchParams],
+  )
 
   const [items, setItems]     = useState<CsvImportResult[]>([])
   const [total, setTotal]     = useState(0)
-  const [page, setPage]       = useState(1)
   const [pages, setPages]     = useState(1)
   const [loading, setLoading] = useState(true)
 
-  const limit = 20
+  const perPage = 20
 
-  async function load(p = 1) {
+  const setPage = useCallback(
+    (next: number) => {
+      const params = buildSearchParams({ page: next > 1 ? next : undefined })
+      setSearchParams(params, { replace: true })
+    },
+    [setSearchParams],
+  )
+
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    try {
-      const resp = await fetchImports({ page: p, limit })
-      setItems(resp.items)
-      setTotal(resp.total)
-      setPages(resp.pages)
-      setPage(p)
-    } finally {
-      setLoading(false)
+    fetchImports({ page, perPage })
+      .then((resp) => {
+        if (cancelled) return
+        setItems(resp.data)
+        setTotal(resp.meta.total)
+        setPages(resp.meta.lastPage)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-  }
-
-  useEffect(() => { load(1) }, [])
+  }, [page, refreshKey])
 
   function openDetail(imp: CsvImportResult) {
-    navigate(String(imp.id), { state: { imp } })
+    navigate(String(imp.id))
   }
 
   return (
@@ -59,7 +78,7 @@ export default function ImportHistoria() {
           </p>
         </div>
         <button
-          onClick={() => load(page)}
+          onClick={() => setRefreshKey((k) => k + 1)}
           disabled={loading}
           className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40"
           title="Odśwież"
@@ -172,7 +191,7 @@ export default function ImportHistoria() {
           {pages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-4">
               <button
-                onClick={() => load(page - 1)}
+                onClick={() => setPage(page - 1)}
                 disabled={page <= 1 || loading}
                 className="px-3 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
@@ -180,7 +199,7 @@ export default function ImportHistoria() {
               </button>
               <span className="text-xs text-gray-500 dark:text-gray-400">{page} / {pages}</span>
               <button
-                onClick={() => load(page + 1)}
+                onClick={() => setPage(page + 1)}
                 disabled={page >= pages || loading}
                 className="px-3 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >

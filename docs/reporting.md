@@ -2,16 +2,51 @@
 
 ## Stan implementacji
 
-Moduł raportów **nie jest zaimplementowany**. W aplikacji istnieją wyłącznie:
+Moduł raportów jest **częściowo zaimplementowany**:
 
-1. **Placeholder UI** — strona `/app/raporty` renderuje komponent `ComingSoon` z tytułem „Raporty” i podtytułem „Analizy i zestawienia finansowe”.
+1. **Raport miesięczny** — `/app/raporty/miesieczny` z filtrami w URL (`year`, `month`, `walletId`); API `GET /api/reports/monthly`.
 2. **Podstawowe statystyki transakcji** — endpoint API i dashboard.
+3. **Lista transakcji z filtrami** — eksploracja operacyjna (nie raport formalny).
 
-Folder `mock/` zawiera statyczne prototypy HTML (`mock/js/przeplywy.js`) z przykładowymi zestawieniami — **nie są podłączone** do aplikacji React.
+Folder `mock/` zawiera statyczne prototypy HTML — **nie są podłączone** do aplikacji React.
 
 ---
 
-## Co działa dziś
+## Raport miesięczny (MVP)
+
+### API: `GET /api/reports/monthly`
+
+Parametry query:
+
+| Parametr | Wymagany | Opis |
+|----------|----------|------|
+| `year` | tak | Rok (np. `2026`) |
+| `month` | tak | Miesiąc 1–12 |
+| `walletId` | nie | Filtr po portfelu (join na pozycje) |
+
+Odpowiedź (jak `GET /api/transactions/stats` w zakresie miesiąca):
+
+```json
+{
+  "income": 0.00,
+  "expenses": 0.00,
+  "balance": 0.00,
+  "unclassifiedCount": 0
+}
+```
+
+Implementacja: `ReportController`, `MonthlyReportQuery`, `TransactionRepository::getPeriodStats()` z filtrami dat i opcjonalnym `walletId`.
+
+### Frontend
+
+- Layout: `ReportsLayout.tsx` — zakładki (`/raporty` → redirect na `/raporty/miesieczny`).
+- Strona: `MonthlyReport.tsx` — wybór roku, miesiąca i portfela; stan synchronizowany z URL (ADR-025).
+
+Przykład: `/app/raporty/miesieczny?year=2026&month=6&walletId=2`
+
+---
+
+## Co działa dziś (poza raportem miesięcznym)
 
 ### API: `GET /api/transactions/stats`
 
@@ -28,7 +63,7 @@ Odpowiedź:
 }
 ```
 
-Implementacja: `TransactionRepository::getStats()`.
+Implementacja: `TransactionRepository::getPeriodStats()`.
 
 | Pole | Obliczenie |
 |------|------------|
@@ -37,7 +72,7 @@ Implementacja: `TransactionRepository::getStats()`.
 | `balance` | `income - expenses` (w PLN, zaokrąglenie 2 miejsca) |
 | `unclassifiedCount` | Liczba transakcji ze `status = UNCLASSIFIED` w zakresie dat |
 
-**Uwaga:** Statystyki operują na poziomie **transakcji**, nie pozycji (`transaction_items`). Nie uwzględniają wymiarów portfel / obszar / kategoria.
+**Uwaga:** Statystyki operują na poziomie **transakcji**, nie pozycji (`transaction_items`). Filtr `walletId` w raporcie miesięcznym działa przez join na pozycje.
 
 ### Frontend: Dashboard (`/`)
 
@@ -50,11 +85,11 @@ Wyświetla cztery karty:
 
 Dodatkowo: tabela ostatnich transakcji (`fetchTransactions` z limitem).
 
-Wywołanie: `fetchTransactionStats()` bez filtrów datowych (cała historia).
+Wywołanie: `fetchTransactionStats({ month })` — domyślnie bieżący miesiąc; URL dashboardu: `/?month=YYYY-MM`.
 
 ---
 
-## Lista i filtrowanie transakcji (nie raport, ale analityka operacyjna)
+## Lista i filtrowanie transakcji (analityka operacyjna)
 
 `GET /api/transactions` z filtrami:
 
@@ -62,30 +97,27 @@ Wywołanie: `fetchTransactionStats()` bez filtrów datowych (cała historia).
 - Podmioty paid from / paid to
 - Portfel, obszar, kategoria (przez join na pozycje)
 - Kwota min/max (wartość bezwzględna)
+- Opis transakcji (wyszukiwanie częściowe, bez rozróżniania wielkości liter)
 - Sortowanie: `date` lub `amount`, kierunek `asc`/`desc`
 - Paginacja: `page`, `perPage` (max 100)
 
-To umożliwia eksplorację danych w UI transakcji, ale **nie generuje raportów** (PDF, wykresy, zestawienia okresowe per kategoria itd.).
+Stan filtrów synchronizowany z URL na stronie transakcji (ADR-025).
 
 ---
 
-## Czego brakuje (planowane wg UI, nie w kodzie)
+## Czego brakuje
 
-Na podstawie placeholdera `/raporty` i prototypów `mock/` można **domyślać się** planowanych funkcji, ale **nie są one w kodzie produkcyjnym**:
+- Zestawienia wg kategorii / obszarów (agregaty na poziomie pozycji)
+- Raport roczny, wykresy trendów
+- Eksport danych (PDF, CSV)
+- Budżet vs wykonanie
 
-- Zestawienia wg kategorii / portfeli / obszarów
-- Raporty okresowe (miesiąc, rok)
-- Wykresy trendów
-- Eksport danych
-
-Wszelkie przyszłe wymagania raportowe wymagają potwierdzenia z product ownerem — patrz [open-questions.md](open-questions.md).
+Wymagania produktowe: [open-questions.md](open-questions.md) (#19).
 
 ---
 
-## Propozycje architektoniczne (DO POTWIERDZENIA)
+## Kierunki architektoniczne (przyszłość)
 
-Poniższe nie wynikają z istniejącego kodu — to kierunki do rozważenia przy implementacji raportów:
-
-1. **Agregacje na poziomie pozycji** — wiele raportów domowych wymaga sum per `category_id` / `wallet_id` / `concern_id` z `transaction_items`, nie z nagłówka transakcji.
-2. **Osobny moduł Reporting** — endpointy typu `/api/reports/...` vs rozszerzenie `/transactions/stats`.
+1. **Agregacje na poziomie pozycji** — wiele raportów domowych wymaga sum per `category_id` / `wallet_id` / `concern_id` z `transaction_items`.
+2. **Rozszerzenie modułu Reporting** — kolejne endpointy `/api/reports/...` z DTO query (jak `MonthlyReportQuery`).
 3. **Materialized views / cache** — przy większej liczbie transakcji agregaty czasowe mogą wymagać optymalizacji.

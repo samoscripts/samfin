@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { fetchTransactions } from '@/shared/api/transactions'
 import type { Transaction } from '@/shared/types'
 import type { FlowFilters, SortState, PaginationState, PaginationMeta } from '../types'
+import { flowFiltersToTransactionFilters } from '../utils/flowFilters'
 
 export interface FlowsQueryResult {
   data: Transaction[]
@@ -32,7 +33,7 @@ export function useFlowsQuery(
     setLoading(true)
 
     fetchTransactions(
-      filters,
+      flowFiltersToTransactionFilters(filters),
       sort.field,
       sort.direction,
       pagination.page,
@@ -55,12 +56,22 @@ export function useFlowsQuery(
 
     return () => controller.abort()
   }, [
-    filters.dateFrom, filters.dateTo, filters.direction, filters.status,
-    filters.paidFromPartyId, filters.paidToPartyId,
-    filters.walletId, filters.concernId, filters.categoryId,
-    filters.amountMin, filters.amountMax,
-    sort.field, sort.direction,
-    pagination.page, pagination.perPage,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.directions,
+    filters.statuses,
+    filters.paidFromPartyId,
+    filters.paidToPartyId,
+    filters.walletId,
+    filters.concernId,
+    filters.categoryId,
+    filters.amountMin,
+    filters.amountMax,
+    filters.description,
+    sort.field,
+    sort.direction,
+    pagination.page,
+    pagination.perPage,
     refreshKey,
   ])
 

@@ -4,6 +4,7 @@ import {
   createConcern,
   updateConcern,
   deactivateConcern,
+  fetchConcern,
   type Concern,
 } from '@/shared/api/concerns'
 
@@ -18,11 +19,13 @@ const update = (id: number, p: Record<string, unknown>) =>
 export default function Concerns() {
   return (
     <SimpleEntityPage<ConcernEntity>
+      routeBase="/konfiguracja/dotyczy"
       entityLabel="Dotyczy"
       addLabel="Nowy obszar"
       editLabel={(c) => `Edycja: ${c.name}`}
       description="Kogo lub czego dotyczy wydatek lub wpływ (np. Basia, wspólne, Maciek)."
       fetchAll={fetchConcerns as () => Promise<ConcernEntity[]>}
+      fetchOne={fetchConcern as (id: number) => Promise<ConcernEntity>}
       create={create}
       update={update}
       deactivate={deactivateConcern}

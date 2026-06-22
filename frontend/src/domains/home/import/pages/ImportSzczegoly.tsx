@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom'
 
 import { ArrowRight, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 
@@ -66,17 +66,8 @@ export default function ImportSzczegoly() {
 
   const navigate  = useNavigate()
 
-  const location  = useLocation()
-
-
-
-  const stateImp = (location.state as { imp?: CsvImportResult } | null)?.imp
-
-
-
-  const [imp, setImp]         = useState<CsvImportResult | null>(stateImp ?? null)
-
-  const [loading, setLoading]  = useState(!stateImp)
+  const [imp, setImp]         = useState<CsvImportResult | null>(null)
+  const [loading, setLoading]  = useState(true)
 
   const [error, setError]      = useState<string | null>(null)
 
@@ -99,20 +90,14 @@ export default function ImportSzczegoly() {
 
 
   useEffect(() => {
-
-    if (stateImp || !id) return
+    if (!id) return
 
     setLoading(true)
-
     fetchImport(parseInt(id))
-
       .then(setImp)
-
       .catch(() => setError('Nie udało się załadować danych importu.'))
-
       .finally(() => setLoading(false))
-
-  }, [id, stateImp])
+  }, [id])
 
 
 

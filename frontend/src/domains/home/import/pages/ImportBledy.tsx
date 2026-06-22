@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import Pill from '@/shared/components/Pill'
 import { IMPORT_ERROR_SCOPE_PILL } from '@/shared/constants/pillMaps'
 import { fetchImportErrors, type CsvImportError } from '@/shared/api/csvImports'
+import { buildSearchParams, parsePositiveInt } from '@/shared/utils/urlQuery'
 
 const SCOPE_LABEL: Record<string, string> = {
   HEADER: 'Nagłówek',
@@ -13,28 +14,44 @@ const SCOPE_LABEL: Record<string, string> = {
 export default function ImportBledy() {
   const { id } = useParams<{ id: string }>()
   const importId = parseInt(id ?? '0')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const page = useMemo(
+    () => parsePositiveInt(searchParams.get('page')) ?? 1,
+    [searchParams],
+  )
 
   const [items, setItems]     = useState<CsvImportError[]>([])
   const [total, setTotal]     = useState(0)
-  const [page, setPage]       = useState(1)
   const [pages, setPages]     = useState(1)
   const [loading, setLoading] = useState(true)
-  const limit = 50
+  const perPage = 50
 
-  async function load(p = 1) {
+  const setPage = useCallback(
+    (next: number) => {
+      const params = buildSearchParams({ page: next > 1 ? next : undefined })
+      setSearchParams(params, { replace: true })
+    },
+    [setSearchParams],
+  )
+
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    try {
-      const resp = await fetchImportErrors(importId, { page: p, limit })
-      setItems(resp.items)
-      setTotal(resp.total)
-      setPages(resp.pages)
-      setPage(p)
-    } finally {
-      setLoading(false)
+    fetchImportErrors(importId, { page, perPage })
+      .then((resp) => {
+        if (cancelled) return
+        setItems(resp.data)
+        setTotal(resp.meta.total)
+        setPages(resp.meta.lastPage)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-  }
-
-  useEffect(() => { load(1) }, [importId])
+  }, [importId, page])
 
   if (loading && items.length === 0) {
     return (
@@ -112,7 +129,7 @@ export default function ImportBledy() {
         </div>
       </div>
 
-      <SimplePagination page={page} pages={pages} loading={loading} onPage={load} />
+      <SimplePagination page={page} pages={pages} loading={loading} onPage={setPage} />
     </div>
   )
 }

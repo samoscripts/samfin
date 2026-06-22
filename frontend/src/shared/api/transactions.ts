@@ -5,7 +5,7 @@ import type { PaginationMeta } from '@/domains/home/transactions/types'
 export interface TransactionFilters {
   dateFrom?: string
   dateTo?: string
-  direction?: 'EXPENSE' | 'INCOME' | ''
+  direction?: string
   status?: string
   paidFromPartyId?: number | string
   paidToPartyId?: number | string
@@ -14,6 +14,7 @@ export interface TransactionFilters {
   categoryId?: number | string
   amountMin?: string
   amountMax?: string
+  description?: string
 }
 
 export interface TransactionListResponse {
@@ -26,6 +27,17 @@ export interface TransactionStats {
   expenses: number
   balance: number
   unclassifiedCount: number
+  transactionCount?: number
+}
+
+export interface CreateTransactionPayload {
+  direction: string
+  date: string
+  amount: number
+  description: string
+  paidFromPartyId?: number | null
+  paidToPartyId?: number | null
+  items?: ItemPayload[]
 }
 
 export interface ItemPayload {
@@ -56,9 +68,13 @@ export const fetchTransactions = async (
 export const fetchTransaction = async (id: number): Promise<Transaction> =>
   (await api.get<Transaction>(`/transactions/${id}`)).data
 
+export const createTransaction = async (payload: CreateTransactionPayload): Promise<Transaction> =>
+  (await api.post<Transaction>('/transactions', payload)).data
+
 export const fetchTransactionStats = async (params?: {
   dateFrom?: string
   dateTo?: string
+  month?: string
 }): Promise<TransactionStats> =>
   (await api.get<TransactionStats>('/transactions/stats', { params })).data
 

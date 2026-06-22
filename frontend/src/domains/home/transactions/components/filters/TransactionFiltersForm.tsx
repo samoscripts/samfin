@@ -2,8 +2,10 @@ import type { Wallet } from '@/shared/api/wallets'
 import type { Concern } from '@/shared/api/concerns'
 import type { Category } from '@/shared/api/categories'
 import type { Party } from '@/domains/home/configuration/parties/types'
-import Select from '@/shared/components/form/Select'
 import { inputCls } from '@/shared/components/form/formClasses'
+import FilterToggleGroup from '@/shared/components/form/FilterToggleGroup'
+import { DIRECTION_PILL, STATUS_PILL } from '@/shared/constants/pillMaps'
+import type { Direction, Status } from '@/shared/types'
 import type { FlowFilters } from '../../types'
 import {
   DIRECTION_OPTIONS,
@@ -12,6 +14,7 @@ import {
 } from '../../constants/labels'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import CategorySelect from '@/shared/components/form/CategorySelect'
+import { FieldRow, SectionLabel } from '@/shared/components/form/FormSection'
 
 export interface TransactionFiltersFormProps {
   draft: FlowFilters
@@ -36,6 +39,17 @@ export default function TransactionFiltersForm({
 
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+      <Section label="Klasyfikacja">
+        <FilterToggleGroup
+          options={STATUS_OPTIONS}
+          value={draft.statuses ?? []}
+          onChange={(statuses) =>
+            onFieldChange('statuses', statuses.length ? statuses : undefined)
+          }
+          variantForValue={(v) => STATUS_PILL[v as Status]}
+          ariaLabel="Status klasyfikacji"
+        />
+      </Section>
       <Section label="Okres">
         <div className="grid grid-cols-2 gap-2">
           <Field label="Data od">
@@ -58,17 +72,28 @@ export default function TransactionFiltersForm({
       </Section>
       <Hr />
       <Section label="Typ operacji">
-        <Select
-          value={draft.direction ?? ''}
-          onChange={(e) => onFieldChange('direction', e.target.value as FlowFilters['direction'])}
-        >
-          <option value="">{FILTER_EMPTY_LABEL}</option>
-          {DIRECTION_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
+        <FilterToggleGroup
+          options={DIRECTION_OPTIONS}
+          value={draft.directions ?? []}
+          onChange={(directions) =>
+            onFieldChange(
+              'directions',
+              directions.length ? (directions as FlowFilters['directions']) : undefined,
+            )
+          }
+          variantForValue={(v) => DIRECTION_PILL[v as Direction]}
+          ariaLabel="Typ operacji"
+        />
+      </Section>
+      <Section label="Opis">
+        <input
+          type="search"
+          value={draft.description ?? ''}
+          onChange={(e) => onFieldChange('description', e.target.value || undefined)}
+          placeholder="Szukaj w opisie…"
+          className={inputCls}
+          aria-label="Szukaj w opisie transakcji"
+        />
       </Section>
       <Hr />
       <Section label="Kwota (zł)">
@@ -96,68 +121,66 @@ export default function TransactionFiltersForm({
         </div>
       </Section>
       <Hr />
-      <Section label="Portfel">
-        <DictionarySelect
-          items={wallets}
-          value={draft.walletId}
-          onChange={(v) => onFieldChange('walletId', (v as string) ?? '')}
-          emptyLabel={FILTER_EMPTY_LABEL}
-          valueType="string"
-          filterItem={activeOnly}
-        />
-      </Section>
-      <Section label="Dotyczy">
-        <DictionarySelect
-          items={concerns}
-          value={draft.concernId}
-          onChange={(v) => onFieldChange('concernId', (v as string) ?? '')}
-          emptyLabel={FILTER_EMPTY_LABEL}
-          valueType="string"
-          filterItem={activeOnly}
-        />
-      </Section>
-      <Section label="Kategoria">
-        <CategorySelect
-          categories={categories}
-          value={draft.categoryId}
-          onChange={(v) => onFieldChange('categoryId', (v as string) ?? '')}
-          emptyLabel={FILTER_EMPTY_LABEL}
-          valueType="string"
-          direction={draft.direction ?? ''}
-        />
-      </Section>
-      <Section label="Status">
-        <Select
-          value={draft.status ?? ''}
-          onChange={(e) => onFieldChange('status', e.target.value)}
-        >
-          <option value="">{FILTER_EMPTY_LABEL}</option>
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-      </Section>
+      <div className="space-y-3">
+        <SectionLabel>Pozycja</SectionLabel>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <FieldRow label="Portfel">
+            <DictionarySelect
+              items={wallets}
+              value={draft.walletId}
+              onChange={(v) => onFieldChange('walletId', (v as string) ?? '')}
+              emptyLabel={FILTER_EMPTY_LABEL}
+              valueType="string"
+              filterItem={activeOnly}
+            />
+          </FieldRow>
+          <FieldRow label="Dotyczy">
+            <DictionarySelect
+              items={concerns}
+              value={draft.concernId}
+              onChange={(v) => onFieldChange('concernId', (v as string) ?? '')}
+              emptyLabel={FILTER_EMPTY_LABEL}
+              valueType="string"
+              filterItem={activeOnly}
+            />
+          </FieldRow>
+          <FieldRow label="Kategoria">
+            <CategorySelect
+              categories={categories}
+              value={draft.categoryId}
+              onChange={(v) => onFieldChange('categoryId', (v as string) ?? '')}
+              emptyLabel={FILTER_EMPTY_LABEL}
+              valueType="string"
+              direction={draft.directions?.length === 1 ? draft.directions[0] : ''}
+            />
+          </FieldRow>
+        </div>
+      </div>
+
       <Hr />
-      <Section label="Skąd">
-        <DictionarySelect
-          items={paidFromParties}
-          value={draft.paidFromPartyId}
-          onChange={(v) => onFieldChange('paidFromPartyId', (v as string) ?? '')}
-          emptyLabel={FILTER_EMPTY_LABEL}
-          valueType="string"
-        />
-      </Section>
-      <Section label="Dokąd">
-        <DictionarySelect
-          items={paidToParties}
-          value={draft.paidToPartyId}
-          onChange={(v) => onFieldChange('paidToPartyId', (v as string) ?? '')}
-          emptyLabel={FILTER_EMPTY_LABEL}
-          valueType="string"
-        />
-      </Section>
+      <div className="space-y-3">
+        <SectionLabel>Strony transakcji</SectionLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FieldRow label="Skąd">
+            <DictionarySelect
+              items={paidFromParties}
+              value={draft.paidFromPartyId}
+              onChange={(v) => onFieldChange('paidFromPartyId', (v as string) ?? '')}
+              emptyLabel={FILTER_EMPTY_LABEL}
+              valueType="string"
+            />
+          </FieldRow>
+          <FieldRow label="Dokąd">
+            <DictionarySelect
+              items={paidToParties}
+              value={draft.paidToPartyId}
+              onChange={(v) => onFieldChange('paidToPartyId', (v as string) ?? '')}
+              emptyLabel={FILTER_EMPTY_LABEL}
+              valueType="string"
+            />
+          </FieldRow>
+        </div>
+      </div>
     </div>
   )
 }

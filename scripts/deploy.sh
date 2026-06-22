@@ -4,7 +4,8 @@
 # Run from WSL/Linux in repo root (not from PowerShell, not inside a container):
 #   cd /home/msamotyj/www/fin && make deploy
 #
-# Default (hybrid): local npm build + upload frontend, git pull + composer on server.
+# Default (hybrid): local npm build + upload frontend artifacts, git pull + composer on server.
+# PHP webroot files (.htaccess, index.php) come from git pull — commit and push before deploy.
 # Fallback:         ./scripts/deploy.sh --full-rsync  (when composer fails on hosting)
 #
 # File transfer: rsync when available on the remote host; otherwise tar+ssh/scp
@@ -14,7 +15,7 @@
 #
 # One-time server setup:
 #   1. git clone <repo> ~/public_html/samfin
-#   2. Install composer to ~/bin/composer
+#   2. composer available on server (COMPOSER_BIN in deploy.env, default: composer)
 #   3. cp backend/.env.prod.dist backend/.env && edit secrets (backend/.env is gitignored)
 #   4. Subdomain fin.samsoft.pl — either:
 #        docroot -> .../public_html/samfin/backend/public
@@ -35,7 +36,7 @@ DEPLOY_HOST="${DEPLOY_HOST:-mjmvszga@146.59.111.235}"
 DEPLOY_SSH_PORT="${DEPLOY_SSH_PORT:-911}"
 DEPLOY_REPO_PATH="${DEPLOY_REPO_PATH:-/home/mjmvszga/public_html/samfin}"
 DEPLOY_BACKEND_PATH="${DEPLOY_BACKEND_PATH:-$DEPLOY_REPO_PATH/backend}"
-COMPOSER_BIN="${COMPOSER_BIN:-php ~/bin/composer}"
+COMPOSER_BIN="${COMPOSER_BIN:-composer}"
 
 SSH_OPTS=(-p "$DEPLOY_SSH_PORT" -o ServerAliveInterval=60 -o ConnectTimeout=10)
 SCP_OPTS=(-P "$DEPLOY_SSH_PORT" -o ServerAliveInterval=60 -o ConnectTimeout=10)
@@ -137,7 +138,8 @@ upload_frontend_artifacts() {
     else
         local remote_app="$DEPLOY_BACKEND_PATH/public/app"
         log "Upload frontend (tar+ssh) to $DEPLOY_HOST:$remote_app/"
-        ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" "rm -rf '$remote_app' && mkdir -p '$remote_app'"
+        ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" \
+            "rm -rf '$remote_app' && mkdir -p '$DEPLOY_BACKEND_PATH/public'"
         tar -C "$REPO_ROOT/backend/public" -czf - app \
             | ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" "tar -C '$DEPLOY_BACKEND_PATH/public' -xzf -"
 
@@ -168,12 +170,13 @@ upload_full_backend() {
     else
         log "Upload full backend (tar+ssh) to $DEPLOY_HOST:$DEPLOY_BACKEND_PATH/"
         ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" "mkdir -p '$DEPLOY_BACKEND_PATH'"
-        tar -C "$REPO_ROOT/backend" -czf - \
+        tar -C "$REPO_ROOT/backend" \
             --exclude='var/cache' \
             --exclude='var/log' \
             --exclude='.env' \
             --exclude='.env.local' \
-            . | ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" "tar -C '$DEPLOY_BACKEND_PATH' -xzf -"
+            -czf - . | ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" \
+            "tar -C '$DEPLOY_BACKEND_PATH' -xzf -"
     fi
 }
 
@@ -189,14 +192,15 @@ remote_post_deploy() {
 set -euo pipefail
 REPO_PATH="$1"
 BACKEND_PATH="$2"
-COMPOSER="$3"
+COMPOSER_CMD="$3"
 SKIP_COMPOSER="$4"
 
 if [[ "$SKIP_COMPOSER" != "true" ]]; then
     cd "$REPO_PATH"
     git pull
     cd "$BACKEND_PATH"
-    $COMPOSER install --no-dev --optimize-autoloader --no-interaction
+    # shellcheck disable=SC2086
+    $COMPOSER_CMD install --no-dev --optimize-autoloader --no-interaction
 else
     cd "$BACKEND_PATH"
 fi

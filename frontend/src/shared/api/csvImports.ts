@@ -52,12 +52,16 @@ export interface CsvImportRow {
   parseError: string | null
 }
 
-export interface PagedResponse<T> {
-  items: T[]
+export interface PagedMeta {
   total: number
   page: number
-  limit: number
-  pages: number
+  perPage: number
+  lastPage: number
+}
+
+export interface PagedResponse<T> {
+  data: T[]
+  meta: PagedMeta
 }
 
 export interface UploadResponse {
@@ -72,7 +76,7 @@ export const fetchImports = async (params?: {
   source?: string
   status?: string
   page?: number
-  limit?: number
+  perPage?: number
 }): Promise<PagedResponse<CsvImportResult>> =>
   (await api.get<PagedResponse<CsvImportResult>>('/csv-imports', { params })).data
 
@@ -81,13 +85,13 @@ export const fetchImport = async (id: number): Promise<CsvImportResult> =>
 
 export const fetchImportErrors = async (
   id: number,
-  params?: { scope?: string; page?: number; limit?: number },
+  params?: { scope?: string; page?: number; perPage?: number },
 ): Promise<PagedResponse<CsvImportError>> =>
   (await api.get<PagedResponse<CsvImportError>>(`/csv-imports/${id}/errors`, { params })).data
 
 export const fetchImportRows = async (
   id: number,
-  params?: { parseStatus?: string; page?: number; limit?: number },
+  params?: { parseStatus?: string; page?: number; perPage?: number },
 ): Promise<PagedResponse<CsvImportRow>> =>
   (await api.get<PagedResponse<CsvImportRow>>(`/csv-imports/${id}/rows`, { params })).data
 

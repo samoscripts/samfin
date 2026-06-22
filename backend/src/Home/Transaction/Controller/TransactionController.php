@@ -3,10 +3,15 @@
 namespace App\Home\Transaction\Controller;
 
 use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleApplyService;
+use App\Home\Transaction\DTO\TransactionFilterCriteria;
+use App\Home\Transaction\DTO\TransactionListQuery;
+use App\Home\Transaction\DTO\TransactionStatsQuery;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Repository\TransactionRepository;
+use App\Shared\DTO\QueryValidationErrors;
 use App\Home\Transaction\Service\TransactionBulkUpdateService;
 use App\Home\Transaction\Service\TransactionClassificationService;
+use App\Home\Transaction\Service\TransactionCreateService;
 use App\Home\Transaction\Service\TransactionSnapshotLogService;
 use App\Identity\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,56 +29,110 @@ class TransactionController extends AbstractController
         private TransactionBulkUpdateService     $bulkUpdateService,
         private ClassificationRuleApplyService     $classificationRuleApplyService,
         private TransactionSnapshotLogService    $snapshotLogService,
+        private TransactionCreateService         $createService,
         private Security                         $security,
     ) {}
 
     #[Route('/stats', name: 'api_transactions_stats', methods: ['GET'])]
     public function stats(Request $request): JsonResponse
     {
-        $dateFrom = $request->query->get('dateFrom');
-        $dateTo   = $request->query->get('dateTo');
+        $query = TransactionStatsQuery::fromInputBag($request->query);
+        if ($query instanceof QueryValidationErrors) {
+            return $this->json($query->toArray(), 422);
+        }
 
-        return $this->json($this->repository->getStats($dateFrom, $dateTo));
+        return $this->json($this->repository->getPeriodStats($query->toRepositoryFilters()));
     }
 
     #[Route('', name: 'api_transactions_index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
-        $q = $request->query;
+        $query = TransactionListQuery::fromInputBag($request->query);
+        if ($query instanceof QueryValidationErrors) {
+            return $this->json($query->toArray(), 422);
+        }
 
-        $filters = [
-            'dateFrom'        => $q->get('dateFrom'),
-            'dateTo'          => $q->get('dateTo'),
-            'direction'       => $q->get('direction'),
-            'status'          => $q->get('status'),
-            'paidFromPartyId' => $q->get('paidFromPartyId'),
-            'paidToPartyId'   => $q->get('paidToPartyId'),
-            'walletId'        => $q->get('walletId'),
-            'concernId'       => $q->get('concernId'),
-            'categoryId'      => $q->get('categoryId'),
-            'amountMin'       => $q->get('amountMin'),
-            'amountMax'       => $q->get('amountMax'),
-        ];
-
-        $sortField = $q->get('sortField', 'date');
-        $sortDir   = $q->get('sortDir', 'desc');
-        $page      = max(1, (int) $q->get('page', 1));
-        $perPage   = min(100, max(1, (int) $q->get('perPage', 25)));
-
-        $result = $this->repository->findPaged($filters, $sortField, $sortDir, $page, $perPage);
+        $result = $this->repository->findPaged(
+            $query->toRepositoryFilters(),
+            $query->sortField,
+            $query->sortDir,
+            $query->page,
+            $query->perPage,
+        );
 
         $total    = $result['total'];
-        $lastPage = max(1, (int) ceil($total / $perPage));
+        $lastPage = max(1, (int) ceil($total / $query->perPage));
 
         return $this->json([
             'data' => array_map(fn(Transaction $t) => $t->toApiArray(), $result['items']),
             'meta' => [
                 'total'    => $total,
-                'page'     => $page,
-                'perPage'  => $perPage,
+                'page'     => $query->page,
+                'perPage'  => $query->perPage,
                 'lastPage' => $lastPage,
             ],
         ]);
+    }
+
+    #[Route('', name: 'api_transactions_create', methods: ['POST'])]
+    public function create(Request $request): JsonResponse
+    {
+        $body = json_decode($request->getContent(), true) ?? [];
+
+        $direction = $body['direction'] ?? null;
+        $date      = $body['date'] ?? $body['operationDate'] ?? null;
+        $amount    = $body['amount'] ?? null;
+        $description = $body['description'] ?? null;
+
+        if (!is_string($direction) || $direction === '') {
+            return $this->json(['message' => 'Pole direction jest wymagane.'], 422);
+        }
+        if (!is_string($date) || $date === '') {
+            return $this->json(['message' => 'Pole date jest wymagane.'], 422);
+        }
+        if ($amount === null || $amount === '') {
+            return $this->json(['message' => 'Pole amount jest wymagane.'], 422);
+        }
+        if (!is_string($description) || trim($description) === '') {
+            return $this->json(['message' => 'Pole description jest wymagane.'], 422);
+        }
+
+        $paidFromPartyId = array_key_exists('paidFromPartyId', $body)
+            ? ($body['paidFromPartyId'] !== null && $body['paidFromPartyId'] !== ''
+                ? (int) $body['paidFromPartyId']
+                : null)
+            : null;
+
+        $paidToPartyId = array_key_exists('paidToPartyId', $body)
+            ? ($body['paidToPartyId'] !== null && $body['paidToPartyId'] !== ''
+                ? (int) $body['paidToPartyId']
+                : null)
+            : null;
+
+        $items = $body['items'] ?? null;
+        if ($items !== null && !is_array($items)) {
+            return $this->json(['message' => 'Pole items musi być tablicą.'], 422);
+        }
+
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        try {
+            $tx = $this->createService->createManual(
+                $direction,
+                $date,
+                (float) $amount,
+                $description,
+                $paidFromPartyId,
+                $paidToPartyId,
+                $items,
+                $user,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['message' => $e->getMessage()], 422);
+        }
+
+        return $this->json($tx->toApiArray(), 201);
     }
 
     #[Route('/bulk-update', name: 'api_transactions_bulk_update', methods: ['PUT'])]
@@ -137,7 +196,11 @@ class TransactionController extends AbstractController
                 if (!is_array($filters)) {
                     return $this->json(['message' => 'Pole filters musi być obiektem.'], 422);
                 }
-                $result = $this->classificationRuleApplyService->applyByFilters($filters, $user, $overwrite);
+                $result = $this->classificationRuleApplyService->applyByFilters(
+                    TransactionFilterCriteria::fromArray($filters)->toRepositoryFilters(),
+                    $user,
+                    $overwrite,
+                );
             }
         } catch (\InvalidArgumentException $e) {
             return $this->json(['message' => $e->getMessage()], 422);

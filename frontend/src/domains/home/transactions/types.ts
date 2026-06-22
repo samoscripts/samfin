@@ -1,15 +1,22 @@
 export interface FlowFilters {
   dateFrom?: string
   dateTo?: string
-  direction?: 'EXPENSE' | 'INCOME' | ''
+  directions?: ('EXPENSE' | 'INCOME')[]
   paidFromPartyId?: string
   paidToPartyId?: string
   walletId?: string
   concernId?: string
   categoryId?: string
-  status?: string
+  statuses?: string[]
   amountMin?: string
   amountMax?: string
+  description?: string
+}
+
+export function isFilterValueActive(value: FlowFilters[keyof FlowFilters]): boolean {
+  if (value === '' || value === undefined) return false
+  if (Array.isArray(value)) return value.length > 0
+  return true
 }
 
 export type SortField = 'date' | 'amount'
@@ -33,9 +40,9 @@ export interface PaginationMeta {
 }
 
 export function isFilterActive(filters: FlowFilters): boolean {
-  return Object.values(filters).some((v) => v !== '' && v !== undefined)
+  return Object.values(filters).some(isFilterValueActive)
 }
 
 export function countActiveFilters(filters: FlowFilters): number {
-  return Object.values(filters).filter((v) => v !== '' && v !== undefined).length
+  return Object.values(filters).filter(isFilterValueActive).length
 }

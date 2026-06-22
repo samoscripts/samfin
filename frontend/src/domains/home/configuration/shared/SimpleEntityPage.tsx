@@ -8,6 +8,7 @@ import Pill from '@/shared/components/Pill'
 import type { PillVariant } from '@/shared/components/pillVariants'
 import { configInputCls, configSelectCls, textareaCls } from '@/shared/components/form/formClasses'
 import { getApiErrorMessage } from '@/shared/utils/errors'
+import { useCrudRoute } from '@/shared/hooks/useCrudRoute'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,11 +36,13 @@ export interface ExtraField {
 }
 
 export interface SimpleEntityPageProps<T extends SimpleEntity> {
+  routeBase: string
   entityLabel: string
   addLabel: string
   editLabel: (item: T) => string
   description: string
   fetchAll: () => Promise<T[]>
+  fetchOne?: (id: number) => Promise<T>
   create: (payload: Record<string, unknown>) => Promise<T>
   update: (id: number, payload: Record<string, unknown>) => Promise<T>
   deactivate: (id: number) => Promise<void>
@@ -176,35 +179,67 @@ function EntityForm<T extends SimpleEntity>({
 // ---------------------------------------------------------------------------
 
 export default function SimpleEntityPage<T extends SimpleEntity>({
+  routeBase,
   entityLabel,
   addLabel,
   editLabel,
   description,
   fetchAll,
+  fetchOne,
   create,
   update,
   deactivate,
   extraFields = [],
   deactivateConfirm,
 }: SimpleEntityPageProps<T>) {
-  type View = 'list' | 'create' | 'edit'
+  const { isList, isCreate, isEdit, entityId, goList, goCreate, goEdit } = useCrudRoute(routeBase)
 
   const [items, setItems]             = useState<T[]>([])
   const [isLoading, setIsLoading]     = useState(true)
-  const [view, setView]               = useState<View>('list')
   const [editingItem, setEditingItem] = useState<T | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
   const [deactivating, setDeactivating] = useState<number | null>(null)
 
   useEffect(() => {
-    if (view === 'list') {
-      setIsLoading(true)
-      fetchAll().then(setItems).finally(() => setIsLoading(false))
-    }
-  }, [view])
+    if (!isList) return
+    setIsLoading(true)
+    fetchAll().then(setItems).finally(() => setIsLoading(false))
+  }, [isList, fetchAll])
 
-  function openEdit(item: T) { setEditingItem(item); setView('edit') }
-  function openCreate()       { setEditingItem(null); setView('create') }
-  function backToList()       { setEditingItem(null); setView('list') }
+  useEffect(() => {
+    if (!isEdit || entityId === null) {
+      setEditingItem(null)
+      return
+    }
+
+    const fromList = items.find((i) => i.id === entityId)
+    if (fromList) {
+      setEditingItem(fromList)
+      return
+    }
+
+    if (!fetchOne) {
+      setEditingItem(null)
+      return
+    }
+
+    let cancelled = false
+    setEditLoading(true)
+    fetchOne(entityId)
+      .then((item) => {
+        if (!cancelled) setEditingItem(item)
+      })
+      .catch(() => {
+        if (!cancelled) setEditingItem(null)
+      })
+      .finally(() => {
+        if (!cancelled) setEditLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, entityId, items, fetchOne])
 
   async function handleDeactivate(item: T) {
     const msg = deactivateConfirm
@@ -221,8 +256,8 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
   }
 
   function handleSaved(saved: T) {
-    if (view === 'create') {
-      backToList()
+    if (isCreate) {
+      goList()
     } else {
       setEditingItem(saved)
       setItems((prev) => {
@@ -235,40 +270,58 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
     }
   }
 
-  // Breadcrumb
   const breadcrumb = (
     <nav className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 mb-6">
-      <button onClick={backToList} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+      <button type="button" onClick={goList} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
         {entityLabel}
       </button>
-      {view !== 'list' && (
+      {!isList && (
         <>
           <ChevronRight size={12} className="shrink-0" />
           <span className="text-gray-600 dark:text-gray-400 font-medium">
-            {view === 'create' ? addLabel : editLabel(editingItem!)}
+            {isCreate ? addLabel : editLabel(editingItem!)}
           </span>
         </>
       )}
     </nav>
   )
 
-  // ---- Create / Edit ----
-  if (view === 'create' || view === 'edit') {
+  if (isCreate || isEdit) {
+    if (isEdit && editLoading) {
+      return (
+        <div>
+          {breadcrumb}
+          <div className="flex items-center justify-center py-16 text-gray-400">
+            <Loader2 size={24} className="animate-spin" />
+          </div>
+        </div>
+      )
+    }
+
+    if (isEdit && !editingItem) {
+      return (
+        <div>
+          {breadcrumb}
+          <p className="text-sm text-red-600 dark:text-red-400">Nie znaleziono rekordu.</p>
+        </div>
+      )
+    }
+
     return (
       <div>
         {breadcrumb}
         <div className="w-full space-y-6">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {view === 'create' ? addLabel : editLabel(editingItem!)}
+              {isCreate ? addLabel : editLabel(editingItem!)}
             </h2>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
             <EntityForm
-              item={editingItem}
+              item={isCreate ? null : editingItem}
               extraFields={extraFields}
               onSaved={handleSaved}
-              onCancel={backToList}
+              onCancel={goList}
               create={create}
               update={update}
               entityLabel={entityLabel}
@@ -278,8 +331,6 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
       </div>
     )
   }
-
-  // ---- List ----
   const active   = items.filter((i) => i.active)
   const inactive = items.filter((i) => !i.active)
 
@@ -293,7 +344,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
         </div>
         <button
-          onClick={openCreate}
+          onClick={goCreate}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] text-white text-sm font-medium transition-colors"
         >
           <Plus size={15} />
@@ -317,7 +368,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
             items={active}
             title="Aktywne"
             extraFields={extraFields}
-            onEdit={openEdit}
+            onEdit={(item) => goEdit(item.id)}
             onDeactivate={handleDeactivate}
             deactivating={deactivating}
           />
@@ -326,7 +377,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
               items={inactive}
               title="Nieaktywne"
               extraFields={extraFields}
-              onEdit={openEdit}
+              onEdit={(item) => goEdit(item.id)}
               onDeactivate={handleDeactivate}
               deactivating={deactivating}
             />

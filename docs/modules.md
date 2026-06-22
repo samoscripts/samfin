@@ -52,17 +52,18 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 
 | Plik | Opis |
 |------|------|
-| `Transaction/Controller/TransactionController.php` | Lista, stats, klasyfikacja, bulk update, historia, apply reguł |
+| `Transaction/Controller/TransactionController.php` | Lista, tworzenie ręczne, stats, klasyfikacja, bulk update, historia, apply reguł |
 | `Transaction/Service/TransactionClassificationService.php` | Klasyfikacja pojedynczej transakcji |
 | `Transaction/Service/TransactionBulkUpdateService.php` | Masowa aktualizacja pól |
+| `Transaction/Service/TransactionCreateService.php` | Tworzenie transakcji ręcznych (`source: MANUAL`) |
 | `Transaction/Service/TransactionIngestionService.php` | Tworzenie transakcji z wierszy CSV (auto Skąd/Dokąd) |
 | `Transaction/Service/TransactionStatusCalculator.php` | Wspólna logika statusu klasyfikacji |
 | `Transaction/Service/TransactionPartyAssignmentValidator.php` | Walidacja Skąd/Dokąd wg reguł kontekstowych (ADR-017) |
 | `Transaction/Service/TransactionSnapshotLogService.php` | Snapshoty i historia |
 | `Transaction/ClassificationRule/*` | Reguły auto-klasyfikacji per party |
-| `Transaction/Repository/TransactionRepository.php` | `findPaged`, `getStats`, `findDuplicate` |
+| `Transaction/Repository/TransactionRepository.php` | `findPaged`, `getPeriodStats`, `findDuplicate` |
 
-**Planowane (ADR-019):** `POST /api/transactions` — tworzenie transakcji ręcznych (`source: MANUAL`); brak implementacji.
+**Tworzenie ręczne (ADR-019):** `POST /api/transactions` — `TransactionCreateService`; UI w sidebarze listy (`?tab=create`, prefill z query); legacy `/transactions/new` → redirect.
 
 ### Repozytoria
 
@@ -108,7 +109,7 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 | Moduł | Ścieżka | Strony / komponenty |
 |-------|---------|---------------------|
 | dashboard | `dashboard/pages/Dashboard.tsx` | Karty statystyk, ostatnie transakcje |
-| transactions | `transactions/` | `Transactions.tsx`, sidebar (filtry/szczegóły/bulk), `TransactionEdit.tsx` (edycja pojedyncza), historia |
+| transactions | `transactions/` | `Transactions.tsx`, sidebar (filtry/szczegóły/edycja/tworzenie), redirecty legacy URL |
 | import | `import/pages/` | Upload, historia, szczegóły, błędy, wiersze |
 | configuration | `configuration/` | Podmioty, portfele, dotyczy, kategorie, reguły klasyfikacji |
 
@@ -280,9 +281,8 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 
 **Kolejne kroki refaktoryzacji frontendu:**
 
-1. Transakcje ręczne (ADR-019) — `POST /api/transactions` + formularz UI
-2. `EntityListPage` — wspólny scaffold listy dla modułów konfiguracji
-3. Rename Flow → Transaction w typach frontendowych (decyzja w [open-questions.md](open-questions.md) #6)
+1. `EntityListPage` — wspólny scaffold listy dla modułów konfiguracji
+2. Rename Flow → Transaction w typach frontendowych (decyzja w [open-questions.md](open-questions.md) #6)
 
 ---
 
@@ -294,7 +294,7 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 | `TransactionsSidebar` | Zakładki Filtry / Szczegóły / Edycja (bulk) |
 | `TransactionDetailsPanel` | Szczegóły pojedynczej transakcji; przyciski Edytuj i Utwórz regułę |
 | `TransactionSummaryCard` | Karta transakcji (szczegóły + formularz reguły z transakcji) |
-| `TransactionEdit.tsx` / `TransactionEditForm.tsx` | Edycja pojedynczej transakcji (strona `/transactions/:id/edit`) |
+| `TransactionEditForm.tsx` / `TransactionCreateForm.tsx` | Edycja i tworzenie w sidebarze (`?tab=edit&tx=`, `?tab=create`) |
 | `EditBulkPanel` | Masowa edycja wybranych pól (sidebar) |
 | `ApplyClassificationRulesDialog` | Potwierdzenie zastosowania reguł (zaznaczenie / filtr) |
 | `TransactionMultiDetailsPanel` | Szczegóły wielu zaznaczonych transakcji |

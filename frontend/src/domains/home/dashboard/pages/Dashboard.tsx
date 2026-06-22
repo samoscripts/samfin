@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { TrendingUp, TrendingDown, Scale, AlertCircle, ArrowRight } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { TrendingUp, TrendingDown, Scale, AlertCircle, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import PageHeader from '@/layout/PageHeader'
 import Pill from '@/shared/components/Pill'
 import ListTextTooltip from '@/shared/components/ListTextTooltip'
@@ -9,6 +9,11 @@ import { STATUS_LABEL_BY_VALUE } from '@/domains/home/transactions/constants/lab
 import { fetchTransactionStats, fetchTransactions, type TransactionStats } from '@/shared/api/transactions'
 import { Transaction } from '@/shared/types'
 import { formatAmount } from '@/shared/utils/format'
+import { currentMonthParam, monthLabel, shiftMonth } from '@/shared/utils/monthQuery'
+import {
+  parseDashboardSearchParams,
+  serializeDashboardSearchParams,
+} from '../utils/dashboardUrlParams'
 
 interface StatCardProps {
   label: string
@@ -94,30 +99,97 @@ function RecentCard({ tx }: { tx: Transaction }) {
 const EMPTY_STATS: TransactionStats = { income: 0, expenses: 0, balance: 0, unclassifiedCount: 0 }
 
 export default function Dashboard() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlState = useMemo(() => parseDashboardSearchParams(searchParams), [searchParams])
+
   const [stats, setStats]   = useState<TransactionStats>(EMPTY_STATS)
   const [recent, setRecent] = useState<Transaction[]>([])
-  const [totalIncome, setTotalIncome]   = useState(0)
-  const [totalExpense, setTotalExpense] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  const setMonth = useCallback(
+    (month: string) => {
+      setSearchParams(
+        serializeDashboardSearchParams({ ...urlState, month }),
+        { replace: true },
+      )
+    },
+    [setSearchParams, urlState],
+  )
 
   useEffect(() => {
-    fetchTransactionStats().then(setStats).catch(() => {})
+    let cancelled = false
+    setLoading(true)
 
-    fetchTransactions({}, 'date', 'desc', 1, 10)
-      .then((res) => setRecent(res.data))
-      .catch(() => {})
+    Promise.all([
+      fetchTransactionStats({ month: urlState.month }),
+      fetchTransactions(
+        { dateFrom: urlState.dateFrom, dateTo: urlState.dateTo },
+        'date',
+        'desc',
+        1,
+        10,
+      ),
+    ])
+      .then(([statsResp, recentResp]) => {
+        if (cancelled) return
+        setStats(statsResp)
+        setRecent(recentResp.data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStats(EMPTY_STATS)
+          setRecent([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
 
-    fetchTransactions({ direction: 'INCOME' }, 'date', 'desc', 1, 1)
-      .then((res) => setTotalIncome(res.meta.total))
-      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [urlState.month, urlState.dateFrom, urlState.dateTo])
 
-    fetchTransactions({ direction: 'EXPENSE' }, 'date', 'desc', 1, 1)
-      .then((res) => setTotalExpense(res.meta.total))
-      .catch(() => {})
-  }, [])
+  const txCount = stats.transactionCount ?? 0
+  const isCurrentMonth = urlState.month === currentMonthParam()
 
   return (
     <div className="p-4 md:p-6 max-w-screen-2xl">
-      <PageHeader title="Dashboard" subtitle="Podsumowanie finansów domowych" />
+      <PageHeader
+        title="Dashboard"
+        subtitle={isCurrentMonth ? 'Podsumowanie finansów domowych' : `Okres: ${monthLabel(urlState.month)}`}
+      />
+
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <button
+          type="button"
+          onClick={() => setMonth(shiftMonth(urlState.month, -1))}
+          className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          aria-label="Poprzedni miesiąc"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 min-w-[10rem] text-center">
+          {monthLabel(urlState.month)}
+        </span>
+        <button
+          type="button"
+          onClick={() => setMonth(shiftMonth(urlState.month, 1))}
+          className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          aria-label="Następny miesiąc"
+        >
+          <ChevronRight size={18} />
+        </button>
+        {!isCurrentMonth && (
+          <button
+            type="button"
+            onClick={() => setMonth(currentMonthParam())}
+            className="text-xs font-medium text-[#c9a96e] hover:text-[#d4bc8e] transition-colors"
+          >
+            Bieżący miesiąc
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6 md:mb-8">
         <StatCard
@@ -126,7 +198,7 @@ export default function Dashboard() {
           icon={<TrendingUp size={18} className="text-emerald-600 dark:text-emerald-400" />}
           iconBg="bg-emerald-50 dark:bg-emerald-950"
           valueColor="text-emerald-600 dark:text-emerald-400"
-          sub={`${totalIncome} transakcji`}
+          sub={txCount > 0 ? `${txCount} transakcji w okresie` : 'Brak transakcji w okresie'}
         />
         <StatCard
           label="Wydatki"
@@ -134,7 +206,6 @@ export default function Dashboard() {
           icon={<TrendingDown size={18} className="text-red-600 dark:text-red-400" />}
           iconBg="bg-red-50 dark:bg-red-950"
           valueColor="text-red-600 dark:text-red-400"
-          sub={`${totalExpense} transakcji`}
         />
         <StatCard
           label="Bilans"
@@ -149,20 +220,25 @@ export default function Dashboard() {
           icon={<AlertCircle size={18} className="text-amber-600 dark:text-amber-400" />}
           iconBg="bg-amber-50 dark:bg-amber-950"
           valueColor={stats.unclassifiedCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'}
-          sub="transakcji bez klasyfikacji"
+          sub="w wybranym okresie"
         />
       </div>
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
           <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Ostatnie transakcje</h2>
-          <Link to="/transactions" className="flex items-center gap-1 text-xs font-medium text-[#c9a96e] hover:text-[#d4bc8e] transition-colors">
+          <Link
+            to={`/transactions?month=${urlState.month}`}
+            className="flex items-center gap-1 text-xs font-medium text-[#c9a96e] hover:text-[#d4bc8e] transition-colors"
+          >
             Wszystkie <ArrowRight size={12} />
           </Link>
         </div>
 
-        {recent.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400 dark:text-gray-600">Brak transakcji</div>
+        {loading && recent.length === 0 ? (
+          <div className="py-12 text-center text-sm text-gray-400 dark:text-gray-600">Ładowanie…</div>
+        ) : recent.length === 0 ? (
+          <div className="py-12 text-center text-sm text-gray-400 dark:text-gray-600">Brak transakcji w tym okresie</div>
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">

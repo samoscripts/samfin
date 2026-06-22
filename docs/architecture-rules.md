@@ -215,12 +215,27 @@ Szczegóły nawigacji i struktury folderów — ADR-012, ADR-020 w [`decisions.m
 | API client w `shared/api/` — jeden plik na zasób | ZAIMPLEMENTOWANE |
 | Walidacja formularzy UX + backend jako source of truth | ZAIMPLEMENTOWANE |
 | Formularze CRUD w **page content** lub **sidebar**; modale tylko na confirmy | ZAIMPLEMENTOWANE |
+| Query params jako źródło prawdy widoku (ADR-025) | ZAIMPLEMENTOWANE |
+| Walidacja query params na backendzie → HTTP 422 | ZAIMPLEMENTOWANE (Transaction, Import, Reports) |
+
+### Query params i URL (ADR-025)
+
+| Reguła | Status |
+|--------|--------|
+| Filtry, sort, paginacja list — w `useSearchParams`, nie w `useState` | ZAIMPLEMENTOWANE |
+| Skrót `month=YYYY-MM` dla zakresu dat (transakcje, dashboard, stats API) | ZAIMPLEMENTOWANE |
+| Paginacja: parametr `perPage` (`limit` — przestarzały alias w API importu) | ZAIMPLEMENTOWANE |
+| Odpowiedź list importu: `{ data, meta: { total, page, perPage, lastPage } }` | ZAIMPLEMENTOWANE |
+| Nieprawidłowe query → `422` z `{ message, errors: { pole: opis } }` | ZAIMPLEMENTOWANE |
+| DTO query: `final readonly`, parsowanie w `fromInputBag()` | ZAIMPLEMENTOWANE |
+
+**Pliki wzorcowe:** `Shared/DTO/QueryParams.php`, `TransactionListQuery.php`, `CsvImportListQuery.php`, `useTransactionListUrl.ts`, `dashboardUrlParams.ts`.
 
 ### Umiejscowienie UI (formularze vs modale)
 
 | Typ interakcji | Gdzie | Przykłady |
 |----------------|-------|-----------|
-| Formularz create/edit (CRUD) | **Page content** lub **sidebar** | Podmioty, Kategorie, Reguły klasyfikacji; edycja bulk transakcji w panelu bocznym; edycja pojedynczej transakcji na `/transactions/:id/edit` |
+| Formularz create/edit (CRUD) | **Page content** lub **sidebar** | Podmioty, Kategorie, Reguły klasyfikacji; edycja/tworzenie transakcji w panelu bocznym listy (`?tab=edit`, `?tab=create`); edycja bulk w panelu bocznym |
 | Potwierdzenie akcji destrukcyjnej | **Modal** (`ConfirmDialog`) | Usuń regułę, podmiot |
 | Krótki prompt kontekstowy (1–2 pola) | Modal dopuszczalny | Zastosuj reguły klasyfikacji (checkbox overwrite) |
 | Główne zakładki modułu | **URL** (`NavLink` + `Outlet`) | ADR-020 |
@@ -241,6 +256,7 @@ Docelowy osobny dokument: `frontend-conventions.md` (opcjonalnie).
 - [ ] Zależności przez konstruktor
 - [ ] Brak zduplikowanej walidacji już istniejącej w serwisie
 - [ ] Nowe DTO — `final`, `readonly` properties
+- [ ] GET z query params — DTO `fromInputBag()` + `QueryValidationErrors` → 422
 
 ---
 
@@ -250,3 +266,6 @@ Docelowy osobny dokument: `frontend-conventions.md` (opcjonalnie).
 - [ ] Nawigacja przez `NavLink`, nie `useState` dla głównych tabów
 - [ ] Wywołania API w `shared/api/`
 - [ ] Formularze CRUD w content/sidebar — nie w modalu (modale: confirmy)
+- [ ] Filtry/sort/paginacja synchronizowane z URL (`useSearchParams`)
+- [ ] Nowe endpointy GET z query — DTO + walidacja 422 przy błędnych parametrach
+- [ ] Paginacja API: `perPage` (nie `limit`)

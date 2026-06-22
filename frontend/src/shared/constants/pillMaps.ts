@@ -10,7 +10,7 @@ export const STATUS_PILL: Record<Status, PillVariant> = {
 
 export const DIRECTION_PILL: Record<Direction, PillVariant> = {
   INCOME: 'success',
-  EXPENSE: 'neutral',
+  EXPENSE: 'danger',
 }
 
 export const CATEGORY_TYPE_PILL: Record<CategoryType, PillVariant> = {

@@ -13,7 +13,7 @@ Dokument zbiera niejasności wynikające z analizy kodu. Wymagają potwierdzenia
 | Q5 | `concern` vs budżet | **A** — `concern` = „Dotyczy” (kogo dotyczy); brak limitów kwotowych |
 | Q6 | Beneficjent / cele | Brak osobnej encji; beneficjent → `concern`; cele poza MVP |
 | Q7 | Portfel (`wallet`) | **A** — kubełek rozliczeniowy, nie konto bankowe (ADR-018) |
-| Q8 | Transakcje ręczne | MVP ADR-019; **API/UI nie zaimplementowane** |
+| Q8 | Transakcje ręczne | MVP ADR-019 — **zaimplementowane** (`POST /api/transactions`, `/transactions/new`) |
 
 ---
 
@@ -35,9 +35,9 @@ Dokument zbiera niejasności wynikające z analizy kodu. Wymagają potwierdzenia
 
 **Decyzja (Q6):** Pojęcie **beneficjenta** mapuje się na `concern` („Dotyczy”). Osobne encje celów i beneficjentów **nie wchodzą do MVP**. Limity budżetowe — osobna decyzja (ADR-P07).
 
-### ~~4. Transakcje ręczne (`SOURCE_MANUAL`)~~ — **ROZWIĄZANE w wywiadzie (2026-06-13), implementacja oczekuje**
+### ~~4. Transakcje ręczne (`SOURCE_MANUAL`)~~ — **ROZWIĄZANE i zaimplementowane**
 
-**Decyzja (Q8):** Tak — ręczne dodawanie w MVP. Pola: kierunek, data, kwota, opis; klasyfikacja opcjonalna przy tworzeniu. Skąd/Dokąd wg ADR-017 (MANUAL: strona własna = OWN+CASH). Szczegóły: **ADR-019**. Brak `POST /api/transactions` i formularza w UI.
+**Decyzja (Q8):** Tak — ręczne dodawanie w MVP. Pola: kierunek, data, kwota, opis; klasyfikacja opcjonalna przy tworzeniu. Skąd/Dokąd wg ADR-017 (MANUAL: strona własna = OWN+CASH). Szczegóły: **ADR-019**. `POST /api/transactions`, formularz `/transactions/new` z prefill z URL.
 
 ---
 
@@ -135,12 +135,10 @@ Pakiet `symfony/validator` jest w `composer.json`, ale kontrolery walidują ręc
 
 ### 19. Zakres modułu Raporty
 
-Placeholder `ComingSoon` bez specyfikacji.
+**Stan:** MVP — raport miesięczny (`/raporty/miesieczny`, `GET /api/reports/monthly`). Placeholder `ComingSoon` usunięty.
 
-**Pytanie:** Jakie raporty są priorytetem (per kategoria, per portfel, cashflow miesięczny, budżet vs wykonanie)?
+**Pytanie:** Jakie raporty są kolejnym priorytetem (per kategoria, per portfel szczegółowy, cashflow roczny, budżet vs wykonanie)?
 
 ### 20. Stats na dashboardzie bez zakresu dat
 
-`fetchTransactionStats()` wywoływane bez `dateFrom`/`dateTo` — agreguje całą historię.
-
-**Pytanie:** Czy dashboard powinien domyślnie pokazywać bieżący miesiąc?
+**Rozwiązane:** Dashboard domyślnie pokazuje bieżący miesiąc; `?month=YYYY-MM` w URL; API `GET /transactions/stats?month=`.

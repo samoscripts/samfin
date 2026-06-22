@@ -5,13 +5,13 @@
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # Root → SPA (before pass-through of the public/ directory)
+    RewriteRule ^$ /app/ [R=302,L]
+
     # 1. Serve existing files and directories as-is
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
-
-    # Root → SPA entry point
-    RewriteRule ^$ /app/ [R=302,L]
 
     # 2. React SPA — /app/* routes fallback to /app/index.html
     RewriteRule ^app(/.*)?$ /app/index.html [L]
