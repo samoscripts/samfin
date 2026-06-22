@@ -1,16 +1,37 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { fetchTransactions } from '@/shared/api/transactions'
 import type { Transaction } from '@/shared/types'
 import type { FlowFilters, SortState, PaginationState, PaginationMeta } from '../types'
 import { flowFiltersToTransactionFilters } from '../utils/flowFilters'
+import { serializeCommaList } from '@/shared/utils/urlQuery'
 
 export interface FlowsQueryResult {
   data: Transaction[]
+  /** True only while fetching and there is no data to show yet. */
   isLoading: boolean
+  /** True when re-fetching while previous data is still visible. */
+  isRefreshing: boolean
   meta: PaginationMeta
 }
 
 const DEFAULT_META: PaginationMeta = { total: 0, page: 1, perPage: 25, lastPage: 1 }
+
+function filtersQueryKey(filters: FlowFilters): string {
+  return [
+    filters.dateFrom ?? '',
+    filters.dateTo ?? '',
+    serializeCommaList(filters.directions) ?? '',
+    serializeCommaList(filters.statuses) ?? '',
+    filters.paidFromPartyId ?? '',
+    filters.paidToPartyId ?? '',
+    filters.walletId ?? '',
+    filters.concernId ?? '',
+    filters.categoryId ?? '',
+    filters.amountMin ?? '',
+    filters.amountMax ?? '',
+    filters.description ?? '',
+  ].join('\0')
+}
 
 export function useFlowsQuery(
   filters: FlowFilters,
@@ -20,17 +41,17 @@ export function useFlowsQuery(
 ): FlowsQueryResult {
   const [data, setData]         = useState<Transaction[]>([])
   const [meta, setMeta]         = useState<PaginationMeta>(DEFAULT_META)
-  const [isLoading, setLoading] = useState(false)
+  const [isFetching, setFetching] = useState(false)
 
-  // Abort controller ref to cancel in-flight requests on new calls
   const abortRef = useRef<AbortController | null>(null)
+  const filtersKey = useMemo(() => filtersQueryKey(filters), [filters])
 
   useEffect(() => {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
-    setLoading(true)
+    setFetching(true)
 
     fetchTransactions(
       flowFiltersToTransactionFilters(filters),
@@ -51,23 +72,12 @@ export function useFlowsQuery(
         setMeta(DEFAULT_META)
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
+        if (!controller.signal.aborted) setFetching(false)
       })
 
     return () => controller.abort()
   }, [
-    filters.dateFrom,
-    filters.dateTo,
-    filters.directions,
-    filters.statuses,
-    filters.paidFromPartyId,
-    filters.paidToPartyId,
-    filters.walletId,
-    filters.concernId,
-    filters.categoryId,
-    filters.amountMin,
-    filters.amountMax,
-    filters.description,
+    filtersKey,
     sort.field,
     sort.direction,
     pagination.page,
@@ -75,5 +85,8 @@ export function useFlowsQuery(
     refreshKey,
   ])
 
-  return { data, isLoading, meta }
+  const isLoading = isFetching && data.length === 0
+  const isRefreshing = isFetching && data.length > 0
+
+  return { data, isLoading, isRefreshing, meta }
 }

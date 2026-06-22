@@ -16,6 +16,22 @@ export function toggleIdInSet(set: Set<number>, id: number): Set<number> {
   return next
 }
 
+export function seedSelectionFromCurrent(
+  set: Set<number>,
+  currentId: number | null | undefined,
+): Set<number> {
+  if (set.size > 0 || currentId == null) return set
+  return new Set([currentId])
+}
+
+export function toggleBulkSelection(
+  set: Set<number>,
+  id: number,
+  currentId?: number | null,
+): Set<number> {
+  return toggleIdInSet(seedSelectionFromCurrent(set, currentId), id)
+}
+
 export function selectRange(data: Transaction[], from: number, to: number): Set<number> {
   const start = Math.min(from, to)
   const end = Math.max(from, to)

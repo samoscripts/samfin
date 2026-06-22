@@ -16,6 +16,7 @@ import {
   getSelectedTransactions,
   hasMixedDirections,
   selectRange,
+  toggleBulkSelection,
   toggleIdInSet,
 } from '../utils/bulkSelection'
 import { useFlowsQuery } from '../hooks/useFlowsQuery'
@@ -70,6 +71,7 @@ export default function Transactions() {
     openCreate,
     exitEditMode,
     setTab,
+    openBulkDetails,
     closePanel,
   } = useTransactionListUrl()
 
@@ -93,13 +95,14 @@ export default function Transactions() {
   const [applyRulesLoading, setApplyRulesLoading] = useState(false)
   const [applyRulesMessage, setApplyRulesMessage] = useState<string | null>(null)
   const [filterCategories, setFilterCategories] = useState<Category[]>([])
+  const [selectionMode, setSelectionMode] = useState(false)
 
   const saveFnRef = useRef<(() => Promise<void>) | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const portalRoot = useRightPanelPortal()
 
-  const { data, isLoading, meta } = useFlowsQuery(activeFilters, sort, pagination, refreshKey)
+  const { data, isLoading, isRefreshing, meta } = useFlowsQuery(activeFilters, sort, pagination, refreshKey)
 
   const panelOpen = isPanelOpenFromUrl({ filters: activeFilters, sort, pagination, tx: urlTxId, tab: urlTab, createPrefill }) || isEditing
   const activeTab: SidebarTab = isEditing
@@ -168,7 +171,16 @@ export default function Transactions() {
     setSelectedIds(new Set())
     setFocusIndex(-1)
     setSelectionAnchor(-1)
+    setSelectionMode(false)
   }, [pagination.page, pagination.perPage])
+
+  const currentSelectionId = selectedTx?.transactionId ?? urlTxId ?? null
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+    closePanel()
+  }, [closePanel])
 
   useEffect(() => {
     if (focusIndex < 0) return
@@ -196,27 +208,88 @@ export default function Transactions() {
     openFiltersTab()
   }, [isEditing, openFiltersTab])
 
+  const applyBulkSelection = useCallback(
+    (ids: Set<number>, index: number) => {
+      setSelectedTx(null)
+      setFocusIndex(index)
+      setSelectionAnchor(index)
+      if (ids.size === 0) {
+        setSelectedIds(new Set())
+        openFiltersTab()
+        return
+      }
+      setSelectedIds(ids)
+      openBulkDetails()
+    },
+    [openBulkDetails, openFiltersTab],
+  )
+
   const handleRowActivate = useCallback(
     (tx: Transaction, index: number, e?: React.MouseEvent) => {
       if (isEditing) return
 
-      tableRef.current?.focus()
-
-      if (e?.ctrlKey || e?.metaKey) {
-        setSelectedIds((prev) => toggleIdInSet(prev, tx.transactionId))
-        setSelectedTx(null)
+      if (selectionMode) {
+        const next = toggleIdInSet(selectedIds, tx.transactionId)
+        if (next.size === 0) {
+          exitSelectionMode()
+          return
+        }
+        setSelectedIds(next)
         setFocusIndex(index)
-        setSelectionAnchor(index)
-        setTab('details')
         return
       }
 
+      tableRef.current?.focus()
+
+      if (e?.shiftKey) {
+        const anchor = selectionAnchor >= 0 ? selectionAnchor : index
+        if (selectionAnchor < 0) setSelectionAnchor(index)
+        applyBulkSelection(selectRange(data, anchor, index), index)
+        return
+      }
+
+      if (e?.ctrlKey || e?.metaKey) {
+        const next = toggleBulkSelection(selectedIds, tx.transactionId, currentSelectionId)
+        applyBulkSelection(next, index)
+        return
+      }
+
+      setSelectionMode(false)
       setSelectedIds(new Set())
       setFocusIndex(index)
       setSelectionAnchor(index)
       openTx(tx.transactionId, 'details')
     },
-    [isEditing, openTx, setTab],
+    [
+      isEditing,
+      selectionMode,
+      selectedIds,
+      selectionAnchor,
+      data,
+      currentSelectionId,
+      applyBulkSelection,
+      exitSelectionMode,
+      openTx,
+    ],
+  )
+
+  const handleMobileLongPress = useCallback(
+    (tx: Transaction, index: number) => {
+      if (isEditing) return
+
+      const ids = new Set<number>()
+      if (currentSelectionId != null) ids.add(currentSelectionId)
+      ids.add(tx.transactionId)
+
+      setSelectionMode(true)
+      setSelectedTx(null)
+      setSelectedIds(ids)
+      setFocusIndex(index)
+      setSelectionAnchor(index)
+      closePanel()
+      navigator.vibrate?.(10)
+    },
+    [isEditing, currentSelectionId, closePanel],
   )
 
   const handleArrowNavigate = useCallback(
@@ -236,11 +309,8 @@ export default function Transactions() {
 
       if (extend) {
         const anchor = selectionAnchor < 0 ? current : selectionAnchor
-        setSelectedIds(selectRange(data, anchor, next))
-        setSelectedTx(null)
-        setFocusIndex(next)
+        applyBulkSelection(selectRange(data, anchor, next), next)
         if (selectionAnchor < 0) setSelectionAnchor(current)
-        setTab('details')
         return
       }
 
@@ -249,7 +319,7 @@ export default function Transactions() {
       setSelectedIds(new Set())
       openTx(data[next].transactionId, 'details')
     },
-    [data, isEditing, focusIndex, selectionAnchor, openTx, setTab],
+    [data, isEditing, focusIndex, selectionAnchor, applyBulkSelection, openTx],
   )
 
   const handleTableKeyDown = useCallback(
@@ -294,6 +364,7 @@ export default function Transactions() {
   const handleBulkSaved = useCallback(() => {
     setRefreshKey((k) => k + 1)
     setSelectedIds(new Set())
+    setSelectionMode(false)
     setEditMode(null)
     exitEditMode(selectedTx?.transactionId ?? urlTxId ?? null)
     setIsDirty(false)
@@ -443,14 +514,15 @@ export default function Transactions() {
         type="button"
         onClick={() => handleOpenCreate()}
         disabled={isEditing}
+        aria-label="Nowa transakcja"
         className={[
-          'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg text-white hover:opacity-90 transition-opacity',
+          'inline-flex items-center justify-center gap-2 px-2.5 py-2 md:px-4 text-sm font-medium rounded-lg text-white hover:opacity-90 transition-opacity',
           isEditing ? 'opacity-50 cursor-not-allowed' : '',
         ].join(' ')}
         style={{ backgroundColor: '#1c4230' }}
       >
         <Plus size={15} />
-        Nowa transakcja
+        <span className="hidden md:inline">Nowa transakcja</span>
       </button>
       <button
         type="button"
@@ -512,6 +584,28 @@ export default function Transactions() {
 
         {/* Mobile: card list */}
         <div className="md:hidden px-4 pb-6 pt-3">
+          {selectionMode && !isLoading && data.length > 0 && (
+            <div className="flex items-center justify-between gap-2 mb-3 px-1">
+              <button
+                type="button"
+                onClick={exitSelectionMode}
+                className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+              >
+                Anuluj
+              </button>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                Zaznaczono: {bulkTransactions.length}
+              </span>
+              <button
+                type="button"
+                onClick={openBulkDetails}
+                disabled={bulkTransactions.length === 0}
+                className="text-sm font-medium text-[#8a7340] dark:text-[#c9a96e] hover:underline disabled:opacity-40 disabled:no-underline"
+              >
+                Szczegóły
+              </button>
+            </div>
+          )}
           {isLoading ? (
             <div className="py-16 text-center text-sm text-gray-400">Ładowanie…</div>
           ) : data.length === 0 ? (
@@ -533,8 +627,10 @@ export default function Transactions() {
                   key={tx.transactionId}
                   tx={tx}
                   bulkSelected={selectedIds.has(tx.transactionId)}
-                  selected={selectedTx?.transactionId === tx.transactionId}
+                  selected={selectedTx?.transactionId === tx.transactionId && selectedIds.size === 0}
+                  selectionMode={selectionMode}
                   onActivate={(e) => handleRowActivate(tx, index, e)}
+                  onLongPress={() => handleMobileLongPress(tx, index)}
                   selectionBlocked={isEditing}
                 />
               ))}
@@ -569,7 +665,10 @@ export default function Transactions() {
                 ref={tableRef}
                 tabIndex={0}
                 onKeyDown={handleTableKeyDown}
-                className="flex-1 overflow-auto outline-none"
+                className={[
+                  'flex-1 overflow-auto outline-none transition-opacity',
+                  isRefreshing ? 'opacity-60' : '',
+                ].join(' ')}
               >
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10">
@@ -595,8 +694,10 @@ export default function Transactions() {
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
                     {data.map((tx, index) => {
-                      const isDetailSelected = selectedTx?.transactionId === tx.transactionId
+                      const isDetailSelected =
+                        selectedIds.size === 0 && selectedTx?.transactionId === tx.transactionId
                       const isBulkSelected = selectedIds.has(tx.transactionId)
+                      const isRowSelected = isBulkSelected || isDetailSelected
                       return (
                         <tr
                           key={tx.transactionId}
@@ -607,7 +708,7 @@ export default function Transactions() {
                           className={[
                             'transition-colors',
                             isEditing ? 'cursor-not-allowed' : 'cursor-pointer',
-                            isBulkSelected || isDetailSelected
+                            isRowSelected
                               ? 'bg-amber-50/80 dark:bg-amber-950/20'
                               : isEditing
                                 ? ''
@@ -742,28 +843,106 @@ function TransactionCard({
   tx,
   bulkSelected,
   selected,
+  selectionMode,
   onActivate,
+  onLongPress,
   selectionBlocked,
 }: {
   tx: Transaction
   bulkSelected: boolean
   selected: boolean
+  selectionMode: boolean
   onActivate: (e: React.MouseEvent) => void
+  onLongPress: () => void
   selectionBlocked: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggeredRef = useRef(false)
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => () => clearLongPressTimer(), [clearLongPressTimer])
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (selectionBlocked || selectionMode) return
+    longPressTriggeredRef.current = false
+    pointerStartRef.current = { x: e.clientX, y: e.clientY }
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true
+      onLongPress()
+    }, 500)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!pointerStartRef.current || !longPressTimerRef.current) return
+    const dx = e.clientX - pointerStartRef.current.x
+    const dy = e.clientY - pointerStartRef.current.y
+    if (Math.hypot(dx, dy) > 10) clearLongPressTimer()
+  }
+
+  const handlePointerUp = () => {
+    clearLongPressTimer()
+    pointerStartRef.current = null
+  }
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false
+      e.preventDefault()
+      return
+    }
+    onActivate(e)
+  }
+
+  const isHighlighted = bulkSelected || selected
 
   return (
     <div
-      onClick={onActivate}
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       className={[
-        'bg-white dark:bg-gray-900 border rounded-xl p-4 transition-colors',
-        bulkSelected || selected
+        'bg-white dark:bg-gray-900 border rounded-xl p-4 transition-colors select-none',
+        isHighlighted
           ? 'border-[#c9a96e]/60 bg-amber-50/40 dark:bg-amber-950/10'
           : 'border-gray-200 dark:border-gray-800',
         selectionBlocked ? 'cursor-not-allowed' : 'cursor-pointer',
       ].join(' ')}
     >
+      <div className="flex items-start gap-3">
+        {selectionMode && (
+          <div
+            className={[
+              'shrink-0 mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors',
+              bulkSelected
+                ? 'bg-[#1c4230] border-[#1c4230] text-white'
+                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900',
+            ].join(' ')}
+            aria-hidden
+          >
+            {bulkSelected && (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M2.5 6L5 8.5L9.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
       <div className="flex items-start justify-between gap-3">
         <span className="text-xs text-gray-400 dark:text-gray-500 font-mono shrink-0 pt-0.5">
           {formatDate(tx.date)}
@@ -806,6 +985,8 @@ function TransactionCard({
           <ItemField items={tx.items} field="category" />
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }

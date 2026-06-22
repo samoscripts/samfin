@@ -83,6 +83,10 @@ export function useTransactionListUrl() {
     [applyUrl],
   )
 
+  const openBulkDetails = useCallback(() => {
+    applyUrl({ tx: null, tab: 'details', createPrefill: {} })
+  }, [applyUrl])
+
   const exitEditMode = useCallback(
     (txId: number | null) => {
       applyUrl({
@@ -109,6 +113,7 @@ export function useTransactionListUrl() {
     openEdit,
     openCreate,
     setTab,
+    openBulkDetails,
     exitEditMode,
     closePanel,
   }
