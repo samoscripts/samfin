@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { Direction, Transaction } from '@/shared/types'
 import type { Wallet } from '@/shared/api/wallets'
@@ -9,7 +9,6 @@ import { createTransaction, type ItemPayload } from '@/shared/api/transactions'
 import ClassificationItemsEditor, {
   type ClassificationItemDraft,
 } from '@/shared/components/classification/ClassificationItemsEditor'
-import FormActions from '@/shared/components/form/FormActions'
 import FormError from '@/shared/components/form/FormError'
 import { FieldRow, SectionLabel } from '@/shared/components/form/FormSection'
 import PartySelect from '@/shared/components/form/PartySelect'
@@ -26,6 +25,11 @@ import {
 import { filterCategoriesForDirection } from '../utils/categoryOptions'
 import type { TransactionNewUrlPrefill } from '../utils/transactionNewUrlParams'
 import { defaultNewTransactionDate, parseAmountFromUrl, parseIdFromUrl } from '../utils/transactionNewUrlParams'
+import {
+  TransactionTemplateFormFooter,
+  TransactionTemplateList,
+} from './TransactionTemplateBar'
+import { applyTemplateToDraft, templatePayloadFromDraft } from '../utils/transactionTemplates'
 
 interface CreateDraft {
   direction: Direction
@@ -95,6 +99,12 @@ export default function TransactionCreateForm({
   const [draft, setDraft] = useState<CreateDraft>(() => prefillToDraft(prefill))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [templateListRefreshKey, setTemplateListRefreshKey] = useState(0)
+
+  const getTemplatePayload = useCallback(
+    () => templatePayloadFromDraft(draft.direction, draft),
+    [draft],
+  )
 
   useEffect(() => {
     setDraft(prefillToDraft(prefill))
@@ -212,6 +222,13 @@ export default function TransactionCreateForm({
               ariaLabel="Kierunek transakcji"
             />
           </FieldRow>
+
+          <TransactionTemplateList
+            direction={draft.direction}
+            refreshKey={templateListRefreshKey}
+            onApply={(template) => setDraft((prev) => applyTemplateToDraft(prev, template))}
+          />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FieldRow label="Data">
               <input
@@ -319,7 +336,13 @@ export default function TransactionCreateForm({
         />
       </div>
 
-      <FormActions saving={saving} submitLabel="Utwórz transakcję" onCancel={onCancel} />
+      <TransactionTemplateFormFooter
+        saving={saving}
+        submitLabel="Utwórz transakcję"
+        onCancel={onCancel}
+        getTemplatePayload={getTemplatePayload}
+        onTemplateCreated={() => setTemplateListRefreshKey((k) => k + 1)}
+      />
     </form>
   )
 }

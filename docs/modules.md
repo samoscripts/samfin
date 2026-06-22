@@ -53,6 +53,7 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 | Plik | Opis |
 |------|------|
 | `Transaction/Controller/TransactionController.php` | Lista, tworzenie ręczne, stats, klasyfikacja, bulk update, historia, apply reguł |
+| `Transaction/Controller/TransactionTemplateController.php` | `GET/POST/DELETE /api/transaction-templates` — szablony klasyfikacji per użytkownik (`?direction=INCOME\|EXPENSE`) |
 | `Transaction/Service/TransactionClassificationService.php` | Klasyfikacja pojedynczej transakcji |
 | `Transaction/Service/TransactionBulkUpdateService.php` | Masowa aktualizacja pól |
 | `Transaction/Service/TransactionCreateService.php` | Tworzenie transakcji ręcznych (`source: MANUAL`) |
@@ -294,7 +295,7 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 | `TransactionsSidebar` | Zakładki Filtry / Szczegóły / Edycja (bulk) |
 | `TransactionDetailsPanel` | Szczegóły pojedynczej transakcji; przyciski Edytuj i Utwórz regułę |
 | `TransactionSummaryCard` | Karta transakcji (szczegóły + formularz reguły z transakcji) |
-| `TransactionEditForm.tsx` / `TransactionCreateForm.tsx` | Edycja i tworzenie w sidebarze (`?tab=edit&tx=`, `?tab=create`) |
+| `TransactionEditForm.tsx` / `TransactionCreateForm.tsx` | Edycja i tworzenie w sidebarze (`?tab=edit&tx=`, `?tab=create`); szablony klasyfikacji (`TransactionTemplateBar`) |
 | `EditBulkPanel` | Masowa edycja wybranych pól (sidebar) |
 | `ApplyClassificationRulesDialog` | Potwierdzenie zastosowania reguł (zaznaczenie / filtr) |
 | `TransactionMultiDetailsPanel` | Szczegóły wielu zaznaczonych transakcji |

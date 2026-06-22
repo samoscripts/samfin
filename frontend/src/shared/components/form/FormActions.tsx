@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { btnPrimary, btnPrimaryModal, btnSecondary, btnSecondaryModal } from './formClasses'
 
@@ -11,6 +12,7 @@ export interface FormActionsProps {
   layout?: 'row' | 'modal'
   className?: string
   submitDisabled?: boolean
+  middleActions?: ReactNode
 }
 
 export default function FormActions({
@@ -23,6 +25,7 @@ export default function FormActions({
   layout = 'row',
   className,
   submitDisabled = false,
+  middleActions,
 }: FormActionsProps) {
   const isModal = layout === 'modal'
 
@@ -45,6 +48,7 @@ export default function FormActions({
           {cancelLabel}
         </button>
       )}
+      {middleActions}
       <button
         type="submit"
         disabled={saving || submitDisabled}

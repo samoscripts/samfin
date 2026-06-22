@@ -2,7 +2,7 @@
 
 Silnik: **MariaDB 11**, charset `utf8mb4_unicode_ci`, silnik InnoDB.
 
-ORM: Doctrine 3. Migracje w `backend/migrations/` (18 plików, chronologicznie od `Version20260607125328`).
+ORM: Doctrine 3. Migracje w `backend/migrations/` (20 plików, chronologicznie od `Version20260607125328`).
 
 ## Lista tabel
 
@@ -21,6 +21,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (18 plików, chronologicznie o
 | `transaction_items` | `TransactionItem` | Pozycje transakcji |
 | `transactions_change_log` | `TransactionChangeLog` | Historia klasyfikacji |
 | `classification_rule` | `ClassificationRule` | Reguły auto-klasyfikacji per podmiot |
+| `transaction_template` | `TransactionTemplate` | Szablony klasyfikacji per użytkownik (wpływ/wydatek) |
 
 ## Diagram relacji (FK)
 
@@ -88,6 +89,16 @@ erDiagram
         int transaction_id FK
         json snapshot_json
     }
+    transaction_template {
+        int id PK
+        int user_id FK
+        string direction
+        int paid_from_party_id FK
+        int paid_to_party_id FK
+        int wallet_id FK
+        int concern_id FK
+        int category_id FK
+    }
 
     party_bank_account }o--|| party : party_id_RESTRICT
     category }o--o| category : parent_id_SET_NULL
@@ -104,6 +115,12 @@ erDiagram
     transaction_items }o--o| concern : SET_NULL
     transaction_items }o--o| category : SET_NULL
     transactions_change_log }o--|| transactions : CASCADE
+    transaction_template }o--|| app_user : user_id_CASCADE
+    transaction_template }o--o| party : paid_from_SET_NULL
+    transaction_template }o--o| party : paid_to_SET_NULL
+    transaction_template }o--o| wallet : SET_NULL
+    transaction_template }o--o| concern : SET_NULL
+    transaction_template }o--o| category : SET_NULL
 ```
 
 ## Klucze obce — zachowanie ON DELETE
@@ -149,6 +166,8 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260613140000` | Usunięcie `direction_usage_*` z `party` |
 | `20260614120000` | `csv_import_row`: rename `account_raw` → `own_account_label_raw`; `counterparty_account_raw` |
 | `20260614150000` | `classification_rule`; `transactions.counterparty_account_number` |
+| `20260615120000` | Reguły klasyfikacji: warunek `direction` na początku `conditions_json` |
+| `20260622120000` | `transaction_template` — szablony klasyfikacji per użytkownik |
 
 ## Konwencja kwot
 

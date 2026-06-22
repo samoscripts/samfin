@@ -16,7 +16,7 @@
 # One-time server setup:
 #   1. git clone <repo> ~/public_html/samfin
 #   2. composer available on server (COMPOSER_BIN in deploy.env, default: composer)
-#   3. cp backend/.env.prod.dist backend/.env && edit secrets (backend/.env is gitignored)
+#   3. cp backend/.env.prod.dist backend/.env && edit secrets (backend/.env is gitignored — nie commituj)
 #   4. Subdomain fin.samsoft.pl — either:
 #        docroot -> .../public_html/samfin/backend/public
 #      or symlink:
@@ -197,7 +197,16 @@ SKIP_COMPOSER="$4"
 
 if [[ "$SKIP_COMPOSER" != "true" ]]; then
     cd "$REPO_PATH"
+    ENV_BACKUP=""
+    if [[ -f "$BACKEND_PATH/.env" ]]; then
+        ENV_BACKUP="$(mktemp)"
+        cp "$BACKEND_PATH/.env" "$ENV_BACKUP"
+    fi
     git pull
+    if [[ -n "$ENV_BACKUP" ]]; then
+        cp "$ENV_BACKUP" "$BACKEND_PATH/.env"
+        rm -f "$ENV_BACKUP"
+    fi
     cd "$BACKEND_PATH"
     # shellcheck disable=SC2086
     $COMPOSER_CMD install --no-dev --optimize-autoloader --no-interaction
@@ -207,6 +216,15 @@ fi
 
 mkdir -p var/cache var/log
 chmod -R u+rwX var
+
+if [[ ! -f .env ]]; then
+    echo "ERROR: brak backend/.env na serwerze. Skopiuj .env.prod.dist i ustaw DATABASE_URL (localhost, nie db)." >&2
+    exit 1
+fi
+if grep -qE '@db[:/]' .env 2>/dev/null; then
+    echo "ERROR: backend/.env wskazuje host 'db' (Docker dev). Ustaw produkcyjny DATABASE_URL, np. z .env.prod.dist." >&2
+    exit 1
+fi
 
 php bin/console doctrine:migrations:migrate --no-interaction --env=prod
 php bin/console cache:clear --env=prod

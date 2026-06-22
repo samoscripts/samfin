@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { Transaction } from '@/shared/types'
 import type { Wallet } from '@/shared/api/wallets'
@@ -9,7 +9,6 @@ import { classifyTransactionItems, type ItemPayload } from '@/shared/api/transac
 import ClassificationItemsEditor, {
   type ClassificationItemDraft,
 } from '@/shared/components/classification/ClassificationItemsEditor'
-import FormActions from '@/shared/components/form/FormActions'
 import FormError from '@/shared/components/form/FormError'
 import { FieldRow, ReadOnlyField, SectionLabel } from '@/shared/components/form/FormSection'
 import PartySelect from '@/shared/components/form/PartySelect'
@@ -32,6 +31,11 @@ import {
   resolvePartyName,
 } from '../utils/partyAssignment'
 import { filterCategoriesForDirection } from '../utils/categoryOptions'
+import {
+  TransactionTemplateFormFooter,
+  TransactionTemplateList,
+} from './TransactionTemplateBar'
+import { applyTemplateToDraft, templatePayloadFromDraft } from '../utils/transactionTemplates'
 
 interface EditDraft {
   paidFromPartyId: number | null
@@ -95,6 +99,12 @@ export default function TransactionEditForm({
   const [draft, setDraft] = useState<EditDraft>(() => txToEditDraft(tx))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [templateListRefreshKey, setTemplateListRefreshKey] = useState(0)
+
+  const getTemplatePayload = useCallback(
+    () => templatePayloadFromDraft(tx.direction, draft),
+    [tx.direction, draft],
+  )
 
   useEffect(() => {
     setDraft(txToEditDraft(tx))
@@ -167,6 +177,12 @@ export default function TransactionEditForm({
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
+      <TransactionTemplateList
+        direction={tx.direction}
+        refreshKey={templateListRefreshKey}
+        onApply={(template) => setDraft((prev) => applyTemplateToDraft(prev, template, tx))}
+      />
+
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{tx.date}</span>
@@ -280,11 +296,13 @@ export default function TransactionEditForm({
         )}
       </div>
 
-      <FormActions
+      <TransactionTemplateFormFooter
         saving={saving}
         submitLabel="Zapisz"
         submitDisabled={!!validationError}
         onCancel={onCancel}
+        getTemplatePayload={getTemplatePayload}
+        onTemplateCreated={() => setTemplateListRefreshKey((k) => k + 1)}
       />
     </form>
   )
