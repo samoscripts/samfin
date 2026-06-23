@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowUp, ArrowDown, ArrowUpDown, PanelRight, ArrowRight, Plus } from 'lucide-react'
 import PageHeader from '@/layout/PageHeader'
 import Pill from '@/shared/components/Pill'
@@ -55,6 +55,7 @@ const COLUMNS: { key: string; label: string; sortable?: SortableCol }[] = [
 
 export default function Transactions() {
   const navigate = useNavigate()
+  const location = useLocation()
   const {
     filters: activeFilters,
     sort,
@@ -62,7 +63,7 @@ export default function Transactions() {
     tx: urlTxId,
     tab: urlTab,
     createPrefill,
-    setFilters,
+    applyUrl,
     setSort,
     setPagination,
     openTx,
@@ -128,13 +129,17 @@ export default function Transactions() {
       setEditMode((prev) => (prev === 'bulk' ? 'bulk' : 'single'))
       return
     }
-    if (urlTab === 'edit' && editMode === 'bulk') {
+    if (urlTab === 'edit' && !urlTxId && bulkTransactions.length > 1 && !selectionMixed) {
+      setEditMode('bulk')
       return
     }
     if (urlTab === 'filters' || urlTab === 'details' || urlTab === null) {
-      setEditMode(null)
+      if (editMode !== 'bulk') {
+        setEditMode(null)
+      }
+      return
     }
-  }, [urlTab, urlTxId, editMode])
+  }, [urlTab, urlTxId, editMode, bulkTransactions.length, selectionMixed])
 
   const handlePanelWidthChange = useCallback((w: number) => {
     setPanelWidth(w)
@@ -188,11 +193,15 @@ export default function Transactions() {
   }, [focusIndex])
 
   const handleApplyFilters = useCallback(
-    (filters: FlowFilters) => {
-      setFilters(filters)
+    (filters: FlowFilters, options?: { closePanel?: boolean }) => {
+      applyUrl({
+        filters,
+        pagination: { ...pagination, page: 1 },
+        ...(options?.closePanel ? { tx: null, tab: null, createPrefill: {} } : {}),
+      })
       setRefreshKey((k) => k + 1)
     },
-    [setFilters],
+    [applyUrl, pagination],
   )
 
   const handleSortColumn = (field: SortableCol) => {
@@ -398,9 +407,13 @@ export default function Transactions() {
 
   const handleCreateRule = useCallback(
     (tx: Transaction) => {
-      navigate(`/konfiguracja/reguly/nowy?fromTx=${tx.transactionId}`)
+      const params = new URLSearchParams({
+        fromTx: String(tx.transactionId),
+        returnUrl: location.pathname + location.search,
+      })
+      navigate(`/konfiguracja/reguly/nowy?${params.toString()}`)
     },
-    [navigate],
+    [navigate, location],
   )
 
   const requestSaveEdit = useCallback(() => {

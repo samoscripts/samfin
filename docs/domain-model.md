@@ -125,7 +125,16 @@ Słownik konfigurowalny — kogo/czego dotyczy wydatek lub wpływ (np. Basia, ws
 
 ## Category (kategoria)
 
-Słownik konfigurowalny z hierarchią (`parent_id`). Ma pole `type`: `INCOME` lub `EXPENSE` — musi być zgodne z kierunkiem transakcji przy bulk update.
+Słownik konfigurowalny z hierarchią (`parent_id`).
+
+- **DB:** `direction_expense`, `direction_income` (co najmniej jedno `true`; CHECK w migracji `20260623120000`).
+- **API:** `directions: ['EXPENSE']`, `['INCOME']` lub `['EXPENSE','INCOME']`.
+- **Drzewo:** kierunki dziecka ⊆ kierunki parenta.
+- **Transakcja:** kategoria na pozycji musi obsługiwać `transaction.direction` (`Category::supportsDirection()`).
+- **Dezaktywacja:** blokowana przy użyciu w `transaction_items`, `transaction_template` lub `classification_rule.actions_json.items` (ADR-027). Scalanie subkategorii (`POST /api/categories/merge`) przepina te referencje przed dezaktywacją źródła.
+- **UI:** lista drzewiasta + panel boczny (`?panel=create|edit|move|merge&id=`); merge i przenoszenie w panelu, nie w modalu (ADR-026).
+
+Pole `type` (pojedynczy INCOME/EXPENSE) — **usunięte** w migracji `20260623120000`.
 
 ## CsvImport / CsvImportRow / CsvImportError
 

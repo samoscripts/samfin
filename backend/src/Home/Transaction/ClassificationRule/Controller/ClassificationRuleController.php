@@ -7,6 +7,7 @@ use App\Home\Configuration\Repository\PartyRepository;
 use App\Home\Transaction\ClassificationRule\Entity\ClassificationRule;
 use App\Home\Transaction\ClassificationRule\Repository\ClassificationRuleRepository;
 use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleDefinitionValidator;
+use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleReorderService;
 use App\Home\Transaction\Repository\TransactionRepository;
 use App\Identity\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,6 +26,7 @@ class ClassificationRuleController extends AbstractController
         private ClassificationRuleRepository         $ruleRepository,
         private TransactionRepository                $transactionRepository,
         private ClassificationRuleDefinitionValidator $validator,
+        private ClassificationRuleReorderService     $reorderService,
         private Security                             $security,
     ) {}
 
@@ -69,6 +71,10 @@ class ClassificationRuleController extends AbstractController
             return $this->json(['message' => $e->getMessage()], 422);
         }
 
+        if (!array_key_exists('priority', $data)) {
+            $rule->setPriority($this->ruleRepository->getNextPriorityForParty($party));
+        }
+
         /** @var User $user */
         $user = $this->security->getUser();
         $rule->setCreatedBy($user);
@@ -80,7 +86,33 @@ class ClassificationRuleController extends AbstractController
         return $this->json($rule->toApiArray(), 201);
     }
 
-    #[Route('/{id}', name: 'api_classification_rules_update', methods: ['PUT'])]
+    #[Route('/reorder', name: 'api_classification_rules_reorder', methods: ['PUT'], priority: 10)]
+    public function reorder(int $partyId, Request $request): JsonResponse
+    {
+        $party = $this->requireParty($partyId);
+        if ($party instanceof JsonResponse) {
+            return $party;
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $orderedRuleIds = $data['orderedRuleIds'] ?? null;
+        if (!is_array($orderedRuleIds)) {
+            return $this->json(['message' => 'Pole orderedRuleIds jest wymagane.'], 422);
+        }
+
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        try {
+            $this->reorderService->reorder($party, $orderedRuleIds, $user);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['message' => $e->getMessage()], 422);
+        }
+
+        return $this->json(['updated' => count($orderedRuleIds)]);
+    }
+
+    #[Route('/{id}', name: 'api_classification_rules_update', methods: ['PUT'], requirements: ['id' => '\d+'])]
     public function update(int $partyId, int $id, Request $request): JsonResponse
     {
         $rule = $this->requireRule($partyId, $id);
@@ -113,7 +145,7 @@ class ClassificationRuleController extends AbstractController
         return $this->json($rule->toApiArray());
     }
 
-    #[Route('/{id}', name: 'api_classification_rules_delete', methods: ['DELETE'])]
+    #[Route('/{id}', name: 'api_classification_rules_delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     public function delete(int $partyId, int $id): JsonResponse
     {
         $rule = $this->requireRule($partyId, $id);

@@ -212,7 +212,10 @@ Typowy kształt (camelCase w JSON):
 - **Party:** `name`, `type`, `ownershipType`, `usageType`, `description`, `active`
 - **PartyBankAccount:** `partyId`, `accountNumber`, `bankName`, `displayName`, `ownerNameFromBank`, `currency`, `active`
 - **Wallet / Concern:** `name`, `description`, `active`
-- **Category:** `name`, `type`, `parentId`, `description`, `active`
+- **Category:** `name`, `directions` (`EXPENSE` / `INCOME`, min. 1), `parentId`, `description`, `active`
+- **Category merge:** `POST /api/categories/merge` — `{ sourceId, targetId }` (tylko subkategorie; przepina pozycje transakcji, szablony, reguły; dezaktywuje źródło)
+- **Category deactivation guard:** `DELETE /api/categories/{id}` i `PUT active=false` zwracają `422` z `usage`, gdy kategoria jest używana w tych samych miejscach co merge (`CategoryUsageService`, `CategoryRuleReferenceSupport`)
+- **Category UI:** `Categories.tsx` + `CategoriesSidebar` (portal prawego panelu, `?panel=create|edit|move|merge&id=`); `formatCategoryDeactivateError()` w `categories.ts`
 
 ### Upload CSV — `POST /api/csv-imports`
 

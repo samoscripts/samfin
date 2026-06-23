@@ -5,7 +5,10 @@ import Transactions from '@/domains/home/transactions/pages/Transactions'
 import TransactionEditRedirect from '@/domains/home/transactions/pages/TransactionEditRedirect'
 import TransactionNewRedirect from '@/domains/home/transactions/pages/TransactionNewRedirect'
 import ReportsLayout from '@/domains/home/reports/pages/ReportsLayout'
-import MonthlyReport from '@/domains/home/reports/pages/MonthlyReport'
+import MonthlyReport from '@/domains/home/reports/default/pages/MonthlyReport'
+import CommonAccountSettlementLayout from '@/domains/home/reports/common-account/pages/CommonAccountSettlementLayout'
+import CommonAccountSettlementReport from '@/domains/home/reports/common-account/pages/CommonAccountSettlementReport'
+import CommonAccountSettlementSettings from '@/domains/home/reports/common-account/pages/CommonAccountSettlementSettings'
 import Settings     from '@/domains/settings/pages/Settings'
 import UsersPage    from '@/domains/settings/users/pages/Users'
 import SystemSettings from '@/domains/settings/system/pages/SystemSettings'
@@ -15,6 +18,7 @@ import Parties      from '@/domains/home/configuration/parties/pages/Parties'
 import Wallets      from '@/domains/home/configuration/wallets/pages/Wallets'
 import Concerns     from '@/domains/home/configuration/concerns/pages/Concerns'
 import Categories   from '@/domains/home/configuration/categories/pages/Categories'
+import { CategoriesCreateRedirect, CategoriesEditRedirect } from '@/domains/home/configuration/categories/pages/CategoriesLegacyRedirect'
 import ClassificationRules from '@/domains/home/configuration/classification-rules/pages/ClassificationRules'
 import ImportLayout    from '@/domains/home/import/pages/ImportLayout'
 import ImportNowy      from '@/domains/home/import/pages/ImportNowy'
@@ -45,8 +49,17 @@ export default function AppRoutes() {
         </Route>
 
         <Route path="raporty" element={<ReportsLayout />}>
-          <Route index element={<Navigate to="miesieczny" replace />} />
-          <Route path="miesieczny" element={<MonthlyReport />} />
+          <Route index element={<Navigate to="default/monthly" replace />} />
+          <Route path="default/monthly" element={<MonthlyReport />} />
+          <Route path="common-account" element={<CommonAccountSettlementLayout />}>
+            <Route index element={<CommonAccountSettlementReport />} />
+            <Route path="settings" element={<CommonAccountSettlementSettings />} />
+          </Route>
+          {/* legacy redirects */}
+          <Route path="miesieczny" element={<Navigate to="/raporty/default/monthly" replace />} />
+          <Route path="domyslne/miesieczny" element={<Navigate to="/raporty/default/monthly" replace />} />
+          <Route path="konto-wspolne" element={<Navigate to="/raporty/common-account" replace />} />
+          <Route path="konto-wspolne/konfiguracja" element={<Navigate to="/raporty/common-account/settings" replace />} />
         </Route>
 
         <Route path="konfiguracja" element={<Configuration />}>
@@ -68,8 +81,8 @@ export default function AppRoutes() {
           </Route>
           <Route path="kategorie">
             <Route index element={<Categories />} />
-            <Route path="nowy" element={<Categories />} />
-            <Route path=":entityId/edycja" element={<Categories />} />
+            <Route path="nowy" element={<CategoriesCreateRedirect />} />
+            <Route path=":entityId/edycja" element={<CategoriesEditRedirect />} />
           </Route>
           <Route path="reguly">
             <Route index element={<ClassificationRules />} />

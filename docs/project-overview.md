@@ -46,7 +46,7 @@ fin/
 
 ```bash
 make setup    # build + composer install
-make migrate  # migracje bazy
+make migrate  # migracje bazy (w kontenerze Docker, użytkownik www-data)
 make up
 ```
 
@@ -89,18 +89,18 @@ flowchart LR
 4. **Reguły klasyfikacji** — zestaw reguł per podmiot OWN; ręczne uruchomienie na zaznaczeniu lub filtrze; opcjonalne tworzenie reguły z istniejącej transakcji.
 5. **Dashboard** — agregaty przychodów, wydatków, salda i liczby niesklasyfikowanych transakcji.
 6. **Transakcje ręczne** — formularz `/transactions/new` ze `source: MANUAL`; klasyfikacja opcjonalna; reguły Skąd/Dokąd jak przy edycji (ADR-017, ADR-019).
-7. **Raport miesięczny** — `/raporty/miesieczny` z filtrami w URL; API `GET /api/reports/monthly`.
+7. **Raporty** — sidebar z podmenu: miesięczny (`/raporty/default/monthly`, `GET /api/reports/monthly`) oraz rozliczenie konta wspólnego (`/raporty/common-account`, `GET /api/reports/common-account-settlement`).
 
 ## Konwencje globalne
 
 - **Kwoty**: przechowywane w groszach (`amount_minor`, typ `INT`); API zwraca wartości dziesiętne PLN (`round(minor / 100, 2)`).
-- **Soft delete**: encje konfiguracyjne i użytkownicy dezaktywowani przez `active = false` (endpoint `DELETE` nie usuwa rekordu fizycznie).
+- **Soft delete**: encje konfiguracyjne i użytkownicy dezaktywowani przez `active = false` (endpoint `DELETE` nie usuwa rekordu fizycznie). **Kategorie:** dezaktywacja zablokowana przy potwierdzonych użyciach — ADR-027; merge przepina powiązania.
 - **Audyt**: większość encji ma `created_by`, `updated_by`, `created_at`, `updated_at`.
 - **Język UI**: głównie polski; część etykiet nawigacji po angielsku (np. „Dashboard”, „Transactions”).
 
 ## Co nie jest jeszcze zaimplementowane
 
-- Rozszerzone raporty (per kategoria, wykresy, eksport) — poza raportem miesięcznym cashflow.
+- Rozszerzone raporty (per kategoria, wykresy, eksport, okresy rozliczeniowe ze snapshotami) — poza raportem miesięcznym i MVP rozliczenia konta wspólnego.
 - Osobne encje na cele, beneficjentów, zakresy budżetu — nie występują w kodzie (beneficjent → `concern`; cele poza MVP).
 
 Szczegóły: [open-questions.md](open-questions.md), [reporting.md](reporting.md).

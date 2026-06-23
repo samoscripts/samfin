@@ -35,7 +35,7 @@ sf:
 	docker compose exec app php bin/console $(CMD)
 
 migrate:
-	docker compose exec app php bin/console doctrine:migrations:migrate --no-interaction
+	docker compose exec -u www-data -T app php bin/console doctrine:migrations:migrate --no-interaction
 
 routes:
 	docker compose exec app php bin/console debug:router

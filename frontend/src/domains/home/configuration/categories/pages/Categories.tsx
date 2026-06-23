@@ -1,48 +1,56 @@
-import { useEffect, useState } from 'react'
-import { ChevronRight, Loader2, Pencil, Plus, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Loader2, Plus } from 'lucide-react'
 import {
   deactivateCategory,
   fetchCategories,
   fetchCategory,
+  formatCategoryDeactivateError,
   type Category,
-  type CategoryType,
 } from '@/shared/api/categories'
-import Pill from '@/shared/components/Pill'
-import { CATEGORY_TYPE_PILL } from '@/shared/constants/pillMaps'
-import { useCrudRoute } from '@/shared/hooks/useCrudRoute'
-import CategoryForm from '../components/CategoryForm'
-
-const ROUTE_BASE = '/konfiguracja/kategorie'
-
-const TYPE_LABEL: Record<CategoryType, string> = {
-  EXPENSE: 'Wydatek',
-  INCOME: 'Wpływ',
-}
+import { useRightPanelPortal } from '@/layout/RightPanelContext'
+import CategoriesSidebar from '../components/CategoriesSidebar'
+import CategoryTreeList from '../components/CategoryTreeList'
+import {
+  computeExpandedPanelWidth,
+  loadStoredCategoriesPanelWidth,
+  storeCategoriesPanelWidth,
+} from '../constants/panelLayout'
+import { useCategoriesPanelUrl } from '../hooks/useCategoriesPanelUrl'
 
 export default function Categories() {
-  const { isList, isCreate, isEdit, entityId, goList, goCreate, goEdit } = useCrudRoute(ROUTE_BASE)
+  const portalRoot = useRightPanelPortal()
+  const { panel, categoryId, panelOpen, openPanel, closePanel } = useCategoriesPanelUrl()
 
   const [items, setItems] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editingItem, setEditingItem] = useState<Category | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const [deactivating, setDeactivating] = useState<number | null>(null)
+  const [deactivateError, setDeactivateError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!isList) return
+  const [panelWidth, setPanelWidth] = useState(loadStoredCategoriesPanelWidth)
+  const [panelExpanded, setPanelExpanded] = useState(false)
+  const effectivePanelWidth = panelExpanded ? computeExpandedPanelWidth() : panelWidth
+
+  const loadItems = useCallback(() => {
     setIsLoading(true)
     fetchCategories()
       .then(setItems)
       .finally(() => setIsLoading(false))
-  }, [isList])
+  }, [])
 
   useEffect(() => {
-    if (!isEdit || entityId === null) {
+    loadItems()
+  }, [loadItems])
+
+  useEffect(() => {
+    if (panel !== 'edit' || categoryId === null) {
       setEditingItem(null)
       return
     }
 
-    const fromList = items.find((i) => i.id === entityId)
+    const fromList = items.find((i) => i.id === categoryId)
     if (fromList) {
       setEditingItem(fromList)
       return
@@ -50,7 +58,7 @@ export default function Categories() {
 
     let cancelled = false
     setEditLoading(true)
-    fetchCategory(entityId)
+    fetchCategory(categoryId)
       .then((item) => {
         if (!cancelled) setEditingItem(item)
       })
@@ -64,73 +72,41 @@ export default function Categories() {
     return () => {
       cancelled = true
     }
-  }, [isEdit, entityId, items])
+  }, [panel, categoryId, items])
+
+  const handlePanelWidthChange = useCallback((w: number) => {
+    setPanelWidth(w)
+    storeCategoriesPanelWidth(w)
+  }, [])
 
   async function handleDeactivate(item: Category) {
     if (!confirm(`Dezaktywować kategorię „${item.name}"?`)) return
+    setDeactivateError(null)
     setDeactivating(item.id)
     try {
       await deactivateCategory(item.id)
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: false } : i)))
+    } catch (err: unknown) {
+      setDeactivateError(formatCategoryDeactivateError(err, 'Nie udało się dezaktywować kategorii.'))
     } finally {
       setDeactivating(null)
     }
   }
 
-  const breadcrumb = (
-    <nav className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 mb-6">
-      <button type="button" onClick={goList} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-        Kategorie
-      </button>
-      {!isList && (
-        <>
-          <ChevronRight size={12} className="shrink-0" />
-          <span className="text-gray-600 dark:text-gray-400 font-medium">
-            {isCreate ? 'Nowa kategoria' : `Edycja: ${editingItem?.name ?? ''}`}
-          </span>
-        </>
-      )}
-    </nav>
-  )
+  function handleSaved() {
+    closePanel()
+    loadItems()
+  }
 
-  if (isCreate || isEdit) {
-    if (isEdit && editLoading) {
-      return (
-        <div>
-          {breadcrumb}
-          <div className="flex items-center justify-center py-16 text-gray-400">
-            <Loader2 size={24} className="animate-spin" />
-          </div>
-        </div>
-      )
-    }
+  function handleMerged({ deactivatedSourceId }: { deactivatedSourceId: number }) {
+    setItems((prev) =>
+      prev.map((c) => (c.id === deactivatedSourceId ? { ...c, active: false } : c)),
+    )
+  }
 
-    if (isEdit && !editingItem) {
-      return (
-        <div>
-          {breadcrumb}
-          <p className="text-sm text-red-600 dark:text-red-400">Nie znaleziono kategorii.</p>
-        </div>
-      )
-    }
-
-    return (
-      <div>
-        {breadcrumb}
-        <div className="w-full space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {isCreate ? 'Nowa kategoria' : `Edycja: ${editingItem?.name ?? ''}`}
-          </h2>
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <CategoryForm
-              item={isCreate ? null : editingItem}
-              allCategories={items}
-              onSaved={goList}
-              onCancel={goList}
-            />
-          </div>
-        </div>
-      </div>
+  function handleMoved(updated: Category) {
+    setItems((prev) =>
+      prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
     )
   }
 
@@ -138,155 +114,89 @@ export default function Categories() {
   const inactive = items.filter((i) => !i.active)
 
   return (
-    <div>
-      {breadcrumb}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Kategorie</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Kategorie przychodów i wydatków z opcjonalną kategorią nadrzędną.
-          </p>
+    <>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Kategorie</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              Grupy i subkategorie — przeciągnij subkategorię na grupę, aby przenieść.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openPanel('create')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] text-white text-sm font-medium transition-colors"
+          >
+            <Plus size={15} />
+            Nowa kategoria
+          </button>
         </div>
-        <button
-          onClick={goCreate}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] text-white text-sm font-medium transition-colors"
-        >
-          <Plus size={15} />
-          Nowa kategoria
-        </button>
-      </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-gray-400">
-          <Loader2 size={24} className="animate-spin" />
-        </div>
-      ) : items.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
-          <p className="text-gray-400 dark:text-gray-500 text-sm">
-            Brak kategorii. Kliknij „Nowa kategoria”, aby dodać pierwszą.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <CategoryTable
-            title="Aktywne"
-            items={active}
-            deactivating={deactivating}
-            onEdit={goEdit}
-            onDeactivate={handleDeactivate}
-          />
-          {inactive.length > 0 && (
-            <CategoryTable
-              title="Nieaktywne"
-              items={inactive}
+        {deactivateError && (
+          <p className="text-sm text-red-600 dark:text-red-400 mb-4">{deactivateError}</p>
+        )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16 text-gray-400">
+            <Loader2 size={24} className="animate-spin" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
+            <p className="text-gray-400 dark:text-gray-500 text-sm">
+              Brak kategorii. Kliknij „Nowa kategoria”, aby dodać pierwszą.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <CategoryTreeList
+              title="Aktywne"
+              items={active}
               deactivating={deactivating}
-              onEdit={goEdit}
+              onEdit={(id) => openPanel('edit', id)}
               onDeactivate={handleDeactivate}
+              onMerge={(item) => openPanel('merge', item.id)}
+              onMove={(item) => openPanel('move', item.id)}
+              onItemsChange={setItems}
             />
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface CategoryTableProps {
-  title: string
-  items: Category[]
-  deactivating: number | null
-  onEdit: (id: number) => void
-  onDeactivate: (item: Category) => void
-}
-
-function CategoryTable({ title, items, deactivating, onEdit, onDeactivate }: CategoryTableProps) {
-  if (items.length === 0) return null
-
-  return (
-    <div>
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 px-1">
-        {title}
-      </h3>
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Nazwa</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Typ</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Nadrzędna</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Opis</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">Akcje</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
-              {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{item.name}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <Pill variant={CATEGORY_TYPE_PILL[item.type]}>{TYPE_LABEL[item.type]}</Pill>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{item.parentName ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs max-w-xs truncate">{item.description ?? '—'}</td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => onEdit(item.id)}
-                        title="Edytuj"
-                        className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      {item.active && (
-                        <button
-                          onClick={() => onDeactivate(item)}
-                          disabled={deactivating === item.id}
-                          title="Dezaktywuj"
-                          className="p-1.5 rounded-md text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors disabled:opacity-40"
-                        >
-                          {deactivating === item.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
-          {items.map((item) => (
-            <div key={item.id} className="p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">{item.name}</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Pill variant={CATEGORY_TYPE_PILL[item.type]}>{TYPE_LABEL[item.type]}</Pill>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Nadrzędna: {item.parentName ?? '—'}</span>
-                  </div>
-                  {item.description && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{item.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => onEdit(item.id)} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
-                    <Pencil size={14} />
-                  </button>
-                  {item.active && (
-                    <button
-                      onClick={() => onDeactivate(item)}
-                      disabled={deactivating === item.id}
-                      className="p-1.5 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-40"
-                    >
-                      {deactivating === item.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            {inactive.length > 0 && (
+              <CategoryTreeList
+                title="Nieaktywne"
+                items={inactive}
+                dimmed
+                deactivating={deactivating}
+                onEdit={(id) => openPanel('edit', id)}
+                onDeactivate={handleDeactivate}
+                onMerge={(item) => openPanel('merge', item.id)}
+                onMove={(item) => openPanel('move', item.id)}
+                onItemsChange={setItems}
+              />
+            )}
+          </div>
+        )}
       </div>
-    </div>
+
+      {portalRoot &&
+        createPortal(
+          <CategoriesSidebar
+            open={panelOpen}
+            panel={panel}
+            categoryId={categoryId}
+            width={effectivePanelWidth}
+            expanded={panelExpanded}
+            resizable={!panelExpanded}
+            onWidthChange={handlePanelWidthChange}
+            onToggleExpand={() => setPanelExpanded((v) => !v)}
+            onClose={closePanel}
+            allCategories={items}
+            editingItem={editingItem}
+            editLoading={editLoading}
+            onSaved={handleSaved}
+            onMerged={handleMerged}
+            onMoved={handleMoved}
+          />,
+          portalRoot,
+        )}
+    </>
   )
 }

@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Plus, Search, X } from 'lucide-react'
-import { createCategory, type Category, type CategoryType } from '@/shared/api/categories'
+import { createCategory, type Category, type CategoryDirection } from '@/shared/api/categories'
 import Select from '@/shared/components/form/Select'
 import { btnSecondary, configInputCls, configSelectCls, selectCls } from '@/shared/components/form/formClasses'
 import { getApiErrorMessage } from '@/shared/utils/errors'
 import {
   buildCategoryGroups,
+  categoryMatchesQuery,
+  filterActiveCategories,
   filterCategoryGroups,
   findCategoryById,
   formatCategoryLabel,
+  categorySupportsDirection,
   prepareCategoriesForSelect,
 } from '@/shared/utils/categoryOptions'
 
 export type CategorySelectValueType = 'string' | 'number'
+export type CategorySelectMode = 'child' | 'group'
 
 export interface CategorySelectProps {
   categories: Category[]
@@ -20,7 +24,9 @@ export interface CategorySelectProps {
   onChange: (value: string | number | null) => void
   emptyLabel?: string
   valueType?: CategorySelectValueType
-  direction?: CategoryType | ''
+  direction?: CategoryDirection | ''
+  /** `child` — subkategorie (domyślnie); `group` — tylko grupy główne (parentId = null) */
+  selectable?: CategorySelectMode
   disabled?: boolean
   className?: string
   allowQuickAdd?: boolean
@@ -40,6 +46,7 @@ export default function CategorySelect({
   emptyLabel = '— brak —',
   valueType = 'number',
   direction = '',
+  selectable = 'child',
   disabled = false,
   className,
   allowQuickAdd = false,
@@ -54,45 +61,62 @@ export default function CategorySelect({
   const [highlightIndex, setHighlightIndex] = useState(0)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [quickName, setQuickName] = useState('')
-  const [quickType, setQuickType] = useState<CategoryType>(
+  const [quickDirection, setQuickDirection] = useState<CategoryDirection>(
     direction === 'INCOME' ? 'INCOME' : 'EXPENSE',
   )
   const [quickParentId, setQuickParentId] = useState<number | ''>('')
   const [quickSaving, setQuickSaving] = useState(false)
   const [quickError, setQuickError] = useState<string | null>(null)
 
-  const prepared = useMemo(
-    () => prepareCategoriesForSelect(categories, direction),
-    [categories, direction],
-  )
+  const prepared = useMemo(() => {
+    if (selectable === 'group') {
+      let roots = filterActiveCategories(categories).filter((c) => c.parentId == null)
+      if (direction === 'EXPENSE' || direction === 'INCOME') {
+        roots = roots.filter((c) => categorySupportsDirection(c, direction))
+      }
+      return roots.sort((a, b) => a.name.localeCompare(b.name, 'pl'))
+    }
+    return prepareCategoriesForSelect(categories, direction)
+  }, [categories, direction, selectable])
 
   const groups = useMemo(() => {
+    if (selectable === 'group') return []
     const built = buildCategoryGroups(prepared)
     return filterCategoryGroups(built, query)
-  }, [prepared, query])
+  }, [prepared, query, selectable])
 
-  const flatOptions: FlatOption[] = useMemo(
-    () => groups.flatMap((g) => g.children.map((category) => ({ category, groupName: g.parentName }))),
-    [groups],
-  )
+  const flatOptions: FlatOption[] = useMemo(() => {
+    if (selectable === 'group') {
+      return prepared
+        .filter((c) => categoryMatchesQuery(c, query))
+        .map((category) => ({ category, groupName: '' }))
+    }
+    return groups.flatMap((g) => g.children.map((category) => ({ category, groupName: g.parentName })))
+  }, [groups, prepared, query, selectable])
 
   const parentOptions = useMemo(
     () =>
       prepared
         .filter((c) => c.parentId == null)
-        .filter((c) => c.type === quickType)
+        .filter((c) => categorySupportsDirection(c, quickDirection))
         .sort((a, b) => a.name.localeCompare(b.name, 'pl')),
-    [prepared, quickType],
+    [prepared, quickDirection],
   )
 
   const numericValue =
     value === null || value === undefined || value === '' ? null : Number(value)
 
   const selected = findCategoryById(prepared, numericValue)
-  const displayLabel = selected ? formatCategoryLabel(selected) : emptyLabel
+  const displayLabel =
+    selected
+      ? selectable === 'group'
+        ? selected.name
+        : formatCategoryLabel(selected)
+      : emptyLabel
   const hasValue = selected != null
 
   const showQuickAddRow =
+    selectable === 'child' &&
     allowQuickAdd &&
     !disabled &&
     normalizeSearch(query).length > 0 &&
@@ -152,7 +176,7 @@ export default function CategorySelect({
 
   useEffect(() => {
     if (direction === 'EXPENSE' || direction === 'INCOME') {
-      setQuickType(direction)
+      setQuickDirection(direction)
     }
   }, [direction])
 
@@ -164,7 +188,7 @@ export default function CategorySelect({
 
   function openQuickAdd() {
     setQuickName(query.trim())
-    setQuickType(direction === 'INCOME' ? 'INCOME' : direction === 'EXPENSE' ? 'EXPENSE' : 'EXPENSE')
+    setQuickDirection(direction === 'INCOME' ? 'INCOME' : direction === 'EXPENSE' ? 'EXPENSE' : 'EXPENSE')
     setQuickParentId(parentOptions[0]?.id ?? '')
     setQuickError(null)
     setQuickAddOpen(true)
@@ -186,7 +210,7 @@ export default function CategorySelect({
     try {
       const category = await createCategory({
         name,
-        type: quickType,
+        directions: [quickDirection],
         parentId: Number(quickParentId),
         description: null,
         active: true,
@@ -336,9 +360,9 @@ export default function CategorySelect({
               </Select>
               <Select
                 className={configSelectCls}
-                value={quickType}
+                value={quickDirection}
                 onChange={(e) => {
-                  setQuickType(e.target.value as CategoryType)
+                  setQuickDirection(e.target.value as CategoryDirection)
                   setQuickParentId('')
                 }}
                 disabled={direction === 'EXPENSE' || direction === 'INCOME'}
@@ -348,7 +372,7 @@ export default function CategorySelect({
               </Select>
               {parentOptions.length === 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Brak kategorii głównych dla wybranego typu.
+                  Brak kategorii głównych dla wybranego kierunku.
                 </p>
               )}
               {quickError && (
@@ -389,6 +413,31 @@ export default function CategorySelect({
             >
               {flatOptions.length === 0 && !showQuickAddRow ? (
                 <li className="px-3 py-2 text-sm text-gray-400">Brak wyników</li>
+              ) : selectable === 'group' ? (
+                flatOptions.map((option, idx) => {
+                  const highlighted = idx === highlightIndex
+                  return (
+                    <li key={option.category.id} role="presentation">
+                      <button
+                        type="button"
+                        id={`${listboxId}-opt-${option.category.id}`}
+                        role="option"
+                        aria-selected={option.category.id === numericValue}
+                        className={[
+                          'w-full text-left px-3 py-2 text-sm',
+                          highlighted
+                            ? 'bg-[#c9a96e]/15 text-gray-900 dark:text-gray-100'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60',
+                          option.category.id === numericValue ? 'font-medium' : '',
+                        ].join(' ')}
+                        onMouseEnter={() => setHighlightIndex(idx)}
+                        onClick={() => selectOption(option)}
+                      >
+                        {option.category.name}
+                      </button>
+                    </li>
+                  )
+                })
               ) : (
                 <>
                   {groups.map((group) => (

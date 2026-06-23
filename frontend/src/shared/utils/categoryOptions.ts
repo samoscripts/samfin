@@ -1,4 +1,4 @@
-import type { Category, CategoryType } from '@/shared/api/categories'
+import type { Category, CategoryDirection } from '@/shared/api/categories'
 
 export function formatCategoryLabel(c: Pick<Category, 'name' | 'parentName'>): string {
   return c.parentName ? `${c.parentName} / ${c.name}` : c.name
@@ -8,11 +8,27 @@ export function filterActiveCategories(categories: Category[]): Category[] {
   return categories.filter((c) => c.active)
 }
 
+export function categorySupportsDirection(
+  category: Pick<Category, 'directions'>,
+  direction: CategoryDirection,
+): boolean {
+  return category.directions.includes(direction)
+}
+
+export function parentSupportsChildDirections(
+  parent: Pick<Category, 'directions'>,
+  childDirections: CategoryDirection[],
+): boolean {
+  return childDirections.every((direction) => parent.directions.includes(direction))
+}
+
 export function filterCategoriesForDirection(
   categories: Category[],
-  direction: CategoryType | string,
+  direction: CategoryDirection | string,
 ): Category[] {
-  return categories.filter((c) => c.active && c.type === direction)
+  return categories.filter(
+    (c) => c.active && categorySupportsDirection(c, direction as CategoryDirection),
+  )
 }
 
 export function isSelectableCategory(c: Category): boolean {
@@ -22,7 +38,7 @@ export function isSelectableCategory(c: Category): boolean {
 export interface CategoryGroup {
   parentId: number
   parentName: string
-  type: CategoryType
+  directions: CategoryDirection[]
   children: Category[]
 }
 
@@ -48,7 +64,7 @@ export function buildCategoryGroups(categories: Category[]): CategoryGroup[] {
     groups.push({
       parentId: parent.id,
       parentName: parent.name,
-      type: parent.type,
+      directions: parent.directions,
       children,
     })
   }
@@ -87,7 +103,7 @@ export function findCategoryById(categories: Category[], id: number | null | und
 
 export function prepareCategoriesForSelect(
   categories: Category[],
-  direction?: CategoryType | '',
+  direction?: CategoryDirection | '',
 ): Category[] {
   const active = filterActiveCategories(categories)
   if (direction === 'EXPENSE' || direction === 'INCOME') {

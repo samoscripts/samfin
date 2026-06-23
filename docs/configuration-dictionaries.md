@@ -12,7 +12,7 @@ W SamFin dane referencyjne używane przy klasyfikacji transakcji są **konfiguro
 | Obszary (Dotyczy) | `concern` | `/api/concerns` | Konfiguracja → Dotyczy |
 | Kategorie | `category` | `/api/categories` | Konfiguracja → Kategorie |
 
-Wszystkie słowniki wspierają **dezaktywację** (`active = false`) zamiast fizycznego usuwania.
+Wszystkie słowniki wspierają **dezaktywację** (`active = false`) zamiast fizycznego usuwania. **Wyjątek (kategorie, ADR-027):** zwykła dezaktywacja jest blokowana, gdy kategoria jest używana w transakcjach, szablonach lub regułach — patrz sekcja Kategorie poniżej.
 
 ---
 
@@ -95,15 +95,30 @@ Przykłady wartości to **dane użytkownika**, nie stałe systemowe. Decyzja dom
 
 ## Category (kategoria)
 
-**Cel:** trzeci wymiar klasyfikacji — typ wydatku lub przychodu. Drzewo kategorii przez `parent_id`.
+**Cel:** trzeci wymiar klasyfikacji — rodzaj wydatku lub przychodu. Drzewo kategorii przez `parent_id`. Kategoria może obsługiwać **jeden lub oba** kierunki (wydatek, wpływ).
 
-| Pole | Opis |
-|------|------|
+| Pole (DB) | Opis |
+|-----------|------|
 | `name` | Nazwa kategorii |
-| `type` | INCOME lub EXPENSE — musi być zgodne z kierunkiem transakcji przy bulk update |
+| `direction_expense` | Kategoria dostępna dla wydatków (`EXPENSE`) |
+| `direction_income` | Kategoria dostępna dla wpływów (`INCOME`) |
 | `parent_id` | Kategoria nadrzędna (opcjonalna) |
 | `description` | Opis opcjonalny |
 | `active` | Dezaktywacja |
+
+**Constraint:** co najmniej jedno z `direction_expense` / `direction_income` musi być aktywne.
+
+**API (JSON):** pole `directions: ('EXPENSE' \| 'INCOME')[]` — tablica aktywnych kierunków (min. 1 element). Przy zapisie wysyłaj `directions`, nie pojedyncze booleany.
+
+**Reguła drzewa:** podkategoria może mieć tylko kierunki będące **podzbiorem** kierunków kategorii nadrzędnej (parent musi obsługiwać wszystkie kierunki dziecka).
+
+**Walidacja przy transakcji:** przypisana kategoria musi `supportsDirection(transaction.direction)` — klasyfikacja, bulk update, szablony.
+
+**Drzewo (max 2 poziomy):** grupa główna (`parent_id = null`) → subkategorie. Subkategoria nie może być parentem. Grupa z subkategoriami nie może stać się subkategorią.
+
+**UI listy (Konfiguracja → Kategorie):** widok drzewiasty (accordion), drag-and-drop subkategorii między grupami (`PUT parentId`), scalanie subkategorii (`POST /api/categories/merge`). Edycja, dodawanie, przenoszenie i scalanie odbywają się w **prawym panelu bocznym** (portal `RightPanelContext`, query `?panel=create|edit|move|merge&id=`), lista drzewa pozostaje widoczna.
+
+**Dezaktywacja:** zwykłe `DELETE /api/categories/{id}` (lub `PUT` z `active: false`) jest **blokowane**, gdy kategoria jest używana w pozycjach transakcji, szablonach transakcji lub regułach klasyfikacji (`actions_json.items[].categoryId`). API zwraca `422` z licznikami `usage`. Scalanie subkategorii przepina te referencje przed dezaktywacją źródła. Snapshoty historii transakcji (`transactions_change_log`) nie są liczone ani modyfikowane.
 
 Konkretne nazwy kategorii (np. „Żywność”, „Zasilenie budżetu”) to **dane użytkownika**, nie stałe systemowe.
 

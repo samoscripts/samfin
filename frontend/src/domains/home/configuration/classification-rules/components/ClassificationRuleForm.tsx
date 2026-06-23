@@ -34,6 +34,7 @@ import {
 import RuleActionsEditor from './RuleActionsEditor'
 import RuleConditionsEditor from './RuleConditionsEditor'
 import type { RuleFromTransactionDraft, TransactionConditionSeeds } from '../utils/ruleFromTransaction'
+import { nextRulePriority } from '../utils/ruleFilters'
 
 const priorityInputCls = [
   configInputCls,
@@ -119,8 +120,17 @@ export default function ClassificationRuleForm({
     [allRules, contextPartyId, rule?.id],
   )
 
-  const firstPriority = priorities.length > 0 ? Math.min(...priorities) - 1 : 100
-  const lastPriority = priorities.length > 0 ? Math.max(...priorities) + 1 : 100
+  const firstPriority = priorities.length > 0 ? Math.min(...priorities) - 1 : 1
+  const lastPriority = nextRulePriority(
+    allRules.filter((r) => r.partyId === contextPartyId && r.active && r.id !== (rule?.id ?? null)),
+  )
+
+  useEffect(() => {
+    if (isEdit || fromTransaction) return
+    if (contextPartyId === null) return
+    const siblings = allRules.filter((r) => r.partyId === contextPartyId && r.active)
+    setForm((f) => ({ ...f, priority: nextRulePriority(siblings) }))
+  }, [contextPartyId, isEdit, fromTransaction, allRules])
 
   useEffect(() => {
     if (!formReady || contextPartyId === null) {

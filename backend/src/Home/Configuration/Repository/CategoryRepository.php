@@ -13,4 +13,14 @@ class CategoryRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Category::class);
     }
+
+    public function countChildren(int $parentId): int
+    {
+        return (int) $this->createQueryBuilder('c')
+            ->select('COUNT(c.id)')
+            ->andWhere('c.parent = :parentId')
+            ->setParameter('parentId', $parentId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

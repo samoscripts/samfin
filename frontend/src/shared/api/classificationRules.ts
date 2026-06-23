@@ -95,6 +95,16 @@ export interface ApplyClassificationRulesResult {
   errors: Record<number, string>
 }
 
+export const reorderClassificationRules = async (
+  partyId: number,
+  orderedRuleIds: number[],
+): Promise<{ updated: number }> =>
+  (
+    await api.put<{ updated: number }>(`/parties/${partyId}/classification-rules/reorder`, {
+      orderedRuleIds,
+    })
+  ).data
+
 export const fetchAllClassificationRules = async (): Promise<ClassificationRule[]> =>
   (await api.get<ClassificationRule[]>('/classification-rules')).data
 

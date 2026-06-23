@@ -1,0 +1,42 @@
+---
+description: Aktualizuj dokumentację docs/ przy większych zmianach w kodzie (API, domena, UI, ADR).
+alwaysApply: true
+---
+
+# Synchronizacja dokumentacji
+
+Przy **większych zmianach** w tym samym zadaniu co kod **zaktualizuj dokumentację** — nie czekaj na osobne polecenie użytkownika.
+
+## Kiedy aktualizować docs (obowiązkowo)
+
+- Nowy lub zmieniony **endpoint API**, kształt payloadu, kody błędów (`422`, `usage`, itd.)
+- Nowa **reguła biznesowa** (walidacja, blokada, merge, soft delete z wyjątkami)
+- Zmiana **modelu domenowego** lub schematu DB (migracja + opis w `database.md` jeśli istotne)
+- Nowy **ADR** lub zmiana statusu istniejącej decyzji
+- Zmiana **UX** (sidebar vs modal, query params panelu, nowe ścieżki)
+- Nowy moduł / istotny refaktor struktury (`modules.md`, `ai-guidelines.md`)
+
+## Gdzie pisać
+
+| Zmiana | Plik |
+|--------|------|
+| Decyzja architektoniczna | `docs/decisions.md` (ADR + data w historii) |
+| Słownik / konfiguracja | `docs/configuration-dictionaries.md` |
+| Encja / relacje | `docs/domain-model.md` |
+| Endpointy / pliki modułu | `docs/modules.md` |
+| Niespójność / otwarte pytanie | `docs/open-questions.md` |
+| Wytyczne dla AI i checklisty | `docs/ai-guidelines.md` |
+| Reguły FE (pola, panele) | `.cursor/rules/*.mdc` gdy dotyczy konwencji UI |
+
+## Czego nie robić
+
+- Nie twórz nowych plików `.md` bez potrzeby — rozszerz istniejące.
+- Nie opisuj w docs zachowań, których nie ma w kodzie (oznacz „DO POTWIERDZENIA” jeśli niepewne).
+- Nie aktualizuj docs przy drobnych fixach (typo, rename bez zmiany semantyki).
+
+## Minimalny checklist po większej zmianie
+
+1. Czy `decisions.md` wymaga nowego/zmienionego ADR?
+2. Czy `configuration-dictionaries.md` / `domain-model.md` odzwierciedlają nowe reguły?
+3. Czy `modules.md` ma nowe endpointy lub serwisy?
+4. Czy `ai-guidelines.md` ma nową pozycję checklisty, jeśli reguła dotyczy wielu miejsc w kodzie?

@@ -1,4 +1,5 @@
 import type { RuleCondition } from '@/shared/api/classificationRules'
+import type { Category } from '@/shared/api/categories'
 import type { Party } from '@/domains/home/configuration/parties/types'
 import type { Transaction } from '@/shared/types'
 import { DEFAULT_SPLIT_PERCENT } from '@/shared/utils/splitAllocation'
@@ -24,6 +25,45 @@ export interface RuleFromTransactionDraft {
 
 export interface CreateRuleFromTransactionState {
   fromTransaction: Transaction
+}
+
+const RULE_NAME_MAX_LENGTH = 120
+const DESCRIPTION_CONDITION_MAX_LENGTH = 30
+
+export function transactionDescriptionConditionValue(tx: Transaction): string {
+  return (tx.description ?? '').slice(0, DESCRIPTION_CONDITION_MAX_LENGTH)
+}
+
+export function suggestRuleDescriptionFromTransaction(tx: Transaction): string | null {
+  const value = transactionDescriptionConditionValue(tx)
+  return value !== '' ? value : null
+}
+
+function firstTransactionCategoryId(tx: Transaction): number | null {
+  for (const item of tx.items) {
+    if (item.categoryId != null) return item.categoryId
+  }
+  return null
+}
+
+export function formatRuleNameFromCategoryId(
+  categoryId: number | null | undefined,
+  categories: Category[],
+): string | null {
+  if (categoryId == null) return null
+  const cat = categories.find((c) => c.id === categoryId)
+  if (!cat) return null
+  if (cat.parentId != null && cat.parentName) {
+    return `${cat.parentName}/${cat.name}`.slice(0, RULE_NAME_MAX_LENGTH)
+  }
+  return cat.name.slice(0, RULE_NAME_MAX_LENGTH)
+}
+
+function suggestRuleName(tx: Transaction, categories: Category[]): string {
+  const categoryId = firstTransactionCategoryId(tx)
+  const fromCategory = formatRuleNameFromCategoryId(categoryId, categories)
+  if (fromCategory) return fromCategory
+  return `Reguła z transakcji #${tx.transactionId}`
 }
 
 export function getRuleContextPartyId(tx: Transaction): number | null {
@@ -85,25 +125,19 @@ function transactionItemsToRuleItems(tx: Transaction): FormState['actions']['ite
   }))
 }
 
-function suggestRuleName(tx: Transaction): string {
-  const category = tx.items[0]?.category
-  const counterpart = tx.direction === 'EXPENSE' ? tx.paidTo : tx.paidFrom
-  if (category && counterpart) return `${counterpart} → ${category}`.slice(0, 120)
-  if (tx.description) return tx.description.slice(0, 120)
-  return `Reguła z transakcji #${tx.transactionId}`
-}
-
 function buildConditions(tx: Transaction): RuleCondition[] {
   const direction = tx.direction as RuleDirection
-  const conditions: RuleCondition[] = [
-    createDirectionCondition(direction),
-    {
+  const descriptionValue = transactionDescriptionConditionValue(tx)
+  const conditions: RuleCondition[] = [createDirectionCondition(direction)]
+
+  if (descriptionValue !== '') {
+    conditions.push({
       field: 'description',
       operator: 'starts_with',
-      value: (tx.description ?? '').slice(0, 30),
+      value: descriptionValue,
       caseInsensitive: true,
-    },
-  ]
+    })
+  }
 
   if (tx.counterpartyAccountNumber?.trim()) {
     conditions.push({
@@ -117,11 +151,15 @@ function buildConditions(tx: Transaction): RuleCondition[] {
   return conditions
 }
 
-export function buildRuleDraftFromTransaction(tx: Transaction): RuleFromTransactionDraft | null {
+export function buildRuleDraftFromTransaction(
+  tx: Transaction,
+  categories: Category[],
+): RuleFromTransactionDraft | null {
   const contextPartyId = getRuleContextPartyId(tx)
   if (contextPartyId === null) return null
 
   const direction = tx.direction as RuleDirection
+  const descriptionValue = transactionDescriptionConditionValue(tx)
 
   const actions = applyOwnSideToActions(
     {
@@ -137,7 +175,8 @@ export function buildRuleDraftFromTransaction(tx: Transaction): RuleFromTransact
 
   const form: FormState = {
     ...defaultForm(),
-    name: suggestRuleName(tx),
+    name: suggestRuleName(tx, categories),
+    description: suggestRuleDescriptionFromTransaction(tx),
     conditions: { conditions: buildConditions(tx) },
     actions,
     createdFromTransactionId: tx.transactionId,
@@ -148,7 +187,7 @@ export function buildRuleDraftFromTransaction(tx: Transaction): RuleFromTransact
     form,
     createdFromTransactionId: tx.transactionId,
     transactionSeeds: {
-      description: true,
+      description: descriptionValue !== '',
       counterparty: Boolean(tx.counterpartyAccountNumber?.trim()),
     },
   }

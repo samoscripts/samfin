@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Save, Loader2 } from 'lucide-react'
 import type { Transaction } from '@/shared/types'
 import type { Wallet } from '@/shared/api/wallets'
 import type { Concern } from '@/shared/api/concerns'
@@ -20,24 +19,28 @@ import { formatCategoryLabel } from '../utils/categoryOptions'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import CategorySelect from '@/shared/components/form/CategorySelect'
 import PartySelect from '@/shared/components/form/PartySelect'
+import FormError from '@/shared/components/form/FormError'
+import { SectionLabel } from '@/shared/components/form/FormSection'
 import { selectCls } from '@/shared/components/form/formClasses'
+import {
+  TransactionTemplateFormFooter,
+  TransactionTemplateList,
+} from './TransactionTemplateBar'
+import {
+  applyTemplateToBulkDraft,
+  bulkTemplatePayloadFromDraft,
+  type BulkClassificationDraft,
+} from '../utils/transactionTemplates'
 
-type FieldState = {
-  enabled: boolean
-  value: number | null
-}
-
-type BulkDraft = Record<BulkUpdateField, FieldState>
-
-const FIELD_DEFS: { key: BulkUpdateField; label: string; group: 'party' | 'item' }[] = [
-  { key: 'paidFromPartyId', label: 'Skąd', group: 'party' },
-  { key: 'paidToPartyId', label: 'Dokąd', group: 'party' },
-  { key: 'walletId', label: 'Portfel', group: 'item' },
-  { key: 'concernId', label: 'Dotyczy', group: 'item' },
-  { key: 'categoryId', label: 'Kategoria', group: 'item' },
+const FIELD_DEFS: { key: BulkUpdateField; label: string }[] = [
+  { key: 'paidFromPartyId', label: 'Skąd' },
+  { key: 'paidToPartyId', label: 'Dokąd' },
+  { key: 'walletId', label: 'Portfel' },
+  { key: 'concernId', label: 'Dotyczy' },
+  { key: 'categoryId', label: 'Kategoria' },
 ]
 
-const EMPTY_DRAFT = (): BulkDraft => ({
+const EMPTY_DRAFT = (): BulkClassificationDraft => ({
   paidFromPartyId: { enabled: false, value: null },
   paidToPartyId: { enabled: false, value: null },
   walletId: { enabled: false, value: null },
@@ -45,7 +48,7 @@ const EMPTY_DRAFT = (): BulkDraft => ({
   categoryId: { enabled: false, value: null },
 })
 
-function isDraftDirty(draft: BulkDraft): boolean {
+function isDraftDirty(draft: BulkClassificationDraft): boolean {
   return FIELD_DEFS.some((f) => draft[f.key].enabled)
 }
 
@@ -78,10 +81,11 @@ export default function EditBulkPanel({
   onPartyCreated,
   onCategoryCreated,
 }: EditBulkPanelProps) {
-  const [draft, setDraft] = useState<BulkDraft>(EMPTY_DRAFT)
+  const [draft, setDraft] = useState<BulkClassificationDraft>(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedOk, setSavedOk] = useState(false)
+  const [templateListRefreshKey, setTemplateListRefreshKey] = useState(0)
 
   const direction = transactions[0]?.direction ?? 'EXPENSE'
   const directionLabel = DIRECTION_LABEL_BY_VALUE[direction] ?? direction
@@ -92,6 +96,11 @@ export default function EditBulkPanel({
   )
 
   const canSave = enabledFields.length > 0
+
+  const getTemplatePayload = useCallback(
+    () => bulkTemplatePayloadFromDraft(direction, draft),
+    [direction, draft],
+  )
 
   useEffect(() => {
     setDraft(EMPTY_DRAFT())
@@ -192,25 +201,49 @@ export default function EditBulkPanel({
     return { label: f.label, display }
   })
 
+  const countLabel =
+    transactions.length === 1
+      ? '1 transakcja'
+      : transactions.length < 5
+        ? `${transactions.length} transakcje`
+        : `${transactions.length} transakcji`
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    onSaveClick()
+  }
+
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="px-5 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Edycja zbiorcza
-          </span>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <TransactionTemplateList
+        direction={direction}
+        refreshKey={templateListRefreshKey}
+        onApply={(template) => {
+          setDraft((prev) => applyTemplateToBulkDraft(prev, template, transactions))
+          setError(null)
+        }}
+      />
+
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              Edycja zbiorcza
+            </p>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-0.5">{countLabel}</p>
+          </div>
           <Pill variant={DIRECTION_PILL[direction]}>{directionLabel}</Pill>
         </div>
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {transactions.length}{' '}
-          {transactions.length === 1 ? 'transakcja' : transactions.length < 5 ? 'transakcje' : 'transakcji'}
-        </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          Zaznaczone wiersze z bieżącej strony
-        </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+      {error && <FormError message={error} />}
+      {savedOk && !error && (
+        <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+          Zaktualizowano pomyślnie
+        </p>
+      )}
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 md:p-5 space-y-5">
         <div className="space-y-3">
           <SectionLabel>Pola do nadpisania</SectionLabel>
           <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
@@ -223,120 +256,125 @@ export default function EditBulkPanel({
               (field.key === 'paidToPartyId' && paidToBlocked)
 
             return (
-            <div key={field.key} className="space-y-1.5">
-              <label className={`flex items-center gap-2 ${partyBlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                <input
-                  type="checkbox"
-                  checked={draft[field.key].enabled}
-                  disabled={partyBlocked}
-                  onChange={(e) => setFieldEnabled(field.key, e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600 text-[#1c4230] focus:ring-[#c9a96e]/40 disabled:opacity-50"
-                />
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{field.label}</span>
-              </label>
-              {partyBlocked && (
-                <p className="pl-6 text-[10px] text-gray-400">
-                  Zablokowane dla transakcji z importu CSV
-                </p>
-              )}
+              <div key={field.key} className="space-y-1.5">
+                <label
+                  className={[
+                    'flex items-center gap-2',
+                    partyBlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                  ].join(' ')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={draft[field.key].enabled}
+                    disabled={partyBlocked}
+                    onChange={(e) => setFieldEnabled(field.key, e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-[#1c4230] focus:ring-[#c9a96e]/40 disabled:opacity-50"
+                  />
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{field.label}</span>
+                </label>
+                {partyBlocked && (
+                  <p className="pl-6 text-[10px] text-gray-400">
+                    Zablokowane dla transakcji z importu CSV
+                  </p>
+                )}
 
-              {draft[field.key].enabled && !partyBlocked && (
-                <div className="pl-6">
-                  {field.key === 'paidFromPartyId' && (
-                    <PartySelect
-                      parties={paidFromParties}
-                      value={draft[field.key].value}
-                      onChange={(partyId) => {
-                        setDraft((prev) => ({
-                          ...prev,
-                          paidFromPartyId: { ...prev.paidFromPartyId, value: partyId },
-                          paidToPartyId:
-                            prev.paidToPartyId.value === partyId
-                              ? { ...prev.paidToPartyId, value: null }
-                              : prev.paidToPartyId,
-                        }))
-                        setError(null)
-                      }}
-                      emptyLabel={EDIT_EMPTY_LABEL}
-                      className={selectCls}
-                      excludePartyId={
-                        draft.paidToPartyId.enabled ? draft.paidToPartyId.value : null
-                      }
-                      onPartyCreated={onPartyCreated}
-                      allowedTypes={manualOwnFrom ? ['CASH'] : undefined}
-                      allowedOwnerships={manualOwnFrom ? ['OWN'] : undefined}
-                      quickAddDefaults={
-                        manualOwnFrom
-                          ? { type: 'CASH', ownershipType: 'OWN' }
-                          : { type: 'OTHER', ownershipType: 'EXTERNAL' }
-                      }
-                    />
-                  )}
-                  {field.key === 'paidToPartyId' && (
-                    <PartySelect
-                      parties={paidToParties}
-                      value={draft[field.key].value}
-                      onChange={(partyId) => {
-                        setDraft((prev) => ({
-                          ...prev,
-                          paidToPartyId: { ...prev.paidToPartyId, value: partyId },
-                          paidFromPartyId:
-                            prev.paidFromPartyId.value === partyId
-                              ? { ...prev.paidFromPartyId, value: null }
-                              : prev.paidFromPartyId,
-                        }))
-                        setError(null)
-                      }}
-                      emptyLabel={EDIT_EMPTY_LABEL}
-                      className={selectCls}
-                      excludePartyId={
-                        draft.paidFromPartyId.enabled ? draft.paidFromPartyId.value : null
-                      }
-                      onPartyCreated={onPartyCreated}
-                      allowedTypes={manualOwnTo ? ['CASH'] : undefined}
-                      allowedOwnerships={manualOwnTo ? ['OWN'] : undefined}
-                      quickAddDefaults={
-                        manualOwnTo
-                          ? { type: 'CASH', ownershipType: 'OWN' }
-                          : { type: 'OTHER', ownershipType: 'EXTERNAL' }
-                      }
-                    />
-                  )}
-                  {field.key === 'walletId' && (
-                    <DictionarySelect
-                      items={wallets}
-                      value={draft[field.key].value}
-                      onChange={(v) => setFieldValue(field.key, v as number | null)}
-                      emptyLabel={EDIT_EMPTY_LABEL}
-                      valueType="number"
-                      filterItem={(w) => w.active}
-                    />
-                  )}
-                  {field.key === 'concernId' && (
-                    <DictionarySelect
-                      items={concerns}
-                      value={draft[field.key].value}
-                      onChange={(v) => setFieldValue(field.key, v as number | null)}
-                      emptyLabel={EDIT_EMPTY_LABEL}
-                      valueType="number"
-                      filterItem={(c) => c.active}
-                    />
-                  )}
-                  {field.key === 'categoryId' && (
-                    <CategorySelect
-                      categories={categories}
-                      value={draft[field.key].value}
-                      onChange={(v) => setFieldValue(field.key, v as number | null)}
-                      emptyLabel={EDIT_EMPTY_LABEL}
-                      valueType="number"
-                      direction={direction}
-                      allowQuickAdd
-                      onCategoryCreated={onCategoryCreated}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
+                {draft[field.key].enabled && !partyBlocked && (
+                  <div className="pl-6">
+                    {field.key === 'paidFromPartyId' && (
+                      <PartySelect
+                        parties={paidFromParties}
+                        value={draft[field.key].value}
+                        onChange={(partyId) => {
+                          setDraft((prev) => ({
+                            ...prev,
+                            paidFromPartyId: { ...prev.paidFromPartyId, value: partyId },
+                            paidToPartyId:
+                              prev.paidToPartyId.value === partyId
+                                ? { ...prev.paidToPartyId, value: null }
+                                : prev.paidToPartyId,
+                          }))
+                          setError(null)
+                        }}
+                        emptyLabel={EDIT_EMPTY_LABEL}
+                        className={selectCls}
+                        excludePartyId={
+                          draft.paidToPartyId.enabled ? draft.paidToPartyId.value : null
+                        }
+                        onPartyCreated={onPartyCreated}
+                        allowedTypes={manualOwnFrom ? ['CASH'] : undefined}
+                        allowedOwnerships={manualOwnFrom ? ['OWN'] : undefined}
+                        quickAddDefaults={
+                          manualOwnFrom
+                            ? { type: 'CASH', ownershipType: 'OWN' }
+                            : { type: 'OTHER', ownershipType: 'EXTERNAL' }
+                        }
+                      />
+                    )}
+                    {field.key === 'paidToPartyId' && (
+                      <PartySelect
+                        parties={paidToParties}
+                        value={draft[field.key].value}
+                        onChange={(partyId) => {
+                          setDraft((prev) => ({
+                            ...prev,
+                            paidToPartyId: { ...prev.paidToPartyId, value: partyId },
+                            paidFromPartyId:
+                              prev.paidFromPartyId.value === partyId
+                                ? { ...prev.paidFromPartyId, value: null }
+                                : prev.paidFromPartyId,
+                          }))
+                          setError(null)
+                        }}
+                        emptyLabel={EDIT_EMPTY_LABEL}
+                        className={selectCls}
+                        excludePartyId={
+                          draft.paidFromPartyId.enabled ? draft.paidFromPartyId.value : null
+                        }
+                        onPartyCreated={onPartyCreated}
+                        allowedTypes={manualOwnTo ? ['CASH'] : undefined}
+                        allowedOwnerships={manualOwnTo ? ['OWN'] : undefined}
+                        quickAddDefaults={
+                          manualOwnTo
+                            ? { type: 'CASH', ownershipType: 'OWN' }
+                            : { type: 'OTHER', ownershipType: 'EXTERNAL' }
+                        }
+                      />
+                    )}
+                    {field.key === 'walletId' && (
+                      <DictionarySelect
+                        items={wallets}
+                        value={draft[field.key].value}
+                        onChange={(v) => setFieldValue(field.key, v as number | null)}
+                        emptyLabel={EDIT_EMPTY_LABEL}
+                        valueType="number"
+                        filterItem={(w) => w.active}
+                      />
+                    )}
+                    {field.key === 'concernId' && (
+                      <DictionarySelect
+                        items={concerns}
+                        value={draft[field.key].value}
+                        onChange={(v) => setFieldValue(field.key, v as number | null)}
+                        emptyLabel={EDIT_EMPTY_LABEL}
+                        valueType="number"
+                        filterItem={(c) => c.active}
+                      />
+                    )}
+                    {field.key === 'categoryId' && (
+                      <CategorySelect
+                        categories={categories}
+                        value={draft[field.key].value}
+                        onChange={(v) => setFieldValue(field.key, v as number | null)}
+                        emptyLabel={EDIT_EMPTY_LABEL}
+                        valueType="number"
+                        direction={direction}
+                        allowQuickAdd
+                        onCategoryCreated={onCategoryCreated}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
@@ -349,7 +387,8 @@ export default function EditBulkPanel({
               <div className="rounded-lg border border-amber-200/80 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2.5 space-y-1">
                 <p className="text-xs text-gray-700 dark:text-gray-300">
                   Zostanie zaktualizowanych:{' '}
-                  <span className="font-semibold">{transactions.length}</span> {transactions.length === 1 ? 'transakcja' : 'transakcji'}
+                  <span className="font-semibold">{transactions.length}</span>{' '}
+                  {transactions.length === 1 ? 'transakcja' : 'transakcji'}
                 </p>
                 {previewLines.map((line) => (
                   <p key={line.label} className="text-xs text-gray-600 dark:text-gray-400">
@@ -364,36 +403,15 @@ export default function EditBulkPanel({
         )}
       </div>
 
-      {error && (
-        <div className="px-5 py-2 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400 shrink-0">
-          {error}
-        </div>
-      )}
-      {savedOk && !error && (
-        <div className="px-5 py-2 bg-emerald-50 dark:bg-emerald-950/30 border-t border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-400 shrink-0">
-          Zaktualizowano pomyślnie
-        </div>
-      )}
-
-      <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0 flex gap-2">
-        <button
-          onClick={onCancelClick}
-          disabled={saving}
-          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-60"
-        >
-          Anuluj
-        </button>
-        <button
-          onClick={onSaveClick}
-          disabled={saving || !canSave}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60 hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: '#1c4230' }}
-        >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          {saving ? 'Zapisywanie…' : 'Zastosuj'}
-        </button>
-      </div>
-    </div>
+      <TransactionTemplateFormFooter
+        saving={saving}
+        submitLabel="Zastosuj"
+        submitDisabled={!canSave}
+        onCancel={onCancelClick}
+        getTemplatePayload={getTemplatePayload}
+        onTemplateCreated={() => setTemplateListRefreshKey((k) => k + 1)}
+      />
+    </form>
   )
 }
 
@@ -414,10 +432,4 @@ function resolveFieldDisplay(
   const cat = categories.find((c) => c.id === value)
   if (!cat) return String(value)
   return formatCategoryLabel(cat)
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{children}</p>
-  )
 }

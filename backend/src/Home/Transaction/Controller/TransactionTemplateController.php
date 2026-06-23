@@ -91,7 +91,7 @@ class TransactionTemplateController extends AbstractController
         if ($err = $this->resolveConcern($concernId)) {
             return $this->json(['message' => $err], 422);
         }
-        if ($err = $this->resolveCategory($categoryId)) {
+        if ($err = $this->resolveCategory($categoryId, $direction)) {
             return $this->json(['message' => $err], 422);
         }
 
@@ -184,7 +184,7 @@ class TransactionTemplateController extends AbstractController
         return null;
     }
 
-    private function resolveCategory(?int $id): ?string
+    private function resolveCategory(?int $id, string $direction): ?string
     {
         if ($id === null) {
             return null;
@@ -192,6 +192,9 @@ class TransactionTemplateController extends AbstractController
         $category = $this->categoryRepository->find($id);
         if (!$category instanceof Category) {
             return 'Nie znaleziono kategorii.';
+        }
+        if (!$category->supportsDirection($direction)) {
+            return 'Kategoria nie pasuje do kierunku szablonu.';
         }
 
         return null;

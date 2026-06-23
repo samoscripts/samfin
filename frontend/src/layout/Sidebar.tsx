@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -8,6 +9,7 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
   LogOut,
 } from 'lucide-react'
@@ -21,11 +23,50 @@ interface NavItem {
   end?: boolean
 }
 
-const NAV_MAIN: NavItem[] = [
+interface NavChild {
+  to: string
+  label: string
+  end?: boolean
+}
+
+interface NavSection {
+  label?: string
+  items: NavChild[]
+}
+
+interface NavGroup {
+  id: string
+  label: string
+  icon: React.ReactNode
+  basePath: string
+  defaultTo: string
+  sections: NavSection[]
+}
+
+const REPORTS_NAV: NavGroup = {
+  id: 'reports',
+  label: 'Raporty',
+  icon: <BarChart2 size={18} />,
+  basePath: '/raporty',
+  defaultTo: '/raporty/default/monthly',
+  sections: [
+    {
+      label: 'Domyślne',
+      items: [{ to: '/raporty/default/monthly', label: 'Miesięczny', end: true }],
+    },
+    {
+      items: [{ to: '/raporty/common-account', label: 'Konto wspólne' }],
+    },
+  ],
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
   { to: '/transactions', label: 'Transactions', icon: <ArrowLeftRight size={18} /> },
   { to: '/import', label: 'Import', icon: <Upload size={18} /> },
-  { to: '/raporty', label: 'Raporty', icon: <BarChart2 size={18} /> },
+]
+
+const NAV_AFTER: NavItem[] = [
   { to: '/konfiguracja', label: 'Konfiguracja', icon: <SlidersHorizontal size={18} /> },
 ]
 
@@ -48,12 +89,38 @@ function SidebarNav({
   isMobile?: boolean
 }) {
   const { user, logout } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const navCollapsed = isMobile ? false : collapsed
   const isAdmin = user?.role === 'ADMIN'
 
+  const reportsActive = location.pathname.startsWith(REPORTS_NAV.basePath)
+  const [reportsOpen, setReportsOpen] = useState(reportsActive)
+
+  useEffect(() => {
+    if (reportsActive) setReportsOpen(true)
+  }, [reportsActive])
+
+  const linkCls = (isActive: boolean) =>
+    [
+      'flex items-center rounded-md text-sm font-medium transition-colors',
+      navCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
+      isActive
+        ? 'text-[#c9a96e] bg-white/10'
+        : 'text-white/60 hover:text-white/90 hover:bg-white/8',
+    ].join(' ')
+
+  const childLinkCls = (isActive: boolean) =>
+    [
+      'flex items-center rounded-md text-sm transition-colors py-2 pr-3',
+      navCollapsed ? 'justify-center px-0' : 'pl-9',
+      isActive
+        ? 'text-[#c9a96e] font-medium'
+        : 'text-white/50 hover:text-white/80 hover:bg-white/5',
+    ].join(' ')
+
   return (
     <>
-      {/* Logo */}
       <div
         className={[
           'flex items-center h-16 shrink-0 border-b border-white/10 relative',
@@ -76,24 +143,100 @@ function SidebarNav({
         )}
       </div>
 
-      {/* Main navigation */}
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {NAV_MAIN.map((item) => (
+        {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             title={navCollapsed ? item.label : undefined}
             onClick={isMobile ? onMobileClose : undefined}
-            className={({ isActive }) =>
-              [
-                'flex items-center rounded-md text-sm font-medium transition-colors',
-                navCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
-                isActive
-                  ? 'text-[#c9a96e] bg-white/10'
-                  : 'text-white/60 hover:text-white/90 hover:bg-white/8',
-              ].join(' ')
-            }
+            className={({ isActive }) => linkCls(isActive)}
+          >
+            {({ isActive }) => (
+              <>
+                <span className={['shrink-0', isActive ? 'text-[#c9a96e]' : 'text-white/50'].join(' ')}>
+                  {item.icon}
+                </span>
+                {!navCollapsed && <span className="truncate">{item.label}</span>}
+              </>
+            )}
+          </NavLink>
+        ))}
+
+        {/* Reports — expandable group */}
+        <div>
+          <button
+            type="button"
+            title={navCollapsed ? REPORTS_NAV.label : undefined}
+            onClick={() => {
+              if (navCollapsed) {
+                navigate(REPORTS_NAV.defaultTo)
+                if (isMobile) onMobileClose?.()
+                return
+              }
+              setReportsOpen((v) => !v)
+            }}
+            className={[
+              linkCls(reportsActive),
+              'w-full',
+              navCollapsed ? '' : 'justify-between',
+            ].join(' ')}
+            aria-expanded={reportsOpen}
+          >
+            <span className={['shrink-0 flex items-center', navCollapsed ? '' : 'gap-3'].join(' ')}>
+              <span className={reportsActive ? 'text-[#c9a96e]' : 'text-white/50'}>
+                {REPORTS_NAV.icon}
+              </span>
+              {!navCollapsed && <span className="truncate">{REPORTS_NAV.label}</span>}
+            </span>
+            {!navCollapsed && (
+              <ChevronDown
+                size={14}
+                className={[
+                  'shrink-0 text-white/40 transition-transform',
+                  reportsOpen ? 'rotate-0' : '-rotate-90',
+                ].join(' ')}
+              />
+            )}
+          </button>
+
+          {reportsOpen && !navCollapsed && (
+            <div className="mt-0.5 space-y-1">
+              {REPORTS_NAV.sections.map((section, sIdx) => (
+                <div key={sIdx}>
+                  {section.label && (
+                    <p className="pl-9 pt-1 text-[10px] uppercase tracking-wide text-white/30 font-medium">
+                      {section.label}
+                    </p>
+                  )}
+                  <div className="space-y-0.5">
+                    {section.items.map((child) => (
+                      <NavLink
+                        key={child.to}
+                        to={child.to}
+                        end={child.end}
+                        onClick={isMobile ? onMobileClose : undefined}
+                        className={({ isActive }) => childLinkCls(isActive)}
+                      >
+                        {child.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {NAV_AFTER.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            title={navCollapsed ? item.label : undefined}
+            onClick={isMobile ? onMobileClose : undefined}
+            className={({ isActive }) => linkCls(isActive)}
           >
             {({ isActive }) => (
               <>
@@ -107,23 +250,13 @@ function SidebarNav({
         ))}
       </nav>
 
-      {/* Bottom section */}
       <div className="px-2 py-3 border-t border-white/10 space-y-0.5">
-        {/* Settings — only for admins */}
         {isAdmin && (
           <NavLink
             to="/ustawienia"
             title={navCollapsed ? 'Ustawienia' : undefined}
             onClick={isMobile ? onMobileClose : undefined}
-            className={({ isActive }) =>
-              [
-                'flex items-center rounded-md text-sm font-medium transition-colors',
-                navCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
-                isActive
-                  ? 'text-[#c9a96e] bg-white/10'
-                  : 'text-white/60 hover:text-white/90 hover:bg-white/8',
-              ].join(' ')
-            }
+            className={({ isActive }) => linkCls(isActive)}
           >
             {({ isActive }) => (
               <>
@@ -136,7 +269,6 @@ function SidebarNav({
           </NavLink>
         )}
 
-        {/* Logged-in user */}
         {user && !navCollapsed && (
           <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-2.5 px-3 py-2">
             <AvatarDisplay
@@ -158,7 +290,6 @@ function SidebarNav({
           </div>
         )}
 
-        {/* Collapse toggle (desktop only) */}
         {!isMobile && (
           <button
             onClick={onToggle}
@@ -182,7 +313,6 @@ function SidebarNav({
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   return (
     <>
-      {/* Desktop sidebar */}
       <aside
         className={[
           'hidden md:flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden bg-gray-900',
@@ -192,7 +322,6 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
         <SidebarNav collapsed={collapsed} onToggle={onToggle} />
       </aside>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <>
           <div
@@ -200,9 +329,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
             onClick={onMobileClose}
             aria-hidden="true"
           />
-          <aside
-            className="md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col overflow-hidden bg-gray-900"
-          >
+          <aside className="md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col overflow-hidden bg-gray-900">
             <SidebarNav
               collapsed={false}
               onToggle={onToggle}

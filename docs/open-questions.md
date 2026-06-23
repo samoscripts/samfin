@@ -89,9 +89,11 @@ Snapshot jest zapisywany **po** klasyfikacji (stan wynikowy), nie przed zmianą.
 
 ### 12. Dezaktywacja słowników a istniejące transakcje
 
-Dezaktywacja kategorii/portfela/obszaru nie usuwa FK z pozycji — rekordy pozostają powiązane z nieaktywnym słownikiem.
+Dezaktywacja portfela/obszaru nie usuwa FK z pozycji — rekordy pozostają powiązane z nieaktywnym słownikiem.
 
-**Pytanie:** Czy filtry i formularze powinny ukrywać nieaktywne wartości, ale pokazywać je na istniejących transakcjach?
+**Kategorie (decyzja 2026-06-24, ADR-027):** zwykła dezaktywacja jest blokowana, gdy kategoria jest używana w `transaction_items`, `transaction_template` lub `classification_rule.actions_json.items`. Scalanie subkategorii przepina te referencje. Snapshoty historii (`transactions_change_log`) pozostają poza zakresem blokady.
+
+**Pytanie (pozostałe słowniki):** Czy filtry i formularze powinny ukrywać nieaktywne wartości, ale pokazywać je na istniejących transakcjach?
 
 ### 13. Duplikaty przy imporcie
 
@@ -135,7 +137,7 @@ Pakiet `symfony/validator` jest w `composer.json`, ale kontrolery walidują ręc
 
 ### 19. Zakres modułu Raporty
 
-**Stan:** MVP — raport miesięczny (`/raporty/miesieczny`, `GET /api/reports/monthly`). Placeholder `ComingSoon` usunięty.
+**Stan:** MVP — raport miesięczny (`/raporty/default/monthly`, `GET /api/reports/monthly`) oraz rozliczenie wpłat na konto wspólne (`/raporty/common-account`, `GET /api/reports/common-account-settlement`). Nawigacja: rozwijane podmenu w Sidebarze; konfiguracja rozliczenia w zakładce wewnątrz widoku konto wspólne.
 
 **Pytanie:** Jakie raporty są kolejnym priorytetem (per kategoria, per portfel szczegółowy, cashflow roczny, budżet vs wykonanie)?
 

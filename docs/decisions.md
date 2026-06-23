@@ -354,6 +354,57 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-025: Kategoria — wiele kierunków (`direction_expense` / `direction_income`)
+
+**Kontekst:** Kategoria miała pojedyncze pole `type` (INCOME lub EXPENSE). Użytkownik potrzebuje kategorii wspólnych dla obu kierunków lub wyboru wielu kierunków.
+
+**Decyzja:**
+
+- Zastąpienie `category.type` kolumnami boolean `direction_expense`, `direction_income` (CHECK: co najmniej jedna aktywna).
+- API: `directions: string[]` zamiast `type`.
+- Reguła drzewa: kierunki podkategorii ⊆ kierunki parenta.
+- Walidacja przy klasyfikacji / bulk update / szablonach: `Category::supportsDirection($transactionDirection)`.
+
+**Pliki:** `Category.php`, `CategoryController.php`, migracja `20260623120000`, `categoryOptions.ts`, `CategoryForm.tsx`.
+
+**Uwaga:** To **nie** przywraca flag `direction_usage_*` na `party` (ADR-017) — tam reguły wynikają z kontekstu transakcji, nie ze słownika.
+
+---
+
+### ADR-026: Lista kategorii — drzewo, DnD, scalanie subkategorii
+
+**Kontekst:** Płaska tabela kategorii była mało czytelna przy hierarchii parent → child. Użytkownik potrzebuje przenoszenia subkategorii między grupami i scalania duplikatów.
+
+**Decyzja:**
+
+- UI: accordion grup głównych z rozwijanymi subkategoriami (`CategoryTreeList`, `@dnd-kit/core`).
+- Przenoszenie: drag child → drop na grupę lub panel boczny „Przenieś” (`?panel=move&id=`); API: `PUT` z `parentId`.
+- Scalanie: tylko subkategoria → subkategoria; panel boczny (`?panel=merge&id=`); `POST /api/categories/merge`; `CategoryMergeService` aktualizuje `transaction_items`, `transaction_template`, `classification_rule.actions_json`.
+- Create/edit: panel boczny (`?panel=create`, `?panel=edit&id=`); legacy `/kategorie/nowy` i `/kategorie/:id/edycja` → redirect na query params.
+- Backend: parent musi być rootem; grupa z dziećmi nie może zostać subkategorią.
+
+**Pliki:** `CategoryMergeService.php`, `CategoryUsageService.php`, `CategoryController.php`, `categories/components/CategoryTree*.tsx`, `CategoriesSidebar.tsx`.
+
+---
+
+### ADR-027: Blokada dezaktywacji kategorii przy potwierdzonych użyciach
+
+**Kontekst:** `DELETE /api/categories/{id}` dezaktywował kategorię bez sprawdzenia powiązań, mimo że merge już przepina te same referencje. Można było też ustawić `active: false` przez `PUT`.
+
+**Decyzja:**
+
+- Blokuj dezaktywację (`DELETE` oraz przejście `active: true → false` w `PUT`), gdy kategoria jest używana w:
+  - `transaction_items.category_id`
+  - `transaction_template.category_id`
+  - `classification_rule.actions_json.items[].categoryId`
+- API zwraca `422` z `message` i `usage: { items, templates, rules, total }`.
+- Merge subkategorii nadal przepina powiązania i dopiero potem dezaktywuje źródło (bez zmiany semantyki ADR-026).
+- `transactions_change_log.snapshot_json` nie jest liczony ani modyfikowany przy blokadzie ani merge.
+
+**Pliki:** `CategoryUsageService.php`, `CategoryRuleReferenceSupport.php`, `CategoryController.php`, `CategoryMergeService.php`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -362,4 +413,6 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-13 | ADR-017: usunięcie direction_usage_*; reguły kontekstowe Skąd/Dokąd |
 | 2026-06-13 | ADR-018 (portfel), ADR-019 (transakcje ręczne MVP — plan) |
 | 2026-06-14 | ADR-021..023: reguły klasyfikacji per party, fill_empty, classify service |
-| 2026-06-14 | ADR-024: pozycje reguły — percent zamiast split.type |
+| 2026-06-23 | ADR-025: kategoria — `direction_expense` / `direction_income`, API `directions[]` |
+| 2026-06-24 | ADR-026: lista kategorii — drzewo, DnD przenoszenie, merge subkategorii |
+| 2026-06-24 | ADR-027: blokada dezaktywacji kategorii przy użyciu w transakcjach, szablonach i regułach |

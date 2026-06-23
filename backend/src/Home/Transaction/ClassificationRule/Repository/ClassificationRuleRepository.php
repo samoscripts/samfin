@@ -54,4 +54,21 @@ class ClassificationRuleRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    public function getNextPriorityForParty(Party $party): int
+    {
+        $result = $this->createQueryBuilder('r')
+            ->select('MAX(r.priority)')
+            ->where('r.party = :party')
+            ->andWhere('r.active = true')
+            ->setParameter('party', $party)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($result === null) {
+            return 1;
+        }
+
+        return ((int) $result) + 1;
+    }
 }

@@ -10,12 +10,15 @@ alwaysApply: false
 
 Do wyboru kategorii klasyfikacji (transakcje, reguły, filtry) **zawsze** używaj `CategorySelect` z `@/shared/components/form/CategorySelect`.
 
-- Nie używaj `DictionarySelect` ani zwykłego `<select>` do kategorii.
+- Nie używaj `DictionarySelect` ani zwykłego `<select>` do kategorii (wyjątek: formularz CRUD — wybór kategorii nadrzędnej).
 - Etykieta zamknięta: **`Rodzic / Dziecko`** (`formatCategoryLabel` z `@/shared/utils/categoryOptions`).
-- Wybieralne są tylko kategorie-dzieci (`parentId != null`, aktywne).
+- Wybieralne są tylko kategorie-dzieci (`parentId != null`, aktywne) — domyślny tryb `selectable="child"`.
+- Dla wyboru **grupy głównej** (np. przenoszenie subkategorii) użyj `selectable="group"` — lista pokazuje tylko rooty (`parentId = null`).
 - Gdy kontekst ma kierunek (INCOME/EXPENSE), przekaż `direction` — lista filtruje się automatycznie.
 
-Wyjątek: formularz CRUD kategorii (`CategoryForm`) — tam wybór **kategorii nadrzędnej** ma inne semantyki i pozostaje na `DictionarySelect`.
+Wyjątek: formularz CRUD kategorii (`CategoryForm`) — tam wybór **kategorii nadrzędnej** ma inne semantyki i pozostaje na `DictionarySelect`. Kierunki kategorii (`directions`: EXPENSE / INCOME, min. 1) ustawia się `FilterToggleGroup` (jak filtr „Typ operacji” w sidebarze transakcji), nie checkboxami ani selectem.
+
+Lista kategorii (`Categories.tsx`) używa `CategoryTreeList` — drzewo accordion, nie tabeli płaskiej. Akcje CRUD / przenieś / scal otwierają `CategoriesSidebar` w portalu prawego panelu (`?panel=…`). Dezaktywacja zablokowana przy użyciu kategorii — API zwraca `422` z `usage` (ADR-027).
 
 ## Pomocnicze utils
 

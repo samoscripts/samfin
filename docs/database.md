@@ -2,7 +2,7 @@
 
 Silnik: **MariaDB 11**, charset `utf8mb4_unicode_ci`, silnik InnoDB.
 
-ORM: Doctrine 3. Migracje w `backend/migrations/` (20 plików, chronologicznie od `Version20260607125328`).
+ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od `Version20260607125328`).
 
 ## Lista tabel
 
@@ -22,6 +22,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (20 plików, chronologicznie o
 | `transactions_change_log` | `TransactionChangeLog` | Historia klasyfikacji |
 | `classification_rule` | `ClassificationRule` | Reguły auto-klasyfikacji per podmiot |
 | `transaction_template` | `TransactionTemplate` | Szablony klasyfikacji per użytkownik (wpływ/wydatek) |
+| `common_account_settlement_config` | `CommonAccountSettlementConfig` | Konfiguracja raportu rozliczenia wpłat na konto wspólne (per `user_id`) |
 
 ## Diagram relacji (FK)
 
@@ -50,6 +51,8 @@ erDiagram
     category {
         int id PK
         int parent_id FK
+        bool direction_expense
+        bool direction_income
     }
     csv_import {
         int id PK
@@ -168,6 +171,83 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260614150000` | `classification_rule`; `transactions.counterparty_account_number` |
 | `20260615120000` | Reguły klasyfikacji: warunek `direction` na początku `conditions_json` |
 | `20260622120000` | `transaction_template` — szablony klasyfikacji per użytkownik |
+| `20260623120000` | `category`: `direction_expense`, `direction_income` (zastępuje `type`) |
+| `20260624120000` | Backfill `classification_rule.name` i `description` dla reguł z `created_from_transaction_id` |
+| `20260625120000` | `common_account_settlement_config` — konfiguracja raportu rozliczenia konta wspólnego |
+| `20260626120000` | Repair: utworzenie `common_account_settlement_config` jeśli brak (gdy `20260625120000` zapisana bez tabeli) |
+
+## Zapytania diagnostyczne (tylko SELECT)
+
+Baza działa w kontenerze Docker `db`. **Uruchamiaj wyłącznie zapytania `SELECT`** — nie wykonuj ręcznie `INSERT`, `UPDATE`, `DELETE` ani `ALTER` na produkcyjnej / deweloperskiej bazie. Zmiany danych i schematu idą przez migracje Doctrine (`make migrate`).
+
+### Połączenie z CLI
+
+Z katalogu projektu (WSL / Linux):
+
+```bash
+docker compose exec -T db mariadb -usamfin -psamfin samfin
+```
+
+Jednorazowe zapytanie (bez wchodzenia do shella):
+
+```bash
+docker compose exec -T db mariadb -usamfin -psamfin samfin -e "SELECT COUNT(*) FROM classification_rule;"
+```
+
+Wiele zapytań naraz (heredoc — wygodne przy dłuższym SQL):
+
+```bash
+docker compose exec -T db mariadb -usamfin -psamfin samfin <<'EOSQL'
+SELECT version, executed_at
+FROM doctrine_migration_versions
+ORDER BY executed_at DESC
+LIMIT 5;
+EOSQL
+```
+
+Parametry połączenia (z `docker-compose.yml`): baza `samfin`, użytkownik `samfin`, hasło `samfin`, host wewnątrz Compose: `db`, port na hoście: `3306`.
+
+### Przykłady SELECT — migracje
+
+```sql
+-- Czy konkretna migracja została wykonana?
+SELECT version, executed_at
+FROM doctrine_migration_versions
+WHERE version LIKE '%20260625120000%';
+
+-- Ostatnie migracje
+SELECT version, executed_at
+FROM doctrine_migration_versions
+ORDER BY executed_at DESC
+LIMIT 10;
+```
+
+### Przykłady SELECT — reguły klasyfikacji
+
+```sql
+-- Wszystkie aktywne reguły (po backfillu nazwa: kategoria/podkategoria)
+SELECT id, name, LEFT(description, 40) AS description, created_from_transaction_id
+FROM classification_rule
+WHERE active = 1
+ORDER BY id;
+
+-- Podgląd źródłowej kategorii dla reguły
+SELECT cr.id AS rule_id, cr.name, c.name AS category_name, p.name AS parent_name, t.description AS tx_description
+FROM classification_rule cr
+JOIN transactions t ON t.id = cr.created_from_transaction_id
+LEFT JOIN transaction_items ti ON ti.transaction_id = t.id AND ti.category_id IS NOT NULL
+LEFT JOIN category c ON c.id = ti.category_id
+LEFT JOIN category p ON c.parent_id = p.id
+WHERE cr.active = 1 AND cr.created_from_transaction_id IS NOT NULL
+ORDER BY cr.id, ti.id
+LIMIT 20;
+```
+
+Status migracji Doctrine (alternatywa dla SQL):
+
+```bash
+docker compose exec -T app php bin/console doctrine:migrations:status
+```
 
 ## Konwencja kwot
 
@@ -187,10 +267,20 @@ Jedyna migracja seedująca dane biznesowe: konto `admin@samfin.local`. Słowniki
 
 ## Uruchamianie migracji
 
+Aplikacja działa w Dockerze — **nie uruchamiaj** `doctrine:migrations:migrate` na hoście (brak drivera PDO do MariaDB).
+
 ```bash
 make migrate
-# lub
-docker compose exec app php bin/console doctrine:migrations:migrate --no-interaction
+# lub bezpośrednio (użytkownik www-data = procesy Apache w kontenerze app):
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:migrate --no-interaction
 ```
+
+Tworzenie migracji po zmianie encji (w kontenerze, jako `www-data`):
+
+```bash
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff
+```
+
+**Produkcja** (`scripts/deploy.sh`): migracje na serwerze, bez Dockera — `php bin/console doctrine:migrations:migrate --no-interaction --env=prod` (użytkownik deployu na hoście).
 
 Skrypt pomocniczy: `backend/bin/check-migration-fk-names.php`.

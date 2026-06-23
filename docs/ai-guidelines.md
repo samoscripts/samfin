@@ -10,10 +10,11 @@ Dokument opisuje, jak bezpiecznie pracować z kodem SamFin — dla asystentów A
 2. **Słowniki to dane w tabelach** — nazwy kategorii, portfeli, podmiotów, obszarów są konfigurowalne przez użytkownika. Nie traktuj przykładów z `mock/` jako danych produkcyjnych.
 3. **Enumy w kodzie ≠ słowniki użytkownika** — `INCOME`/`EXPENSE`, statusy klasyfikacji, typy podmiotów to stałe systemowe; konkretne rekordy `party`, `category` itd. to dane użytkownika.
 4. **Kwoty w groszach** — w PHP/DB zawsze `amount_minor` (int). API i frontend używają decimal PLN; konwersja `round(amount * 100)` przy zapisie.
-5. **Soft delete** — `DELETE` w API ustawia `active = false`. Nie zakładaj fizycznego usuwania rekordów konfiguracyjnych.
+5. **Soft delete** — `DELETE` w API ustawia zwykle `active = false`. Nie zakładaj fizycznego usuwania rekordów konfiguracyjnych. **Wyjątek:** kategorie z potwierdzonymi użyciami — dezaktywacja zablokowana (`ADR-027`); merge przepina referencje.
 6. **Minimalny diff** — przy zmianach zachowuj istniejące konwencje (inline JSON validation, `toApiArray()` na encjach, camelCase w API).
 7. **Umiejscowienie UI** — formularze create/edit w **page content** lub **sidebar**; **modale** tylko na confirmy i krótkie prompty. Przy nowej funkcji — zapytaj użytkownika (page / sidebar / modal). Szczegóły: [`architecture-rules.md`](architecture-rules.md) (sekcja Frontend).
 8. **Pole kategorii** — w formularzach klasyfikacji używaj `CategorySelect` (`frontend/src/shared/components/form/CategorySelect.tsx`), nie `DictionarySelect`. Szczegóły: `.cursor/rules/frontend-form-fields.mdc`.
+9. **Dokumentacja przy większych zmianach** — w tym samym zadaniu zaktualizuj `docs/` (ADR, słowniki, moduły). Szczegóły: sekcja „Dokumentowanie zmian” poniżej oraz `.cursor/rules/docs-sync.mdc`.
 
 ---
 
@@ -56,7 +57,7 @@ App\System\               — health
 
 1. Klasa w `Entity/` z atrybutami Doctrine.
 2. `Repository/` extends `ServiceEntityRepository`.
-3. Migracja: `php bin/console doctrine:migrations:diff` (w kontenerze).
+3. Migracja: `make migrate` lub `docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff` (w kontenerze — patrz `.cursor/rules/docker-migrations.mdc`).
 4. Konwencja FK: `fk_{table}_{column}` (patrz istniejące migracje).
 
 ### Import nowego banku
@@ -100,7 +101,9 @@ Przy modyfikacji klasyfikacji lub importu sprawdź:
 - [ ] Status przez `TransactionStatusCalculator` (klasyfikacja, bulk update, import CSV)
 - [ ] Skąd/Dokąd: reguły kontekstowe (`TransactionPartyAssignmentValidator`, `partyAssignment.ts`); Skąd ≠ Dokąd
 - [ ] Bulk update: jeden `direction` dla wszystkich ID
-- [ ] Bulk update: `category.type` === `transaction.direction`
+- [ ] Bulk update: kategoria `directions` zawiera `transaction.direction`
+- [ ] Kategoria CRUD: `directions` min. 1 element; parent obsługuje wszystkie kierunki dziecka
+- [ ] Dezaktywacja kategorii: blokada przy użyciu w pozycjach transakcji, szablonach lub regułach (`CategoryUsageService`, ADR-027); merge przepina referencje
 - [ ] Import: duplikat po party + date + amount + description
 - [ ] Import: EXPENSE → `paid_from`, INCOME → `paid_to` z `csv_import.party`
 - [ ] Historia: czy zmiana powinna wołać `TransactionSnapshotLogService`?
@@ -122,11 +125,19 @@ Przy modyfikacji klasyfikacji lub importu sprawdź:
 
 ```bash
 make up              # Docker
-make migrate         # Migracje DB
+make migrate         # Migracje DB (w kontenerze, użytkownik www-data)
 make shell           # Bash w kontenerze PHP
 make sf CMD="debug:router"   # Lista tras
 make npm CMD="run build"     # Build frontendu
 ```
+
+Migracje ręcznie (gdy `make migrate` niedostępne):
+
+```bash
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:migrate --no-interaction
+```
+
+**Nie** uruchamiaj migracji na hoście WSL bez kontenera — brak `pdo_mysql`. Szczegóły: [database.md](database.md), reguła `.cursor/rules/docker-migrations.mdc`.
 
 Health check: `GET http://localhost:3001/api/health` — zwraca m.in. `version`, `build`, `commit` (z `backend/config/build_info.json`, generowany przez `frontend/scripts/generate-build-info.mjs` przy `npm run build`).
 
@@ -134,11 +145,30 @@ Health check: `GET http://localhost:3001/api/health` — zwraca m.in. `version`,
 
 ## Dokumentowanie zmian
 
-Po istotnych zmianach architektonicznych:
+**Większe zmiany w kodzie obejmują aktualizację dokumentacji w tym samym zadaniu** — bez czekania na osobne polecenie. Reguła Cursor: `.cursor/rules/docs-sync.mdc`.
 
-1. Zaktualizuj odpowiedni plik w `docs/`.
+### Kiedy aktualizować (minimum)
+
+| Typ zmiany | Gdzie |
+|------------|--------|
+| Nowa decyzja / zmiana semantyki API | `decisions.md` (ADR) |
+| Słownik, walidacja, blokada dezaktywacji | `configuration-dictionaries.md` |
+| Encja, relacje, reguły domenowe | `domain-model.md` |
+| Endpoint, serwis, moduł FE/BE | `modules.md` |
+| Nierozstrzygnięte zachowanie | `open-questions.md` |
+| Checklist dla przyszłych zmian | `ai-guidelines.md` |
+| Konwencja UI (formularze, panele) | `.cursor/rules/*.mdc` |
+
+### Po istotnych zmianach architektonicznych
+
+1. Zaktualizuj odpowiedni plik w `docs/` (tabela powyżej).
 2. Nowe decyzje → [decisions.md](decisions.md) z datą i statusem.
-3. Nowe wątpliwości → [open-questions.md](open-questions.md).
+3. Zamknięte lub doprecyzowane wątpliwości → [open-questions.md](open-questions.md).
+4. Nie opisuj w docs zachowań niepotwierdzonych w kodzie.
+
+### Drobnica — docs opcjonalne
+
+Typo, rename bez zmiany semantyki, czysty refactor wewnętrzny bez zmiany API/UX.
 
 ---
 
@@ -146,4 +176,4 @@ Po istotnych zmianach architektonicznych:
 
 Przykładowy prefix przy zadaniach w SamFin:
 
-> Projekt: SamFin — budżet domowy, Symfony 7 + React. Kwoty w groszach. Klasyfikacja: Skąd/Dokąd + portfel + dotyczy + kategoria. Reguły Skąd/Dokąd kontekstowe (import vs ręcznie, bez direction_usage_*). Import CSV dwuetapowy (mBank). Przeczytaj docs/ przed zmianami.
+> Projekt: SamFin — budżet domowy, Symfony 7 + React. Kwoty w groszach. Klasyfikacja: Skąd/Dokąd + portfel + dotyczy + kategoria. Reguły Skąd/Dokąd kontekstowe (import vs ręcznie, bez direction_usage_*). Import CSV dwuetapowy (mBank). Przeczytaj docs/ przed zmianami. Większe zmiany — aktualizuj docs/ w tym samym zadaniu (`.cursor/rules/docs-sync.mdc`).

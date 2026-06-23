@@ -1,6 +1,6 @@
 import type { PillVariant } from '@/shared/components/pillVariants'
 import type { Direction, Status } from '@/shared/types'
-import type { CategoryType } from '@/shared/api/categories'
+import type { CategoryDirection } from '@/shared/api/categories'
 
 export const STATUS_PILL: Record<Status, PillVariant> = {
   CLASSIFIED: 'success',
@@ -13,7 +13,7 @@ export const DIRECTION_PILL: Record<Direction, PillVariant> = {
   EXPENSE: 'danger',
 }
 
-export const CATEGORY_TYPE_PILL: Record<CategoryType, PillVariant> = {
+export const CATEGORY_TYPE_PILL: Record<CategoryDirection, PillVariant> = {
   EXPENSE: 'danger',
   INCOME: 'success',
 }

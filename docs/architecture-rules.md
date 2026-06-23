@@ -235,7 +235,7 @@ Szczegóły nawigacji i struktury folderów — ADR-012, ADR-020 w [`decisions.m
 
 | Typ interakcji | Gdzie | Przykłady |
 |----------------|-------|-----------|
-| Formularz create/edit (CRUD) | **Page content** lub **sidebar** | Podmioty, Kategorie, Reguły klasyfikacji; edycja/tworzenie transakcji w panelu bocznym listy (`?tab=edit`, `?tab=create`); edycja bulk w panelu bocznym |
+| Formularz create/edit (CRUD) | **Page content** lub **sidebar** | Podmioty; **Kategorie** (panel `?panel=…`); Reguły klasyfikacji; edycja/tworzenie transakcji w panelu bocznym listy (`?tab=edit`, `?tab=create`); edycja bulk w panelu bocznym |
 | Potwierdzenie akcji destrukcyjnej | **Modal** (`ConfirmDialog`) | Usuń regułę, podmiot |
 | Krótki prompt kontekstowy (1–2 pola) | Modal dopuszczalny | Zastosuj reguły klasyfikacji (checkbox overwrite) |
 | Główne zakładki modułu | **URL** (`NavLink` + `Outlet`) | ADR-020 |
@@ -255,6 +255,7 @@ Docelowy osobny dokument: `frontend-conventions.md` (opcjonalnie).
 - [ ] Repozytorium bez reguł domenowych
 - [ ] Zależności przez konstruktor
 - [ ] Brak zduplikowanej walidacji już istniejącej w serwisie
+- [ ] Większa zmiana (API, reguła biznesowa) — zaktualizowano `docs/` i ewentualnie ADR (`.cursor/rules/docs-sync.mdc`)
 - [ ] Nowe DTO — `final`, `readonly` properties
 - [ ] GET z query params — DTO `fromInputBag()` + `QueryValidationErrors` → 422
 
@@ -269,3 +270,4 @@ Docelowy osobny dokument: `frontend-conventions.md` (opcjonalnie).
 - [ ] Filtry/sort/paginacja synchronizowane z URL (`useSearchParams`)
 - [ ] Nowe endpointy GET z query — DTO + walidacja 422 przy błędnych parametrach
 - [ ] Paginacja API: `perPage` (nie `limit`)
+- [ ] Większa zmiana (API, reguła biznesowa, UX) — zaktualizowano `docs/` i ewentualnie ADR (`.cursor/rules/docs-sync.mdc`)

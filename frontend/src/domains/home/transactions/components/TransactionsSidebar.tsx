@@ -28,6 +28,10 @@ export type EditMode = 'bulk' | 'single' | 'create' | null
 
 const EMPTY_FILTERS: FlowFilters = {}
 
+export interface ApplyFiltersOptions {
+  closePanel?: boolean
+}
+
 export interface TransactionsSidebarProps {
   open: boolean
   width: number
@@ -38,7 +42,7 @@ export interface TransactionsSidebarProps {
   activeTab: SidebarTab
   onTabChange: (tab: SidebarTab) => void
   activeFilters: FlowFilters
-  onApply: (filters: FlowFilters) => void
+  onApply: (filters: FlowFilters, options?: ApplyFiltersOptions) => void
   selectedTx: Transaction | null
   selectionMixed: boolean
   editMode: EditMode
@@ -155,8 +159,7 @@ export default function TransactionsSidebar({
     const clean = Object.fromEntries(
       Object.entries(draft).filter(([, v]) => isFilterValueActive(v)),
     ) as FlowFilters
-    onApply(clean)
-    if (isMobile) onClose()
+    onApply(clean, { closePanel: isMobile })
   }
 
   const startResize = (e: React.MouseEvent) => {

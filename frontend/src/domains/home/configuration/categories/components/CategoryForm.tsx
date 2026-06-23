@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DIRECTION_OPTIONS } from '@/domains/home/transactions/constants/labels'
 import {
   createCategory,
   updateCategory,
+  formatCategoryDeactivateError,
   type Category,
-  type CategoryType,
+  type CategoryDirection,
 } from '@/shared/api/categories'
+import FilterToggleGroup from '@/shared/components/form/FilterToggleGroup'
 import FormActions from '@/shared/components/form/FormActions'
 import FormError from '@/shared/components/form/FormError'
 import FormField from '@/shared/components/form/FormField'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
-import Select from '@/shared/components/form/Select'
 import { configInputCls, configSelectCls, textareaCls } from '@/shared/components/form/formClasses'
-import { getApiErrorMessage } from '@/shared/utils/errors'
+import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
+import { parentSupportsChildDirections } from '@/shared/utils/categoryOptions'
 
 export interface CategoryFormProps {
   item: Category | null
@@ -20,10 +23,15 @@ export interface CategoryFormProps {
   onCancel: () => void
 }
 
+function defaultDirections(item: Category | null): CategoryDirection[] {
+  if (item?.directions?.length) return item.directions
+  return ['EXPENSE']
+}
+
 export default function CategoryForm({ item, allCategories, onSaved, onCancel }: CategoryFormProps) {
   const isEdit = item !== null
   const [name, setName] = useState(item?.name ?? '')
-  const [type, setType] = useState<CategoryType>(item?.type ?? 'EXPENSE')
+  const [directions, setDirections] = useState<CategoryDirection[]>(() => defaultDirections(item))
   const [parentId, setParentId] = useState<string>(item?.parentId ? String(item.parentId) : '')
   const [description, setDescription] = useState(item?.description ?? '')
   const [active, setActive] = useState(item?.active ?? true)
@@ -33,33 +41,39 @@ export default function CategoryForm({ item, allCategories, onSaved, onCancel }:
   const parentOptions = useMemo(
     () =>
       allCategories.filter((c) => {
-        if (c.type !== type) return false
         if (isEdit && c.id === item.id) return false
-        return true
+        return parentSupportsChildDirections(c, directions)
       }),
-    [allCategories, type, isEdit, item],
+    [allCategories, directions, isEdit, item],
   )
 
   useEffect(() => {
     if (parentId === '') return
     const selected = allCategories.find((c) => c.id === Number(parentId))
-    if (!selected) {
-      setParentId('')
-      return
-    }
-    if (selected.type !== type) {
+    if (!selected || !parentSupportsChildDirections(selected, directions)) {
       setParentId('')
     }
-  }, [type, parentId, allCategories])
+  }, [directions, parentId, allCategories])
+
+  function handleDirectionsChange(next: string[]) {
+    if (next.length === 0) return
+    setDirections(next as CategoryDirection[])
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    if (directions.length === 0) {
+      setError('Wybierz co najmniej jeden kierunek (wydatek lub wpływ).')
+      return
+    }
+
     setSaving(true)
     try {
       const payload = {
         name: name.trim(),
-        type,
+        directions,
         parentId: parentId ? Number(parentId) : null,
         description: description.trim() || null,
         active,
@@ -72,7 +86,7 @@ export default function CategoryForm({ item, allCategories, onSaved, onCancel }:
       }
       onSaved()
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Wystąpił błąd podczas zapisywania kategorii.'))
+      setError(formatCategoryDeactivateError(err, 'Wystąpił błąd podczas zapisywania kategorii.'))
     } finally {
       setSaving(false)
     }
@@ -94,16 +108,14 @@ export default function CategoryForm({ item, allCategories, onSaved, onCancel }:
           />
         </FormField>
 
-        <FormField label="Typ" required>
-          <Select
-            className={configSelectCls}
-            value={type}
-            onChange={(e) => setType(e.target.value as CategoryType)}
-            required
-          >
-            <option value="EXPENSE">Wydatek</option>
-            <option value="INCOME">Wpływ</option>
-          </Select>
+        <FormField label="Kierunki" required>
+          <FilterToggleGroup
+            options={DIRECTION_OPTIONS}
+            value={directions}
+            onChange={handleDirectionsChange}
+            variantForValue={(v) => DIRECTION_PILL[v as CategoryDirection]}
+            ariaLabel="Kierunki kategorii"
+          />
         </FormField>
       </div>
 

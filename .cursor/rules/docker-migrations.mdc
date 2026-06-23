@@ -1,0 +1,52 @@
+---
+description: Migracje Doctrine i komendy Symfony w Dockerze (SamFin)
+alwaysApply: true
+---
+
+# Migracje i Symfony CLI w Dockerze
+
+SamFin działa w Docker Compose (`app`, `db`, `frontend`). Backend Symfony jest w kontenerze **`app`**.
+
+## Migracje bazy
+
+**Zawsze** uruchamiaj migracje **w kontenerze**, jako użytkownik **`www-data`** (ten sam co procesy Apache):
+
+```bash
+make migrate
+```
+
+lub:
+
+```bash
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:migrate --no-interaction
+```
+
+**Nie** uruchamiaj `php bin/console doctrine:migrations:migrate` na hoście WSL/Linux poza kontenerem — typowy błąd: `could not find driver` (brak `pdo_mysql`).
+
+## Nowa migracja po zmianie encji
+
+```bash
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff
+```
+
+Sprawdź wygenerowany plik w `backend/migrations/`, potem `make migrate`.
+
+## Inne komendy Symfony
+
+Wzorzec:
+
+```bash
+docker compose exec -u www-data -T app php bin/console <komenda>
+```
+
+Przykłady: `cache:clear`, `debug:router`, `doctrine:schema:validate`.
+
+Interaktywna powłoka: `make shell` (root w kontenerze — do debugowania, nie do rutynowych migracji).
+
+## Produkcja
+
+Deploy (`scripts/deploy.sh`) uruchamia migracje **na serwerze** bez Dockera: `php bin/console doctrine:migrations:migrate --no-interaction --env=prod`.
+
+## Dokumentacja
+
+Szczegóły schematu i historia migracji: `docs/database.md`. Decyzje domenowe: `docs/decisions.md`.

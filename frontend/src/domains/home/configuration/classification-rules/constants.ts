@@ -102,7 +102,7 @@ export function defaultForm(): FormState {
   return {
     name: '',
     description: null,
-    priority: 100,
+    priority: 1,
     enabled: true,
     stopOnMatch: true,
     conditions: { conditions: [createDirectionCondition('')] },

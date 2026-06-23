@@ -192,8 +192,8 @@ class TransactionBulkUpdateService
         if (!$category) {
             throw new \InvalidArgumentException("Nie znaleziono kategorii id={$id}.");
         }
-        if ($category->getType() !== $direction) {
-            throw new \InvalidArgumentException('Kategoria nie pasuje do typu transakcji.');
+        if (!$category->supportsDirection($direction)) {
+            throw new \InvalidArgumentException('Kategoria nie pasuje do kierunku transakcji.');
         }
 
         return $category;
