@@ -179,7 +179,7 @@ function SettlementContent({ data }: { data: CommonAccountSettlementResponse }) 
         <StatCard
           label={`Następna wpłata: ${PERSON_LABELS[nd.person]}`}
           value={formatAmount(nd.dueAmount)}
-          sub={`bazowo ${formatAmount(nd.baseAmount)} + saldo portfeli ${formatAmount(nd.corrections)} + przeniesienie ${formatAmount(nd.carryOver)}`}
+          sub={`bazowo ${formatAmount(nd.baseAmount)} + saldo portfeli ${formatAmount(nd.walletNet)} + przeniesienie ${formatAmount(nd.carryOver)}`}
           icon={<Wallet size={18} className="text-[#c9a96e]" />}
           highlight
         />
@@ -192,7 +192,7 @@ function SettlementContent({ data }: { data: CommonAccountSettlementResponse }) 
         <StatCard
           label={`Saldo portfeli (${PERSON_LABELS[nd.person]})`}
           value={formatAmount(personNet)}
-          sub={personNet > 0 ? `Korekta wpłaty: ${formatAmount(nd.corrections)}` : 'Brak korekty'}
+          sub={personNet !== 0 ? `Wpływ na wpłatę: ${formatAmount(nd.walletNet)}` : 'Bez wpływu na wpłatę'}
           icon={<ArrowUpRight size={18} className="text-orange-600" />}
         />
         <StatCard

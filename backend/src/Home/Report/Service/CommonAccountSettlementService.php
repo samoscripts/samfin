@@ -104,7 +104,7 @@ class CommonAccountSettlementService
         $carryOverBasia  = $config->getCarryOverBasiaMinor();
 
         $personNetMinor   = (int) round($walletGroups[$nextDepositor]['net'] * 100);
-        $walletCorrection = max(0, $personNetMinor);
+        $walletCorrection = $personNetMinor;
         $carryOver        = $nextDepositor === 'maciek' ? $carryOverMaciek : $carryOverBasia;
         $dueMinor         = $baseMinor + $walletCorrection + $carryOver;
         $paidMinor        = $standardDepositsMinor[$nextDepositor]['total'];

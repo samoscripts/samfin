@@ -101,10 +101,10 @@ Odpowiedź (skrót):
 
 - `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net` (wydatki − wpływy na przypisanych portfelach, poza budżetem domowym)
 - `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego (Skąd z list Maćka/Basi)
-- `nextDeposit` — `dueAmount`, `paidInPeriod`, `walletNet`, `corrections` (= `max(0, walletNet)` osoby wpłacającej), `underpayment`, `carryForward`
+- `nextDeposit` — `dueAmount`, `paidInPeriod`, `walletNet`, `corrections` (= saldo netto portfeli osoby wpłacającej, ze znakiem), `underpayment`, `carryForward`
 - `warnings`, `excludedItemsCount`
 
-Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `nextDeposit`. Korekta wpłaty bierze wyłącznie dodatnie saldo netto grupy portfeli wpłacającej osoby.
+Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `nextDeposit`. Korekta wpłaty to pełne saldo netto grupy portfeli wpłacającej osoby (dodatnie zwiększa należność, ujemne ją zmniejsza).
 
 Implementacja: `CommonAccountSettlementService`, `CommonAccountSettlementItemQuery`, `CommonAccountSettlementQuery`.
 
