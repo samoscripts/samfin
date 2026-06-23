@@ -21,28 +21,36 @@ export interface SettlementItemRef {
   paidTo: string | null
   wallet: string | null
   amount: number
-  type?: string
-  reason?: string
+  kind?: string
 }
+
+export interface WalletGroupBucket {
+  total: number
+  items: SettlementItemRef[]
+}
+
+export interface WalletSettlementGroup {
+  expenses: WalletGroupBucket
+  incomes: WalletGroupBucket
+  net: number
+}
+
+export type WalletGroupKey = 'maciek' | 'basia' | 'other'
 
 export interface CommonAccountSettlementResponse {
   dateFrom: string
   dateTo: string
   config: SettlementConfig
-  corrections: { total: number; items: SettlementItemRef[] }
-  correctionsByPerson: { maciek: number; basia: number }
-  unassignedCorrections: number
-  deposits: {
-    maciek: { total: number; items: SettlementItemRef[] }
-    basia: { total: number; items: SettlementItemRef[] }
-    other: { total: number; items: SettlementItemRef[] }
+  walletGroups: Record<WalletGroupKey, WalletSettlementGroup>
+  standardDeposits: {
+    maciek: WalletGroupBucket
+    basia: WalletGroupBucket
   }
-  expensesFromCommon: Record<string, { walletId: number | null; total: number; count: number }>
   nextDeposit: {
     person: 'maciek' | 'basia'
     baseAmount: number
+    walletNet: number
     corrections: number
-    correctionsDetail: { assigned: number; unassigned: number }
     carryOver: number
     dueAmount: number
     paidInPeriod: number
@@ -52,7 +60,7 @@ export interface CommonAccountSettlementResponse {
     carryForward: number
   }
   balances: Record<string, {
-    correctionsAssigned: number
+    walletNet: number
     carryOver: number
     paidInPeriod: number
   }>

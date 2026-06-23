@@ -4,6 +4,9 @@ import { AlertTriangle, Loader2, Wallet, ArrowDownLeft, ArrowUpRight } from 'luc
 import {
   fetchCommonAccountSettlement,
   type CommonAccountSettlementResponse,
+  type SettlementItemRef,
+  type WalletGroupKey,
+  type WalletSettlementGroup,
 } from '@/shared/api/commonAccountSettlement'
 import { buildSearchParams, parsePositiveInt } from '@/shared/utils/urlQuery'
 import { formatAmount } from '@/shared/utils/format'
@@ -16,6 +19,12 @@ const MONTH_NAMES = [
 const PERSON_LABELS: Record<string, string> = {
   maciek: 'Maciek',
   basia: 'Basia',
+}
+
+const WALLET_GROUP_LABELS: Record<WalletGroupKey, string> = {
+  maciek: 'Portfele Maćka',
+  basia: 'Portfele Basi',
+  other: 'Inne',
 }
 
 function currentYearMonth() {
@@ -144,6 +153,7 @@ export default function CommonAccountSettlementReport() {
 
 function SettlementContent({ data }: { data: CommonAccountSettlementResponse }) {
   const nd = data.nextDeposit
+  const personNet = data.walletGroups[nd.person].net
 
   return (
     <>
@@ -169,7 +179,7 @@ function SettlementContent({ data }: { data: CommonAccountSettlementResponse }) 
         <StatCard
           label={`Następna wpłata: ${PERSON_LABELS[nd.person]}`}
           value={formatAmount(nd.dueAmount)}
-          sub={`bazowo ${formatAmount(nd.baseAmount)} + korekty ${formatAmount(nd.corrections)} + saldo ${formatAmount(nd.carryOver)}`}
+          sub={`bazowo ${formatAmount(nd.baseAmount)} + saldo portfeli ${formatAmount(nd.corrections)} + przeniesienie ${formatAmount(nd.carryOver)}`}
           icon={<Wallet size={18} className="text-[#c9a96e]" />}
           highlight
         />
@@ -180,9 +190,9 @@ function SettlementContent({ data }: { data: CommonAccountSettlementResponse }) 
           icon={<ArrowDownLeft size={18} className="text-emerald-600" />}
         />
         <StatCard
-          label="Korekty (łącznie)"
-          value={formatAmount(data.corrections.total)}
-          sub={`nieprzypisane: ${formatAmount(data.unassignedCorrections)}`}
+          label={`Saldo portfeli (${PERSON_LABELS[nd.person]})`}
+          value={formatAmount(personNet)}
+          sub={personNet > 0 ? `Korekta wpłaty: ${formatAmount(nd.corrections)}` : 'Brak korekty'}
           icon={<ArrowUpRight size={18} className="text-orange-600" />}
         />
         <StatCard
@@ -192,50 +202,29 @@ function SettlementContent({ data }: { data: CommonAccountSettlementResponse }) 
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section title="Wpłaty Maciek" total={data.deposits.maciek.total} items={data.deposits.maciek.items} />
-        <Section title="Wpłaty Basia" total={data.deposits.basia.total} items={data.deposits.basia.items} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StandardDepositsSection
+          title="Wpłaty rotacyjne — Maciek"
+          total={data.standardDeposits.maciek.total}
+          items={data.standardDeposits.maciek.items}
+        />
+        <StandardDepositsSection
+          title="Wpłaty rotacyjne — Basia"
+          total={data.standardDeposits.basia.total}
+          items={data.standardDeposits.basia.items}
+        />
       </div>
 
-      <Section
-        title="Korekty — wydatki ze wspólnego na inne portfele"
-        total={data.corrections.total}
-        items={data.corrections.items}
-      />
-
-      {data.deposits.other.items.length > 0 && (
-        <Section
-          title="Inne wpływy na konto wspólne"
-          total={data.deposits.other.total}
-          items={data.deposits.other.items}
-        />
-      )}
-
-      {Object.keys(data.expensesFromCommon).length > 0 && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-            Wydatki ze wspólnego wg portfela
-          </h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                <th className="pb-2 font-medium">Portfel</th>
-                <th className="pb-2 font-medium text-right">Liczba</th>
-                <th className="pb-2 font-medium text-right">Suma</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(data.expensesFromCommon).map(([name, row]) => (
-                <tr key={name} className="border-b border-gray-50 dark:border-gray-800/50">
-                  <td className="py-2">{name}</td>
-                  <td className="py-2 text-right tabular-nums">{row.count}</td>
-                  <td className="py-2 text-right tabular-nums">{formatAmount(row.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="space-y-6">
+        {(['maciek', 'basia', 'other'] as const).map((key) => (
+          <WalletGroupSection
+            key={key}
+            title={WALLET_GROUP_LABELS[key]}
+            group={data.walletGroups[key]}
+            informational={key === 'other'}
+          />
+        ))}
+      </div>
     </>
   )
 }
@@ -272,24 +261,15 @@ function StatCard({
   )
 }
 
-function Section({
+function StandardDepositsSection({
   title,
   total,
   items,
 }: {
   title: string
   total: number
-  items: CommonAccountSettlementResponse['corrections']['items']
+  items: SettlementItemRef[]
 }) {
-  if (items.length === 0) {
-    return (
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-        <p className="text-sm text-gray-400 mt-2">Brak pozycji.</p>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
       <div className="flex items-baseline justify-between mb-3">
@@ -298,36 +278,116 @@ function Section({
           {formatAmount(total)}
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-              <th className="pb-2 pr-3 font-medium">Data</th>
-              <th className="pb-2 pr-3 font-medium">Opis</th>
-              <th className="pb-2 pr-3 font-medium">Portfel</th>
-              <th className="pb-2 font-medium text-right">Kwota</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={`${item.transactionId}-${item.itemId}`} className="border-b border-gray-50 dark:border-gray-800/50">
-                <td className="py-2 pr-3 whitespace-nowrap">{item.date}</td>
-                <td className="py-2 pr-3 max-w-[200px] truncate">
-                  <Link
-                    to={`/transactions/${item.transactionId}/edit`}
-                    className="text-[#c9a96e] hover:underline"
-                    title={item.description ?? undefined}
-                  >
-                    {item.description || `#${item.transactionId}`}
-                  </Link>
-                </td>
-                <td className="py-2 pr-3">{item.wallet ?? '—'}</td>
-                <td className="py-2 text-right tabular-nums">{formatAmount(item.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {items.length === 0 ? (
+        <p className="text-sm text-gray-400">Brak wpłat w okresie.</p>
+      ) : (
+        <ItemsTable items={items} />
+      )}
+    </div>
+  )
+}
+
+function WalletGroupSection({
+  title,
+  group,
+  informational,
+}: {
+  title: string
+  group: WalletSettlementGroup
+  informational?: boolean
+}) {
+  const hasItems = group.expenses.items.length > 0 || group.incomes.items.length > 0
+
+  return (
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 space-y-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+          {informational && (
+            <p className="text-xs text-gray-400 mt-0.5">Tylko informacyjnie — nie wpływa na następną wpłatę.</p>
+          )}
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Saldo netto</p>
+          <p className={[
+            'text-lg font-semibold tabular-nums',
+            group.net > 0 ? 'text-orange-600' : group.net < 0 ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-300',
+          ].join(' ')}>
+            {formatAmount(group.net)}
+          </p>
+          <p className="text-xs text-gray-400">
+            wydatki {formatAmount(group.expenses.total)} − wpływy {formatAmount(group.incomes.total)}
+          </p>
+        </div>
       </div>
+
+      {!hasItems ? (
+        <p className="text-sm text-gray-400">Brak pozycji w tej grupie.</p>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <BucketSection title="Wydatki" total={group.expenses.total} items={group.expenses.items} />
+          <BucketSection title="Wpływy" total={group.incomes.total} items={group.incomes.items} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BucketSection({
+  title,
+  total,
+  items,
+}: {
+  title: string
+  total: number
+  items: SettlementItemRef[]
+}) {
+  return (
+    <div className="border border-gray-100 dark:border-gray-800 rounded-lg p-4">
+      <div className="flex items-baseline justify-between mb-3">
+        <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">{title}</h4>
+        <span className="text-sm tabular-nums text-gray-600 dark:text-gray-400">{formatAmount(total)}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-sm text-gray-400">Brak pozycji.</p>
+      ) : (
+        <ItemsTable items={items} compact />
+      )}
+    </div>
+  )
+}
+
+function ItemsTable({ items, compact }: { items: SettlementItemRef[]; compact?: boolean }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
+            <th className="pb-2 pr-3 font-medium">Data</th>
+            <th className="pb-2 pr-3 font-medium">Opis</th>
+            {!compact && <th className="pb-2 pr-3 font-medium">Portfel</th>}
+            <th className="pb-2 font-medium text-right">Kwota</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={`${item.transactionId}-${item.itemId}`} className="border-b border-gray-50 dark:border-gray-800/50">
+              <td className="py-2 pr-3 whitespace-nowrap">{item.date}</td>
+              <td className="py-2 pr-3 max-w-[200px] truncate">
+                <Link
+                  to={`/transactions/${item.transactionId}/edit`}
+                  className="text-[#c9a96e] hover:underline"
+                  title={item.description ?? undefined}
+                >
+                  {item.description || `#${item.transactionId}`}
+                </Link>
+              </td>
+              {!compact && <td className="py-2 pr-3">{item.wallet ?? '—'}</td>}
+              <td className="py-2 text-right tabular-nums">{formatAmount(item.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

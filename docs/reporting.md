@@ -97,7 +97,14 @@ Raport wylicza sugerowaną kolejną wpłatę Maćka/Basi na konto wspólne na po
 
 \*Podaj albo `year`+`month`, albo `dateFrom`+`dateTo`.
 
-Odpowiedź (skrót): `corrections`, `deposits` (maciek/basia/other), `nextDeposit` (due, paid, underpayment, carryForward), `expensesFromCommon`, `warnings`.
+Odpowiedź (skrót):
+
+- `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net` (wydatki − wpływy na przypisanych portfelach, poza budżetem domowym)
+- `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego (Skąd z list Maćka/Basi)
+- `nextDeposit` — `dueAmount`, `paidInPeriod`, `walletNet`, `corrections` (= `max(0, walletNet)` osoby wpłacającej), `underpayment`, `carryForward`
+- `warnings`, `excludedItemsCount`
+
+Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `nextDeposit`. Korekta wpłaty bierze wyłącznie dodatnie saldo netto grupy portfeli wpłacającej osoby.
 
 Implementacja: `CommonAccountSettlementService`, `CommonAccountSettlementItemQuery`, `CommonAccountSettlementQuery`.
 
