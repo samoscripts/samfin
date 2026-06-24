@@ -74,6 +74,7 @@ export default function ClassificationRules() {
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [concerns, setConcerns] = useState<Concern[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false)
   const [createFromTx, setCreateFromTx] = useState<Transaction | null>(null)
   const [ruleDraft, setRuleDraft] = useState<RuleFromTransactionDraft | null>(null)
   const [returnAfterCreate, setReturnAfterCreate] = useState<string | null>(null)
@@ -122,7 +123,10 @@ export default function ClassificationRules() {
       .catch(() => setRuleContextParties([]))
     fetchWallets().then(setWallets).catch(() => [])
     fetchConcerns().then(setConcerns).catch(() => [])
-    fetchCategories().then(setCategories).catch(() => [])
+    fetchCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
+      .finally(() => setCategoriesLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -217,13 +221,13 @@ export default function ClassificationRules() {
   }, [isCreate, searchParams, setSearchParams])
 
   useEffect(() => {
-    if (!createFromTx) {
+    if (!createFromTx || !categoriesLoaded) {
       setRuleDraft(null)
       return
     }
     const draft = buildRuleDraftFromTransaction(createFromTx, categories)
     if (draft) setRuleDraft(draft)
-  }, [createFromTx, categories])
+  }, [createFromTx, categories, categoriesLoaded])
 
   const handlePanelWidthChange = useCallback((w: number) => {
     setPanelWidth(w)
@@ -338,6 +342,17 @@ export default function ClassificationRules() {
     }
 
     if (isEdit && !editingRule) {
+      return (
+        <div>
+          {breadcrumb}
+          <div className="py-12 flex justify-center text-gray-400">
+            <Loader2 size={24} className="animate-spin" />
+          </div>
+        </div>
+      )
+    }
+
+    if (isCreate && createFromTx && !ruleDraft) {
       return (
         <div>
           {breadcrumb}
