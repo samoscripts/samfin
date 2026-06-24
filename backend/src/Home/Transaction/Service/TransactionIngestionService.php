@@ -100,7 +100,15 @@ class TransactionIngestionService
 
         $rows = $this->findRowsToProcess($csvImport, $mode);
 
-
+        // #region agent log
+        $this->agentDebugLog('ingest start', [
+            'hypothesisId' => 'H2,H4',
+            'importId' => $csvImport->getId(),
+            'partyId' => $csvImport->getParty()?->getId(),
+            'mode' => $mode->value,
+            'rowCount' => count($rows),
+        ]);
+        // #endregion
 
         $imported   = 0;
 
@@ -158,6 +166,22 @@ class TransactionIngestionService
 
             );
 
+            // #region agent log
+            if ($imported + $duplicates + $skipped < 3 || $duplicate !== null) {
+                $this->agentDebugLog('duplicate check', [
+                    'hypothesisId' => 'H2,H3,H4',
+                    'rowId' => $row->getId(),
+                    'lineNo' => $row->getLineNo(),
+                    'partyId' => $csvImport->getParty()?->getId(),
+                    'operationDate' => $row->getOperationDate()?->format('Y-m-d'),
+                    'amountMinor' => $row->getAmountMinor(),
+                    'descriptionLen' => $row->getDescriptionRaw() !== null ? mb_strlen($row->getDescriptionRaw()) : null,
+                    'duplicateFound' => $duplicate !== null,
+                    'duplicateTxId' => $duplicate?->getId(),
+                ]);
+            }
+            // #endregion
+
 
 
             if ($duplicate !== null) {
@@ -185,6 +209,16 @@ class TransactionIngestionService
         $csvImport->setStatus(CsvImport::STATUS_IMPORTED);
 
         $this->em->flush();
+
+        // #region agent log
+        $this->agentDebugLog('ingest done', [
+            'hypothesisId' => 'H4',
+            'importId' => $csvImport->getId(),
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'duplicates' => $duplicates,
+        ]);
+        // #endregion
 
 
 
@@ -312,6 +346,32 @@ class TransactionIngestionService
 
         $tx->setStatus($this->statusCalculator->calculate($tx));
 
+    }
+
+    /** @param array<string, mixed> $data */
+    private function agentDebugLog(string $message, array $data): void
+    {
+        $payload = json_encode([
+            'sessionId' => 'ca6b48',
+            'location' => 'TransactionIngestionService.php',
+            'message' => $message,
+            'data' => $data,
+            'timestamp' => (int) (microtime(true) * 1000),
+        ], JSON_UNESCAPED_UNICODE);
+        if ($payload === false) {
+            return;
+        }
+        $ctx = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/json\r\nX-Debug-Session-Id: ca6b48\r\n",
+                'content' => $payload,
+                'timeout' => 1,
+                'ignore_errors' => true,
+            ],
+        ]);
+        @file_get_contents('http://host.docker.internal:7837/ingest/efae5210-b6ce-4fa0-9427-6c2f8db109a0', false, $ctx);
+        @file_put_contents(dirname(__DIR__, 4) . '/debug-ca6b48.log', $payload . "\n", FILE_APPEND);
     }
 
 }

@@ -23,6 +23,11 @@ Konwencje warstw i reguły kodu: [`architecture-rules.md`](architecture-rules.md
 | Plik | Route | Opis |
 |------|-------|------|
 | `Settings/Controller/UserController.php` | `/api/users/*` | CRUD użytkowników (ROLE_ADMIN) |
+| `Settings/Controller/SystemController.php` | `/api/system/transactions/*` | Eksport/wyczyszczenie transakcji (ROLE_ADMIN) |
+| `Settings/Controller/DatabaseBackupController.php` | `/api/system/backups/*` | Kopie zapasowe DB: lista, utwórz, pobierz, usuń, restore (ROLE_ADMIN) |
+| `Settings/Service/DatabaseBackupService.php` | — | mysqldump/mysql, ZIP+manifest, pre-restore, walidacja schematu |
+| `Settings/Command/DatabaseBackupCommand.php` | CLI `app:database:backup` | Kopia na żądanie / cron |
+| `Settings/Command/DatabaseRestoreCommand.php` | CLI `app:database:restore` | Restore awaryjny bez HTTP |
 
 ### Home — Configuration
 
@@ -65,6 +70,16 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 | `Transaction/Repository/TransactionRepository.php` | `findPaged`, `getPeriodStats`, `findDuplicate` |
 
 **Tworzenie ręczne (ADR-019):** `POST /api/transactions` — `TransactionCreateService`; UI w sidebarze listy (`?tab=create`, prefill z query); legacy `/transactions/new` → redirect.
+
+### Home — Report
+
+| Plik | Route | Opis |
+|------|-------|------|
+| `Report/Analytics/Controller/AnalyticsController.php` | `GET /api/reports/analytics` | Zestawienie miesięczne (przychody, wydatki, saldo) |
+| `Report/Settlement/Controller/SettlementController.php` | `GET /api/reports/settlements` | Raport rozliczenia wpłat |
+| `Report/Settlement/Controller/SettlementController.php` | `GET/PUT /api/reports/settlements/config` | Konfiguracja rozliczenia per użytkownik |
+| `Report/Settlement/Service/SettlementService.php` | — | Logika obliczeń rozliczenia |
+| `Report/Settlement/Entity/SettlementConfig.php` | — | Encja konfiguracji (`settlement_config`) |
 
 ### Repozytoria
 

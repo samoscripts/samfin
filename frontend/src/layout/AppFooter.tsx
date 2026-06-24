@@ -1,13 +1,10 @@
 import { Activity, ExternalLink } from 'lucide-react'
 import Pill from '@/shared/components/Pill'
 import { useAppInfo } from '@/shared/hooks/useAppInfo'
-
-const ENV_LABELS: Record<string, string> = {
-  dev: 'Development',
-  prod: 'Production',
-  test: 'Test',
-  staging: 'Staging',
-}
+import {
+  getEnvironmentLabel,
+  isProductionEnvironment,
+} from '@/shared/utils/environmentDisplay'
 
 interface AppFooterProps {
   variant?: 'full' | 'minimal'
@@ -17,8 +14,8 @@ export default function AppFooter({ variant = 'full' }: AppFooterProps) {
   const info = useAppInfo()
 
   const version = info?.version ?? '…'
-  const isNonProd = info != null && info.environment !== 'prod'
-  const envLabel = info ? (ENV_LABELS[info.environment] ?? info.environment) : null
+  const isNonProd = info != null && !isProductionEnvironment(info.environment)
+  const envLabel = info ? getEnvironmentLabel(info.environment) : null
 
   return (
     <footer className="shrink-0 border-t border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm px-4 py-2">

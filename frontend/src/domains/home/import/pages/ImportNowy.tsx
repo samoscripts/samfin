@@ -49,6 +49,9 @@ export default function ImportNowy() {
     setGlobalError(null)
     try {
       const resp = await uploadCsv(source, file)
+      // #region agent log
+      fetch('http://127.0.0.1:7837/ingest/efae5210-b6ce-4fa0-9427-6c2f8db109a0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ca6b48'},body:JSON.stringify({sessionId:'ca6b48',location:'ImportNowy.tsx:handleSubmit',message:'upload completed',data:{importId:resp.import.id,status:resp.import.status,partyId:resp.import.partyId,rowsTotal:resp.import.rowsTotal,rowsParsed:resp.import.rowsParsed},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       setResult(resp.import)
       setErrors(resp.errors)
     } catch (err: unknown) {

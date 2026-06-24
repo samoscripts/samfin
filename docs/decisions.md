@@ -405,6 +405,24 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-028: Kopie zapasowe bazy danych (aplikacyjne)
+
+**Kontekst:** Potrzeba eksportu/importu pełnej bazy między instancjami (prod → dev), kopii na żądanie i przywracania. Backup infrastruktury pozostaje po stronie hostingu.
+
+**Decyzja:**
+
+- Zakres: tylko baza danych (nie snapshot kodu).
+- Format: ZIP (`SQL` + `manifest.json`); `schemaVersion` = ostatnia migracja Doctrine — gate przy imporcie (nie sam `build`).
+- UI: Ustawienia → Kopie zapasowe (`ROLE_ADMIN`); API `/api/system/backups/*`.
+- CLI: `app:database:backup`, `app:database:restore` (fallback awaryjny bez tokena HTTP).
+- Przed restore: automatyczny pre-backup w `var/backups/pre-restore/` (max 3).
+- Kompatybilność: dev MariaDB 11, prod MySQL; `mysqldump`/`mysql`; hasło DB przez `--defaults-extra-file`, nie argv.
+- `symfony/process` w `require` (prod `--no-dev`).
+
+**Pliki:** `DatabaseBackupService.php`, `DatabaseBackupController.php`, `DatabaseBackupCommand.php`, `DatabaseRestoreCommand.php`, `frontend/.../backups/`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -416,3 +434,4 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-23 | ADR-025: kategoria — `direction_expense` / `direction_income`, API `directions[]` |
 | 2026-06-24 | ADR-026: lista kategorii — drzewo, DnD przenoszenie, merge subkategorii |
 | 2026-06-24 | ADR-027: blokada dezaktywacji kategorii przy użyciu w transakcjach, szablonach i regułach |
+| 2026-06-24 | ADR-028: kopie zapasowe bazy (ZIP+manifest, CLI, pre-restore) |

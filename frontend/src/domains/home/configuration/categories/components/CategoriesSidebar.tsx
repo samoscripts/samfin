@@ -81,10 +81,19 @@ export default function CategoriesSidebar({
     )
   }, [allCategories, sourceCategory])
 
-  const mergeTargetOptions = useMemo(() => {
+  const mergeTargets = useMemo(() => {
     if (!sourceCategory) return []
     return allCategories.filter((c) => c.active && isMergeTarget(sourceCategory, c))
   }, [allCategories, sourceCategory])
+
+  const mergeTargetOptions = useMemo(() => {
+    if (mergeTargets.length === 0) return []
+    const parentIds = new Set(
+      mergeTargets.map((t) => t.parentId).filter((id): id is number => id != null),
+    )
+    const parents = allCategories.filter((c) => c.active && parentIds.has(c.id))
+    return [...parents, ...mergeTargets]
+  }, [allCategories, mergeTargets])
 
   useEffect(() => {
     if (!open) return
@@ -280,10 +289,10 @@ export default function CategoriesSidebar({
                 value={mergeTargetId}
                 onChange={(v) => setMergeTargetId(v === null || v === '' ? null : Number(v))}
                 emptyLabel="— wybierz subkategorię —"
-                disabled={actionSaving || mergeTargetOptions.length === 0}
+                disabled={actionSaving || mergeTargets.length === 0}
                 className={configSelectCls}
               />
-              {mergeTargetOptions.length === 0 && (
+              {mergeTargets.length === 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
                   Brak kompatybilnych subkategorii (docelowa musi obsługiwać te same kierunki).
                 </p>

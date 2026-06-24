@@ -4,8 +4,8 @@
 
 Moduł raportów jest **częściowo zaimplementowany**:
 
-1. **Raport miesięczny** (grupa *Domyślne*) — `/app/raporty/default/monthly` z filtrami w URL (`year`, `month`, `walletId`); API `GET /api/reports/monthly`.
-2. **Rozliczenie wpłat na konto wspólne** — `/app/raporty/common-account` z zakładką konfiguracji; API `GET /api/reports/common-account-settlement` oraz `GET/PUT .../config`.
+1. **Analizy** — `/app/raporty/analytics` z filtrami w URL (`year`, `month`, `walletId`); API `GET /api/reports/analytics`.
+2. **Rozliczenia** — `/app/raporty/settlements` z zakładką konfiguracji; API `GET /api/reports/settlements` oraz `GET/PUT .../config`.
 3. **Podstawowe statystyki transakcji** — endpoint API i dashboard.
 4. **Lista transakcji z filtrami** — eksploracja operacyjna (nie raport formalny).
 
@@ -16,39 +16,39 @@ Folder `mock/` zawiera statyczne prototypy HTML — **nie są podłączone** do 
 ## Nawigacja (frontend)
 
 - **Sidebar:** pozycja „Raporty” rozwija podmenu (nie zakładki w treści strony):
-  - sekcja *Domyślne* → **Miesięczny** (`/raporty/default/monthly`)
-  - **Konto wspólne** (`/raporty/common-account`)
+  - **Analizy** (`/raporty/analytics`)
+  - **Rozliczenia** (`/raporty/settlements`)
 - **Layout raportów:** [`ReportsLayout.tsx`](../frontend/src/domains/home/reports/pages/ReportsLayout.tsx) — nagłówek + `<Outlet />` (bez poziomego podmenu).
-- **Konto wspólne:** zakładki *Raport* | *Konfiguracja* w [`CommonAccountSettlementLayout.tsx`](../frontend/src/domains/home/reports/common-account/pages/CommonAccountSettlementLayout.tsx).
+- **Rozliczenia:** zakładki *Raport* | *Konfiguracja* w [`SettlementLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementLayout.tsx).
 
 ### Struktura katalogów (angielskie nazwy)
 
 ```
 frontend/src/domains/home/reports/
 ├── pages/ReportsLayout.tsx
-├── default/pages/MonthlyReport.tsx
-└── common-account/pages/
-    ├── CommonAccountSettlementLayout.tsx
-    ├── CommonAccountSettlementReport.tsx
-    └── CommonAccountSettlementSettings.tsx
+├── analytics/pages/AnalyticsReport.tsx
+└── settlements/pages/
+    ├── SettlementLayout.tsx
+    ├── SettlementReport.tsx
+    └── SettlementSettings.tsx
 ```
 
 ### Trasy URL
 
 | Trasa | Opis |
 |-------|------|
-| `/raporty` | redirect → `/raporty/default/monthly` |
-| `/raporty/default/monthly` | raport miesięczny |
-| `/raporty/common-account` | rozliczenie wpłat — widok raportu |
-| `/raporty/common-account/settings` | konfiguracja rozliczenia |
+| `/raporty` | redirect → `/raporty/analytics` |
+| `/raporty/analytics` | analizy (obecnie: zestawienie miesięczne) |
+| `/raporty/settlements` | rozliczenie wpłat — widok raportu |
+| `/raporty/settlements/settings` | konfiguracja rozliczenia |
 
-**Legacy redirecty** (stare bookmarki): `/raporty/miesieczny`, `/raporty/domyslne/miesieczny`, `/raporty/konto-wspolne`, `/raporty/konto-wspolne/konfiguracja`.
+**Legacy redirecty** (stare bookmarki): `/raporty/default/monthly`, `/raporty/analytics/monthly`, `/raporty/common-account`, `/raporty/miesieczny`, `/raporty/domyslne/miesieczny`, `/raporty/konto-wspolne`, `/raporty/konto-wspolne/konfiguracja`.
 
 ---
 
-## Raport miesięczny (MVP)
+## Analizy (MVP)
 
-### API: `GET /api/reports/monthly`
+### API: `GET /api/reports/analytics`
 
 Parametry query:
 
@@ -76,21 +76,23 @@ Odpowiedź (jak `GET /api/transactions/stats` w zakresie miesiąca):
 }
 ```
 
-Implementacja: `ReportController`, `MonthlyReportQuery`, `TransactionRepository::getPeriodStats()`.
+Implementacja: `AnalyticsController`, `AnalyticsQuery`, `TransactionRepository::getPeriodStats()`.
 
-Przykład: `/app/raporty/default/monthly?year=2026&month=6&walletId=2`
+Przykład: `/app/raporty/analytics?year=2026&month=6&walletId=2`
+
+Docelowo: filtr zakresu dat z presetem „Miesięczny” (nie w URL).
 
 ---
 
-## Rozliczenie wpłat na konto wspólne (MVP)
+## Rozliczenia (MVP)
 
-Raport wylicza sugerowaną kolejną wpłatę Maćka/Basi na konto wspólne na podstawie **pozycji transakcji** (`transaction_items`): kierunek, Skąd/Dokąd (`paid_from` / `paid_to`), portfel pozycji. **Nie** opiera się na polu `concern`.
+Raport wylicza sugerowaną kolejną wpłatę Maćka/Basi na podmiot rozliczenia na podstawie **pozycji transakcji** (`transaction_items`): kierunek, Skąd/Dokąd (`paid_from` / `paid_to`), portfel pozycji. **Nie** opiera się na polu `concern`.
 
-### API: `GET /api/reports/common-account-settlement`
+### API: `GET /api/reports/settlements`
 
 | Parametr | Wymagany | Opis |
 |----------|----------|------|
-| `year` + `month` | jedna para* | Skrót okresu (jak monthly) |
+| `year` + `month` | jedna para* | Skrót okresu |
 | `dateFrom` + `dateTo` | alternatywa* | Zakres dat |
 | `nextDepositor` | nie | `maciek` \| `basia` — nadpisuje auto z historii wpłat |
 | `includePartial` | nie | Uwzględnij `PARTIALLY_CLASSIFIED` (domyślnie false) |
@@ -106,41 +108,44 @@ Odpowiedź (skrót):
 
 Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `nextDeposit`. Korekta wpłaty to pełne saldo netto grupy portfeli wpłacającej osoby (dodatnie zwiększa należność, ujemne ją zmniejsza).
 
-Implementacja: `CommonAccountSettlementService`, `CommonAccountSettlementItemQuery`, `CommonAccountSettlementQuery`.
+Implementacja: `SettlementService`, `SettlementItemQuery`, `SettlementQuery`.
 
 ### API: konfiguracja
 
 | Metoda | Endpoint |
 |--------|----------|
-| `GET` | `/api/reports/common-account-settlement/config` |
-| `PUT` | `/api/reports/common-account-settlement/config` |
+| `GET` | `/api/reports/settlements/config` |
+| `PUT` | `/api/reports/settlements/config` |
 
-Pola konfiguracji (per użytkownik, tabela `common_account_settlement_config`):
+Pola konfiguracji (per użytkownik, tabela `settlement_config`):
 
-- `commonAccountPartyId`, `homeBudgetWalletId`
+- `settlementPartyId`, `homeBudgetWalletId`
 - `baseDepositAmount` (domyślnie 5000)
 - `maciekSourcePartyIds`, `basiaSourcePartyIds` — podmioty Skąd uznawane za wpłaty danej osoby
 - `walletSettlementOwner` — mapowanie portfela → `maciek` \| `basia` dla korekt
 - `defaultNextDepositor`, `carryOverMaciek`, `carryOverBasia`
 
-Wymaga skonfigurowania konta wspólnego i portfela budżetu domowego — inaczej `422`.
+Wymaga skonfigurowania podmiotu rozliczenia i portfela budżetu domowego — inaczej `422`.
 
 ### Backend (pliki)
 
 ```
 backend/src/Home/Report/
-├── Controller/ReportController.php
-├── DTO/CommonAccountSettlementQuery.php
-├── DTO/MonthlyReportQuery.php
-├── Entity/CommonAccountSettlementConfig.php
-├── Repository/CommonAccountSettlementConfigRepository.php
-├── Repository/CommonAccountSettlementItemQuery.php
-└── Service/
-    ├── CommonAccountSettlementService.php
-    └── CommonAccountSettlementConfigService.php
+├── Analytics/
+│   ├── Controller/AnalyticsController.php
+│   └── DTO/AnalyticsQuery.php
+└── Settlement/
+    ├── Controller/SettlementController.php
+    ├── DTO/SettlementQuery.php
+    ├── Entity/SettlementConfig.php
+    ├── Repository/SettlementConfigRepository.php
+    ├── Repository/SettlementItemQuery.php
+    └── Service/
+        ├── SettlementService.php
+        └── SettlementConfigService.php
 ```
 
-Migracje: `Version20260625120000` (tabela config), `Version20260626120000` (repair — utworzenie tabeli jeśli brak).
+Migracje: `Version20260625120000` (tabela config), `Version20260626120000` (repair), `Version20260627120000` (rename → `settlement_config`).
 
 ---
 
@@ -159,7 +164,7 @@ Implementacja: `TransactionRepository::getPeriodStats()`.
 | `balance` | `income - expenses` (w PLN, zaokrąglenie 2 miejsca) |
 | `unclassifiedCount` | Liczba transakcji ze `status = UNCLASSIFIED` w zakresie dat |
 
-**Uwaga:** Statystyki operują na poziomie **transakcji**, nie pozycji. Raport konta wspólnego i filtr `walletId` w monthly używają join na `transaction_items`.
+**Uwaga:** Statystyki operują na poziomie **transakcji**, nie pozycji. Rozliczenia i filtr `walletId` w analizach używają join na `transaction_items`.
 
 ### Frontend: Dashboard (`/`)
 
@@ -175,11 +180,12 @@ Cztery karty: przychody, wydatki, saldo, niesklasyfikowane. URL: `/?month=YYYY-M
 
 ## Czego brakuje
 
-- Okresy rozliczeniowe ze snapshotami i zamknięciem okresu (docelowy wariant raportu konta wspólnego)
+- Okresy rozliczeniowe ze snapshotami i zamknięciem okresu (docelowy wariant rozliczeń)
 - Zestawienia wg kategorii / obszarów (agregaty ogólne)
 - Raport roczny, wykresy trendów
 - Eksport danych (PDF, CSV)
 - Budżet vs wykonanie
+- Filtr zakresu dat w analizach (preset „Miesięczny”)
 
 Wymagania produktowe: [open-questions.md](open-questions.md) (#19).
 
@@ -188,5 +194,5 @@ Wymagania produktowe: [open-questions.md](open-questions.md) (#19).
 ## Kierunki architektoniczne (przyszłość)
 
 1. **Agregacje na poziomie pozycji** — standard dla raportów domowych (`transaction_items`).
-2. **Rozszerzenie `/api/reports/...`** — wzorzec DTO query + serwis domenowy (jak `CommonAccountSettlementService`).
+2. **Rozszerzenie `/api/reports/...`** — wzorzec DTO query + serwis domenowy (jak `SettlementService`).
 3. **Materialized views / cache** — przy większej liczbie transakcji.

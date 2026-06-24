@@ -3,8 +3,15 @@ import { Bell, Monitor, Sun, Moon, Check, Menu, LogOut, UserCircle } from 'lucid
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '@/app/providers/ThemeProvider'
 import { ThemeMode } from '@/shared/types'
+import { useAppInfo } from '@/app/providers/AppInfoProvider'
 import { useAuth } from '@/app/providers/AuthProvider'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
+import EnvironmentBadge from '@/shared/components/EnvironmentBadge'
+import {
+  ENV_ACCENT_OVERLAY_CLASS,
+  ENV_TOPBAR_BASE_CLASS,
+  isProductionEnvironment,
+} from '@/shared/utils/environmentDisplay'
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
   { value: 'light', label: 'Jasny', icon: <Sun size={14} /> },
@@ -17,6 +24,9 @@ interface TopbarProps {
 }
 
 export default function Topbar({ onMobileMenuOpen }: TopbarProps) {
+  const info = useAppInfo()
+  const isNonProd = info != null && !isProductionEnvironment(info.environment)
+
   const { mode, setMode } = useTheme()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -34,7 +44,10 @@ export default function Topbar({ onMobileMenuOpen }: TopbarProps) {
   }, [])
 
   return (
-    <header className="flex items-center h-16 px-4 md:px-6 shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 gap-2">
+    <header
+      className={`relative flex items-center h-16 px-4 md:px-6 shrink-0 gap-2 ${ENV_TOPBAR_BASE_CLASS}`}
+    >
+      {isNonProd && <div className={ENV_ACCENT_OVERLAY_CLASS} aria-hidden="true" />}
       {/* Mobile hamburger */}
       <button
         className="md:hidden p-2 -ml-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -45,12 +58,15 @@ export default function Topbar({ onMobileMenuOpen }: TopbarProps) {
       </button>
 
       {/* Mobile logo */}
-      <div className="md:hidden flex-1 flex items-center">
-        <img src="/app/images/samfin_logo_small.png" alt="SamFin" className="h-7 w-auto object-contain" />
+      <div className="md:hidden flex-1 flex items-center gap-2 min-w-0">
+        <img src="/app/images/samfin_logo_small.png" alt="SamFin" className="h-7 w-auto object-contain shrink-0" />
+        <EnvironmentBadge />
       </div>
 
-      {/* Desktop spacer */}
-      <div className="hidden md:flex flex-1" />
+      {/* Desktop env badge */}
+      <div className="hidden md:flex flex-1 items-center">
+        <EnvironmentBadge />
+      </div>
 
       {/* Notifications */}
       <button className="relative p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">

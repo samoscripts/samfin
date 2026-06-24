@@ -17,7 +17,7 @@ Aplikacja jest wieloużytkownikowa (logowanie e-mail + hasło, token API w nagł
 
 | Warstwa | Technologie |
 |---------|-------------|
-| Backend | PHP 8.3+, Symfony 7, Doctrine ORM 3, MariaDB 11 |
+| Backend | PHP 8.3+, Symfony 7, Doctrine ORM 3, MariaDB 11 (dev) / MySQL (prod) |
 | Frontend | React 19, TypeScript, Vite 6, React Router 7, Axios, Tailwind CSS 4 |
 | Infrastruktura | Docker Compose (Apache + PHP, Node dev server, MariaDB) |
 
@@ -89,7 +89,7 @@ flowchart LR
 4. **Reguły klasyfikacji** — zestaw reguł per podmiot OWN; ręczne uruchomienie na zaznaczeniu lub filtrze; opcjonalne tworzenie reguły z istniejącej transakcji.
 5. **Dashboard** — agregaty przychodów, wydatków, salda i liczby niesklasyfikowanych transakcji.
 6. **Transakcje ręczne** — formularz `/transactions/new` ze `source: MANUAL`; klasyfikacja opcjonalna; reguły Skąd/Dokąd jak przy edycji (ADR-017, ADR-019).
-7. **Raporty** — sidebar z podmenu: miesięczny (`/raporty/default/monthly`, `GET /api/reports/monthly`) oraz rozliczenie konta wspólnego (`/raporty/common-account`, `GET /api/reports/common-account-settlement`).
+7. **Raporty** — sidebar z podmenu: Analizy (`/raporty/analytics`, `GET /api/reports/analytics`) oraz Rozliczenia (`/raporty/settlements`, `GET /api/reports/settlements`).
 
 ## Konwencje globalne
 

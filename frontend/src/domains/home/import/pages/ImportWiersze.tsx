@@ -84,6 +84,13 @@ export default function ImportWiersze() {
     })
       .then((resp) => {
         if (cancelled) return
+        const statusCounts = resp.data.reduce<Record<string, number>>((acc, row) => {
+          acc[row.parseStatus] = (acc[row.parseStatus] ?? 0) + 1
+          return acc
+        }, {})
+        // #region agent log
+        fetch('http://127.0.0.1:7837/ingest/efae5210-b6ce-4fa0-9427-6c2f8db109a0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ca6b48'},body:JSON.stringify({sessionId:'ca6b48',location:'ImportWiersze.tsx:fetchRows',message:'rows loaded',data:{importId,filter,page,total:resp.meta.total,statusCounts,sampleStatuses:resp.data.slice(0,5).map(r=>({lineNo:r.lineNo,parseStatus:r.parseStatus}))},timestamp:Date.now(),hypothesisId:'H1,H4'})}).catch(()=>{});
+        // #endregion
         setItems(resp.data)
         setTotal(resp.meta.total)
         setPages(resp.meta.lastPage)

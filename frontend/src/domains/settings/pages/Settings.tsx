@@ -1,10 +1,11 @@
-import { Construction, Users } from 'lucide-react'
+import { Construction, DatabaseBackup, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/app/providers/AuthProvider'
 
 const TABS = [
   { to: 'uzytkownicy', label: 'Użytkownicy', icon: <Users size={15} />, adminOnly: true },
   { to: 'system', label: 'System', icon: <Construction size={15} />, adminOnly: true },
+  { to: 'kopie-zapasowe', label: 'Kopie zapasowe', icon: <DatabaseBackup size={15} />, adminOnly: true },
 ]
 
 export default function Settings() {

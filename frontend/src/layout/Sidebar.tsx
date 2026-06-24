@@ -14,7 +14,12 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useAppInfo } from '@/shared/hooks/useAppInfo'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
+import {
+  ENV_ACCENT_OVERLAY_CLASS,
+  isProductionEnvironment,
+} from '@/shared/utils/environmentDisplay'
 
 interface NavItem {
   to: string
@@ -48,14 +53,13 @@ const REPORTS_NAV: NavGroup = {
   label: 'Raporty',
   icon: <BarChart2 size={18} />,
   basePath: '/raporty',
-  defaultTo: '/raporty/default/monthly',
+  defaultTo: '/raporty/analytics',
   sections: [
     {
-      label: 'Domyślne',
-      items: [{ to: '/raporty/default/monthly', label: 'Miesięczny', end: true }],
-    },
-    {
-      items: [{ to: '/raporty/common-account', label: 'Konto wspólne' }],
+      items: [
+        { to: '/raporty/analytics', label: 'Analizy', end: true },
+        { to: '/raporty/settlements', label: 'Rozliczenia' },
+      ],
     },
   ],
 }
@@ -89,6 +93,8 @@ function SidebarNav({
   isMobile?: boolean
 }) {
   const { user, logout } = useAuth()
+  const info = useAppInfo()
+  const isNonProd = info != null && !isProductionEnvironment(info.environment)
   const location = useLocation()
   const navigate = useNavigate()
   const navCollapsed = isMobile ? false : collapsed
@@ -123,19 +129,20 @@ function SidebarNav({
     <>
       <div
         className={[
-          'flex items-center h-16 shrink-0 border-b border-white/10 relative',
+          'flex items-center h-16 shrink-0 border-b border-white/10 relative overflow-hidden',
           navCollapsed ? 'justify-center px-0' : 'justify-start pl-3 pr-4',
         ].join(' ')}
       >
+        {isNonProd && <div className={ENV_ACCENT_OVERLAY_CLASS} aria-hidden="true" />}
         {navCollapsed ? (
-          <img src="/app/images/samfin_logo_ico.png" alt="SamFin" className="h-9 w-9 object-contain" />
+          <img src="/app/images/samfin_logo_ico.png" alt="SamFin" className="relative h-9 w-9 object-contain" />
         ) : (
-          <img src="/app/images/samfin_logo_small.png" alt="SamFin" className="h-11 w-auto object-contain" />
+          <img src="/app/images/samfin_logo_small.png" alt="SamFin" className="relative h-11 w-auto object-contain" />
         )}
         {isMobile && (
           <button
             onClick={onMobileClose}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors"
             aria-label="Zamknij menu"
           >
             <X size={16} />

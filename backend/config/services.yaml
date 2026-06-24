@@ -1,4 +1,10 @@
 parameters:
+    env(BACKUP_RETENTION_DAYS): '30'
+    env(BACKUP_MAX_UPLOAD_MB): '32'
+    env(BACKUP_PRE_RESTORE_KEEP): '3'
+    backup.retention_days: '%env(int:BACKUP_RETENTION_DAYS)%'
+    backup.max_upload_mb: '%env(int:BACKUP_MAX_UPLOAD_MB)%'
+    backup.pre_restore_keep: '%env(int:BACKUP_PRE_RESTORE_KEEP)%'
 
 services:
     _defaults:

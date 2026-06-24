@@ -137,7 +137,7 @@ Pakiet `symfony/validator` jest w `composer.json`, ale kontrolery walidują ręc
 
 ### 19. Zakres modułu Raporty
 
-**Stan:** MVP — raport miesięczny (`/raporty/default/monthly`, `GET /api/reports/monthly`) oraz rozliczenie wpłat na konto wspólne (`/raporty/common-account`, `GET /api/reports/common-account-settlement`). Nawigacja: rozwijane podmenu w Sidebarze; konfiguracja rozliczenia w zakładce wewnątrz widoku konto wspólne.
+**Stan:** MVP — analizy (`/raporty/analytics`, `GET /api/reports/analytics`) oraz rozliczenia (`/raporty/settlements`, `GET /api/reports/settlements`). Nawigacja: rozwijane podmenu w Sidebarze (Analizy, Rozliczenia); konfiguracja rozliczenia w zakładce wewnątrz widoku Rozliczenia.
 
 **Pytanie:** Jakie raporty są kolejnym priorytetem (per kategoria, per portfel szczegółowy, cashflow roczny, budżet vs wykonanie)?
 

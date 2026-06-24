@@ -5,13 +5,14 @@ import Transactions from '@/domains/home/transactions/pages/Transactions'
 import TransactionEditRedirect from '@/domains/home/transactions/pages/TransactionEditRedirect'
 import TransactionNewRedirect from '@/domains/home/transactions/pages/TransactionNewRedirect'
 import ReportsLayout from '@/domains/home/reports/pages/ReportsLayout'
-import MonthlyReport from '@/domains/home/reports/default/pages/MonthlyReport'
-import CommonAccountSettlementLayout from '@/domains/home/reports/common-account/pages/CommonAccountSettlementLayout'
-import CommonAccountSettlementReport from '@/domains/home/reports/common-account/pages/CommonAccountSettlementReport'
-import CommonAccountSettlementSettings from '@/domains/home/reports/common-account/pages/CommonAccountSettlementSettings'
+import AnalyticsReport from '@/domains/home/reports/analytics/pages/AnalyticsReport'
+import SettlementLayout from '@/domains/home/reports/settlements/pages/SettlementLayout'
+import SettlementReport from '@/domains/home/reports/settlements/pages/SettlementReport'
+import SettlementSettings from '@/domains/home/reports/settlements/pages/SettlementSettings'
 import Settings     from '@/domains/settings/pages/Settings'
 import UsersPage    from '@/domains/settings/users/pages/Users'
 import SystemSettings from '@/domains/settings/system/pages/SystemSettings'
+import BackupsSettings from '@/domains/settings/backups/pages/BackupsSettings'
 import MyAccount    from '@/domains/settings/pages/MyAccount'
 import Configuration from '@/domains/home/configuration/pages/Configuration'
 import Parties      from '@/domains/home/configuration/parties/pages/Parties'
@@ -49,17 +50,21 @@ export default function AppRoutes() {
         </Route>
 
         <Route path="raporty" element={<ReportsLayout />}>
-          <Route index element={<Navigate to="default/monthly" replace />} />
-          <Route path="default/monthly" element={<MonthlyReport />} />
-          <Route path="common-account" element={<CommonAccountSettlementLayout />}>
-            <Route index element={<CommonAccountSettlementReport />} />
-            <Route path="settings" element={<CommonAccountSettlementSettings />} />
+          <Route index element={<Navigate to="analytics" replace />} />
+          <Route path="analytics" element={<AnalyticsReport />} />
+          <Route path="settlements" element={<SettlementLayout />}>
+            <Route index element={<SettlementReport />} />
+            <Route path="settings" element={<SettlementSettings />} />
           </Route>
           {/* legacy redirects */}
-          <Route path="miesieczny" element={<Navigate to="/raporty/default/monthly" replace />} />
-          <Route path="domyslne/miesieczny" element={<Navigate to="/raporty/default/monthly" replace />} />
-          <Route path="konto-wspolne" element={<Navigate to="/raporty/common-account" replace />} />
-          <Route path="konto-wspolne/konfiguracja" element={<Navigate to="/raporty/common-account/settings" replace />} />
+          <Route path="default/monthly" element={<Navigate to="/raporty/analytics" replace />} />
+          <Route path="analytics/monthly" element={<Navigate to="/raporty/analytics" replace />} />
+          <Route path="common-account" element={<Navigate to="/raporty/settlements" replace />} />
+          <Route path="common-account/settings" element={<Navigate to="/raporty/settlements/settings" replace />} />
+          <Route path="miesieczny" element={<Navigate to="/raporty/analytics" replace />} />
+          <Route path="domyslne/miesieczny" element={<Navigate to="/raporty/analytics" replace />} />
+          <Route path="konto-wspolne" element={<Navigate to="/raporty/settlements" replace />} />
+          <Route path="konto-wspolne/konfiguracja" element={<Navigate to="/raporty/settlements/settings" replace />} />
         </Route>
 
         <Route path="konfiguracja" element={<Configuration />}>
@@ -100,6 +105,7 @@ export default function AppRoutes() {
             <Route path=":entityId/edycja" element={<UsersPage />} />
           </Route>
           <Route path="system" element={<SystemSettings />} />
+          <Route path="kopie-zapasowe" element={<BackupsSettings />} />
         </Route>
       </Route>
     </Routes>

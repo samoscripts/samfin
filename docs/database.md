@@ -1,6 +1,6 @@
 # Baza danych SamFin
 
-Silnik: **MariaDB 11**, charset `utf8mb4_unicode_ci`, silnik InnoDB.
+Silnik: **MariaDB 11** (dev, Docker), **MySQL** (prod, hosting). Charset `utf8mb4_unicode_ci`, silnik InnoDB. Migracje Doctrine muszą być kompatybilne z oboma silnikami.
 
 ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od `Version20260607125328`).
 
@@ -22,7 +22,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od 
 | `transactions_change_log` | `TransactionChangeLog` | Historia klasyfikacji |
 | `classification_rule` | `ClassificationRule` | Reguły auto-klasyfikacji per podmiot |
 | `transaction_template` | `TransactionTemplate` | Szablony klasyfikacji per użytkownik (wpływ/wydatek) |
-| `common_account_settlement_config` | `CommonAccountSettlementConfig` | Konfiguracja raportu rozliczenia wpłat na konto wspólne (per `user_id`) |
+| `settlement_config` | `SettlementConfig` | Konfiguracja rozliczenia wpłat (per `user_id`) |
 
 ## Diagram relacji (FK)
 
@@ -173,8 +173,9 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260622120000` | `transaction_template` — szablony klasyfikacji per użytkownik |
 | `20260623120000` | `category`: `direction_expense`, `direction_income` (zastępuje `type`) |
 | `20260624120000` | Backfill `classification_rule.name` i `description` dla reguł z `created_from_transaction_id` |
-| `20260625120000` | `common_account_settlement_config` — konfiguracja raportu rozliczenia konta wspólnego |
+| `20260625120000` | `common_account_settlement_config` — konfiguracja rozliczenia (historyczna nazwa) |
 | `20260626120000` | Repair: utworzenie `common_account_settlement_config` jeśli brak (gdy `20260625120000` zapisana bez tabeli) |
+| `20260627120000` | Rename: `settlement_config`, kolumna `settlement_party_id` |
 
 ## Zapytania diagnostyczne (tylko SELECT)
 
@@ -284,3 +285,53 @@ docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff
 **Produkcja** (`scripts/deploy.sh`): migracje na serwerze, bez Dockera — `php bin/console doctrine:migrations:migrate --no-interaction --env=prod` (użytkownik deployu na hoście).
 
 Skrypt pomocniczy: `backend/bin/check-migration-fk-names.php`.
+
+## Kopie zapasowe bazy (aplikacyjne)
+
+Backup infrastruktury (pliki, konto hostingowe) — po stronie hostingu. SamFin oferuje warstwę aplikacyjną: eksport/import pełnej bazy (użytkownicy, transakcje, słowniki, reguły…).
+
+| Środowisko | Narzędzia | UI |
+|------------|-----------|-----|
+| Dev (Docker) | `mariadb-client` w kontenerze `app` | Ustawienia → Kopie zapasowe |
+| Prod (hosting) | `mysqldump` / `mysql` z PATH (`/usr/bin/`) | j.w. + CLI |
+
+### Format
+
+ZIP w `backend/var/backups/` zawiera `{Ymd_His}_{build}.sql` + `manifest.json` (wersja aplikacji, build, commit, `schemaVersion`, SHA-256 SQL).
+
+### Import — walidacja
+
+Import odrzucany gdy `version` lub `schemaVersion` z manifestu ≠ bieżąca aplikacja/baza. Override: potwierdzenie `PRZYWRÓĆ MIMO NIEZGODNOŚCI` lub CLI `--force`.
+
+### Bezpieczeństwo restore
+
+Import SQL nie jest transakcyjny (DDL commituje od razu). Przed każdym restore tworzona jest automatyczna kopia w `var/backups/pre-restore/` (ostatnie 3).
+
+### CLI (awaryjnie, bez HTTP)
+
+```bash
+# Utwórz kopię
+php bin/console app:database:backup --no-interaction --env=prod
+
+# Przywróć (np. po nieudanym imporcie)
+php bin/console app:database:restore var/backups/pre-restore/pre-restore_YYYYMMDD_HHMMSS.zip --env=prod
+```
+
+Opcje restore: `--force`, `--skip-pre-backup`, `--no-interaction`.
+
+### Cron (opcjonalny, ręczna konfiguracja na hostingu)
+
+```bash
+0 3 * * * cd /home/.../samfin/backend && /usr/local/bin/php bin/console app:database:backup --no-interaction --env=prod
+```
+
+Deploy (`scripts/deploy.sh`) **nie** konfiguruje crona.
+
+### Limity
+
+- Upload HTTP restore: max 32 MB (`BACKUP_MAX_UPLOAD_MB`, `post_max_size`). Większe pliki → CLI.
+- Retencja kopii: 30 dni (`BACKUP_RETENTION_DAYS`).
+
+### Prod → dev
+
+Dump z MySQL 8 może zawierać kolacje (`utf8mb4_0900_ai_ci`) nierozpoznawane przez MariaDB 11 — import może wymagać korekty lub tej samej wersji schematu na obu instancjach.
