@@ -21,6 +21,7 @@ class DatabaseBackupService
 
     private readonly string $backupDir;
     private readonly string $preRestoreDir;
+    private readonly string $projectDir;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -34,7 +35,8 @@ class DatabaseBackupService
         #[Autowire('%backup.pre_restore_keep%')]
         private readonly int $preRestoreKeep,
     ) {
-        $this->backupDir = $kernel->getProjectDir() . '/var/backups';
+        $this->projectDir = $kernel->getProjectDir();
+        $this->backupDir = $this->projectDir . '/var/backups';
         $this->preRestoreDir = $this->backupDir . '/pre-restore';
     }
 
@@ -141,8 +143,9 @@ class DatabaseBackupService
         $manifest = $extracted['manifest'];
         $sqlPath = $extracted['sqlPath'];
 
+        $importMeta = null;
         try {
-            $this->importSqlFile($sqlPath);
+            $importMeta = $this->importSqlFile($sqlPath);
         } catch (\Throwable $e) {
             $this->logger->error('Database restore failed', [
                 'error'    => $e->getMessage(),
@@ -157,10 +160,20 @@ class DatabaseBackupService
             $this->removeDirectory($extracted['tempDir']);
         }
 
+        $txAfter = $this->countTransactions();
+        $sqlSize = is_file($sqlPath) ? (int) filesize($sqlPath) : 0;
+        if ($sqlSize > 10_000 && $txAfter === 0) {
+            throw new DatabaseBackupException(
+                'Import zakończył się bez danych (0 transakcji). Przywróć przez CLI: php bin/console app:database:restore <plik.zip>',
+                ['txCountAfter' => $txAfter, 'sqlSize' => $sqlSize, 'importMeta' => $importMeta],
+            );
+        }
+
         $this->logger->warning('Database restored from backup', ['manifest' => $manifest->toArray()]);
 
         return [
             'restored' => true,
+            'requiresRelogin' => true,
             'manifest' => $manifest->toArray(),
         ];
     }
@@ -367,10 +380,19 @@ class DatabaseBackupService
         }
     }
 
-    private function importSqlFile(string $sqlPath): void
+    /**
+     * @return array{inputBytes: int, exitCode: int, stderr: string}
+     */
+    private function importSqlFile(string $sqlPath): array
     {
         $params = $this->getConnectionParams();
         $defaultsFile = $this->createDefaultsFile($params);
+        $fileSize = is_file($sqlPath) ? (int) filesize($sqlPath) : 0;
+
+        $handle = fopen($sqlPath, 'rb');
+        if ($handle === false) {
+            throw new DatabaseBackupException('Nie udało się otworzyć pliku SQL do importu.');
+        }
 
         try {
             $command = [
@@ -382,8 +404,7 @@ class DatabaseBackupService
                 $params['dbname'],
             ];
 
-            $process = new Process($command);
-            $process->setInput(file_get_contents($sqlPath) ?: '');
+            $process = new Process($command, input: $handle);
             $process->setTimeout(null);
             $process->run();
 
@@ -392,10 +413,32 @@ class DatabaseBackupService
                     'mysql import zakończył się błędem: ' . trim($process->getErrorOutput() ?: $process->getOutput()),
                 );
             }
+
+            $this->em->getConnection()->close();
+
+            return [
+                'inputBytes' => $fileSize,
+                'exitCode' => (int) $process->getExitCode(),
+                'stderr' => substr($process->getErrorOutput(), 0, 500),
+            ];
         } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
             if (is_file($defaultsFile)) {
                 unlink($defaultsFile);
             }
+        }
+    }
+
+    private function countTransactions(): ?int
+    {
+        try {
+            $count = $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM transactions');
+
+            return is_numeric($count) ? (int) $count : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 

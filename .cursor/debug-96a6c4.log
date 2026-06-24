@@ -1,0 +1,7 @@
+{"sessionId":"96a6c4","hypothesisId":"H6","location":"backups.ts:restoreBackupFromServer","message":"restore request","data":{"id":"20260624_225045_20260624.2145","confirmLen":8},"timestamp":1782336050239}
+{"sessionId":"96a6c4","hypothesisId":"H5","location":"backups.ts:restoreBackupFromServer","message":"restore response","data":{"status":200,"restored":true,"manifestDb":"samfin"},"timestamp":1782336051172}
+{"sessionId":"96a6c4","hypothesisId":"H6","location":"backups.ts:restoreBackupFromServer","message":"restore request","data":{"id":"20260624_225045_20260624.2145","confirmLen":8},"timestamp":1782336244496}
+{"sessionId":"96a6c4","hypothesisId":"H5","location":"backups.ts:restoreBackupFromServer","message":"restore response","data":{"status":200,"restored":true,"manifestDb":"samfin"},"timestamp":1782336245399}
+{"sessionId":"96a6c4","hypothesisId":"H6","location":"backups.ts:restoreBackupFromServer","message":"restore request","data":{"id":"20260624_231251_20260624.2057","confirmLen":8},"timestamp":1782336439189}
+{"sessionId":"96a6c4","hypothesisId":"H5","location":"backups.ts:restoreBackupFromServer","message":"restore response","data":{"status":200,"restored":true,"requiresRelogin":true,"manifestDb":"samfin"},"timestamp":1782336440074}
+{"sessionId":"96a6c4","hypothesisId":"H5","location":"completeRestoreSession","message":"clearing token and redirecting","data":{"hadToken":true},"timestamp":1782336440074}

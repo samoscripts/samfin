@@ -43,13 +43,13 @@ class DatabaseBackupController extends AbstractController
     {
         set_time_limit(0);
 
-        $confirm = (string) $request->request->get('confirm', '');
+        $confirm = $this->readRestoreConfirm($request);
         if ($confirm !== 'PRZYWRÓĆ' && $confirm !== 'PRZYWRÓĆ MIMO NIEZGODNOŚCI') {
             return $this->json(['message' => 'Wpisz PRZYWRÓĆ w polu potwierdzenia.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $force = $confirm === 'PRZYWRÓĆ MIMO NIEZGODNOŚCI'
-            || filter_var($request->request->get('force', false), FILTER_VALIDATE_BOOL);
+            || filter_var($this->readRestoreForce($request), FILTER_VALIDATE_BOOL);
 
         $file = $request->files->get('file');
         if ($file === null || !$file->isValid()) {
@@ -73,29 +73,30 @@ class DatabaseBackupController extends AbstractController
         }
     }
 
-    #[Route('/{id}/restore', name: 'api_system_backups_restore_id', methods: ['POST'])]
+    #[Route('/{id}/restore', name: 'api_system_backups_restore_id', methods: ['POST'], requirements: ['id' => '.+'])]
     public function restoreFromServer(string $id, Request $request): JsonResponse
     {
         set_time_limit(0);
 
-        $confirm = (string) $request->request->get('confirm', '');
+        $confirm = $this->readRestoreConfirm($request);
         if ($confirm !== 'PRZYWRÓĆ' && $confirm !== 'PRZYWRÓĆ MIMO NIEZGODNOŚCI') {
             return $this->json(['message' => 'Wpisz PRZYWRÓĆ w polu potwierdzenia.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $force = $confirm === 'PRZYWRÓĆ MIMO NIEZGODNOŚCI'
-            || filter_var($request->request->get('force', false), FILTER_VALIDATE_BOOL);
+            || filter_var($this->readRestoreForce($request), FILTER_VALIDATE_BOOL);
 
         try {
             $zipPath = $this->backupService->getDownloadPath($id);
+            $result = $this->backupService->restoreFromLocalZip($zipPath, $force);
 
-            return $this->json($this->backupService->restoreFromLocalZip($zipPath, $force));
+            return $this->json($result);
         } catch (DatabaseBackupException $e) {
             return $this->backupError($e);
         }
     }
 
-    #[Route('/{id}/download', name: 'api_system_backups_download', methods: ['GET'])]
+    #[Route('/{id}/download', name: 'api_system_backups_download', methods: ['GET'], requirements: ['id' => '.+'])]
     public function download(string $id): StreamedResponse|JsonResponse
     {
         try {
@@ -131,7 +132,7 @@ class DatabaseBackupController extends AbstractController
         return $response;
     }
 
-    #[Route('/{id}', name: 'api_system_backups_delete', methods: ['DELETE'])]
+    #[Route('/{id}', name: 'api_system_backups_delete', methods: ['DELETE'], requirements: ['id' => '.+'])]
     public function delete(string $id): JsonResponse
     {
         try {
@@ -151,5 +152,23 @@ class DatabaseBackupController extends AbstractController
         }
 
         return $this->json($payload, Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    private function readRestoreConfirm(Request $request): string
+    {
+        if ($request->request->has('confirm')) {
+            return (string) $request->request->get('confirm');
+        }
+
+        return (string) ($request->getPayload()->get('confirm') ?? '');
+    }
+
+    private function readRestoreForce(Request $request): mixed
+    {
+        if ($request->request->has('force')) {
+            return $request->request->get('force');
+        }
+
+        return $request->getPayload()->get('force') ?? false;
     }
 }

@@ -176,6 +176,9 @@ class TransactionRepository extends ServiceEntityRepository
             return null;
         }
 
+        // csv_import_row stores DATETIME (often with spurious time); transactions use DATE only.
+        $dateOnly = $operationDate->setTime(0, 0);
+
         return $this->createQueryBuilder('t')
             ->join('t.import', 'i')
             ->where('i.party = :party')
@@ -183,7 +186,7 @@ class TransactionRepository extends ServiceEntityRepository
             ->andWhere('t.amountMinor = :amount')
             ->andWhere('t.description = :description')
             ->setParameter('party', $party)
-            ->setParameter('date', $operationDate)
+            ->setParameter('date', $dateOnly)
             ->setParameter('amount', $amountMinor)
             ->setParameter('description', $description)
             ->setMaxResults(1)

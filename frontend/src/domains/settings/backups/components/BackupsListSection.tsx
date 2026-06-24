@@ -11,6 +11,7 @@ import {
   type BackupEntry,
 } from '@/shared/api/backups'
 import { getApiErrorMessage } from '@/shared/utils/errors'
+import { completeRestoreSession } from '../utils/completeRestoreSession'
 import SystemSection from '../../system/components/SystemSection'
 import SystemOptionRow from '../../system/components/SystemOptionRow'
 
@@ -99,9 +100,13 @@ export default function BackupsListSection() {
     setError('')
     setBusyId(restoreId)
     try {
-      await restoreBackupFromServer(restoreId, restoreConfirm)
+      const result = await restoreBackupFromServer(restoreId, restoreConfirm)
       setRestoreId(null)
       setRestoreConfirm('')
+      if (result.requiresRelogin) {
+        completeRestoreSession(result)
+        return
+      }
       setSuccessMessage('Baza została przywrócona z kopii na serwerze.')
     } catch (err) {
       setError(getApiErrorMessage(err, 'Nie udało się przywrócić bazy.'))

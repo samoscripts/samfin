@@ -118,9 +118,7 @@ export default function ImportSzczegoly() {
     try {
 
       const { import: updated, stats } = await triggerImport(imp.id, mode)
-      // #region agent log
-      fetch('http://127.0.0.1:7837/ingest/efae5210-b6ce-4fa0-9427-6c2f8db109a0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ca6b48'},body:JSON.stringify({sessionId:'ca6b48',location:'ImportSzczegoly.tsx:handleImport',message:'ingestion completed',data:{importId:imp.id,mode,stats,importStatus:updated.status,partyId:updated.partyId},timestamp:Date.now(),hypothesisId:'H1,H2,H3,H4,H5'})}).catch(()=>{});
-      // #endregion
+
       setImp(updated)
 
       const parts: string[] = []
@@ -142,10 +140,9 @@ export default function ImportSzczegoly() {
       )
 
     } catch (err) {
+
       const { message, context } = parseApiError(err, 'Nie udało się przenieść danych do transakcji.')
-      // #region agent log
-      fetch('http://127.0.0.1:7837/ingest/efae5210-b6ce-4fa0-9427-6c2f8db109a0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ca6b48'},body:JSON.stringify({sessionId:'ca6b48',location:'ImportSzczegoly.tsx:handleImport:error',message:'ingestion failed',data:{importId:imp.id,mode,errorMessage:message,contextType:context?.type??null},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
+
       setImportError(message)
 
       setImportErrorContext(context ?? null)

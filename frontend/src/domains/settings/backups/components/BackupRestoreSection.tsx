@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Loader2, Upload } from 'lucide-react'
 import { restoreBackupFromUpload } from '@/shared/api/backups'
 import { getApiErrorMessage } from '@/shared/utils/errors'
+import { completeRestoreSession } from '../utils/completeRestoreSession'
 import SystemSection from '../../system/components/SystemSection'
 
 export default function BackupRestoreSection() {
@@ -25,7 +26,11 @@ export default function BackupRestoreSection() {
     setSuccessMessage('')
     setIsRestoring(true)
     try {
-      await restoreBackupFromUpload(file, confirm)
+      const result = await restoreBackupFromUpload(file, confirm)
+      if (result.requiresRelogin) {
+        completeRestoreSession(result)
+        return
+      }
       setSuccessMessage('Baza została przywrócona z przesłanego pliku.')
       setFile(null)
       setConfirm('')

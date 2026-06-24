@@ -14,6 +14,7 @@ export interface BackupEntry {
 
 export interface RestoreResult {
   restored: boolean
+  requiresRelogin?: boolean
   manifest: Record<string, unknown>
 }
 
@@ -56,9 +57,7 @@ export async function deleteBackup(id: string): Promise<void> {
 }
 
 export async function restoreBackupFromServer(id: string, confirm: string): Promise<RestoreResult> {
-  const form = new FormData()
-  form.append('confirm', confirm)
-  const res = await api.post<RestoreResult>(`/system/backups/${encodeURIComponent(id)}/restore`, form)
+  const res = await api.post<RestoreResult>(`/system/backups/${encodeURIComponent(id)}/restore`, { confirm })
   return res.data
 }
 

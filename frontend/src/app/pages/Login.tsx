@@ -16,7 +16,16 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [infoMessage, setInfoMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('restored') === '1') {
+      setInfoMessage('Baza została przywrócona. Zaloguj się ponownie, aby zobaczyć dane z kopii.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   useEffect(() => {
     fetchLoginOptions()
@@ -158,6 +167,9 @@ export default function Login() {
             </div>
 
             {/* Error */}
+            {infoMessage && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">{infoMessage}</p>
+            )}
             {error && (
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             )}
