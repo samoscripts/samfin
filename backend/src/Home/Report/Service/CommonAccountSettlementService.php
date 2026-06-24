@@ -87,10 +87,6 @@ class CommonAccountSettlementService
             'basia'  => $this->finalizeBucket($standardDepositsMinor['basia']),
         ];
 
-        if ($walletGroups['other']['expenses']['total'] > 0 || $walletGroups['other']['incomes']['total'] > 0) {
-            $warnings[] = 'Część pozycji jest w grupie Inne i nie wpływa na wyliczenie wpłaty. Przypisz portfele w konfiguracji.';
-        }
-
         $nextDepositor = $query->nextDepositor ?? $this->resolveNextDepositor(
             $query->dateTo,
             $commonPartyId,
