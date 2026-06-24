@@ -48,10 +48,11 @@ App\System\               — health
 ### Dodawanie nowego endpointu
 
 1. Kontroler w odpowiednim `Controller/` z atrybutem `#[Route('/api/...')]`.
-2. Logika biznesowa w `Service/` (nie w kontrolerze przy złożonych regułach).
-3. Zapytania DB w `Repository/` tylko gdy przekraczają proste `findBy`.
-4. Aktualizacja `security.yaml` jeśli wymaga innej roli niż `IS_AUTHENTICATED_FULLY`.
-5. Odpowiedź JSON przez `$this->json()` lub `$entity->toApiArray()`.
+2. **Download plików:** `StreamedResponse` + jawny `Content-Type` (patrz `SystemController`, `DatabaseBackupController`) — nie `BinaryFileResponse` bez `symfony/mime` w `require`. Zasada prod: `.cursor/rules/backend-composer-prod.mdc`.
+3. Logika biznesowa w `Service/` (nie w kontrolerze przy złożonych regułach).
+4. Zapytania DB w `Repository/` tylko gdy przekraczają proste `findBy`.
+5. Aktualizacja `security.yaml` jeśli wymaga innej roli niż `IS_AUTHENTICATED_FULLY`.
+6. Odpowiedź JSON przez `$this->json()` lub `$entity->toApiArray()`.
 
 ### Dodawanie encji
 

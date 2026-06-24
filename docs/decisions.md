@@ -418,6 +418,7 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 - Przed restore: automatyczny pre-backup w `var/backups/pre-restore/` (max 3).
 - Kompatybilność: dev MariaDB 11, prod MySQL; `mysqldump`/`mysql`; hasło DB przez `--defaults-extra-file`, nie argv.
 - `symfony/process` w `require` (prod `--no-dev`).
+- `symfony/mime` w `require` lub download przez `StreamedResponse` (nie `BinaryFileResponse` bez mime).
 
 **Pliki:** `DatabaseBackupService.php`, `DatabaseBackupController.php`, `DatabaseBackupCommand.php`, `DatabaseRestoreCommand.php`, `frontend/.../backups/`.
 

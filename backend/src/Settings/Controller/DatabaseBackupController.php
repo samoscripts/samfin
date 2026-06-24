@@ -5,11 +5,10 @@ namespace App\Settings\Controller;
 use App\Settings\Exception\DatabaseBackupException;
 use App\Settings\Service\DatabaseBackupService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -97,7 +96,7 @@ class DatabaseBackupController extends AbstractController
     }
 
     #[Route('/{id}/download', name: 'api_system_backups_download', methods: ['GET'])]
-    public function download(string $id): BinaryFileResponse|JsonResponse
+    public function download(string $id): StreamedResponse|JsonResponse
     {
         try {
             $path = $this->backupService->getDownloadPath($id);
@@ -105,8 +104,29 @@ class DatabaseBackupController extends AbstractController
             return $this->backupError($e);
         }
 
-        $response = new BinaryFileResponse($path);
-        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, basename($path));
+        $filename = basename($path);
+        $size = filesize($path);
+
+        $response = new StreamedResponse(function () use ($path) {
+            $handle = fopen($path, 'rb');
+            if ($handle === false) {
+                return;
+            }
+            while (!feof($handle)) {
+                $chunk = fread($handle, 8192);
+                if ($chunk === false) {
+                    break;
+                }
+                echo $chunk;
+            }
+            fclose($handle);
+        });
+
+        $response->headers->set('Content-Type', 'application/zip');
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        if ($size !== false) {
+            $response->headers->set('Content-Length', (string) $size);
+        }
 
         return $response;
     }

@@ -1,0 +1,30 @@
+# Zależności Composer (prod)
+
+Deploy produkcyjny: `composer install --no-dev` — pakiety tylko w `require-dev` **nie są** na serwerze.
+
+## Zasada
+
+Gdy kod używa klasy z pakietu Symfony, dodaj ją do **`require`** w `backend/composer.json`, nie polegaj na przypadkowym wciągnięciu przez `require-dev` (maker-bundle, web-profiler).
+
+## Typowe pułapki
+
+| Użycie w kodzie | Pakiet w `require` |
+|-----------------|-------------------|
+| `Symfony\Component\Process\Process` | `symfony/process` |
+| `BinaryFileResponse`, `UploadedFile::getMimeType()` | `symfony/mime` |
+| Pobieranie pliku z dysku (download) | Preferuj `StreamedResponse` + jawny `Content-Type` (wzorzec: `SystemController::exportTransactions`, `DatabaseBackupController::download`) — działa bez zgadywania MIME |
+
+## Checklist przed merge (download / upload / CLI)
+
+1. Czy nowa klasa Symfony jest w `composer.json` → `require`?
+2. Czy endpoint download używa `StreamedResponse` z ustawionym `Content-Type`, albo masz `symfony/mime` w `require`?
+3. Po dodaniu zależności: `composer update <pakiet>` w kontenerze `app` i commit `composer.lock`.
+
+## Weryfikacja lokalna
+
+```bash
+docker compose exec -T app composer install --no-dev --no-interaction
+docker compose exec -T app php bin/console about
+```
+
+Jeśli brakuje pakietu, Symfony rzuci błąd przy pierwszym użyciu funkcji (często dopiero na prod).
