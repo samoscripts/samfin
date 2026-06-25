@@ -110,7 +110,6 @@ class SettlementService
             $nextDeposit = $this->buildNextDepositFromLedger(
                 $config,
                 $query,
-                $walletGroups,
                 $standardDepositsMinor,
                 $baseMinor,
             );
@@ -138,7 +137,8 @@ class SettlementService
         }
 
         if ($useLedger && $user !== null) {
-            $ledgerEntry = $this->ledgerRepository->findLastAtOrBefore($user, $query->dateTo);
+            $reindexFrom = $config->getReindexFromDate()?->format('Y-m-d');
+            $ledgerEntry = $this->ledgerRepository->findLatestEntry($user, $reindexFrom);
             if ($ledgerEntry !== null) {
                 $balances['maciek']['walletNetLedger'] = $this->walletNetFromLedger($ledgerEntry, 'maciek', $walletOwners);
                 $balances['basia']['walletNetLedger']  = $this->walletNetFromLedger($ledgerEntry, 'basia', $walletOwners);
@@ -165,7 +165,6 @@ class SettlementService
     }
 
     /**
-     * @param array<string, array{expenses: array{total: float, items: list}, incomes: array{total: float, items: list}, net: float}> $walletGroups
      * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $standardDepositsMinor
      *
      * @return array<string, mixed>
@@ -173,12 +172,12 @@ class SettlementService
     private function buildNextDepositFromLedger(
         SettlementConfig $config,
         SettlementQuery $query,
-        array $walletGroups,
         array $standardDepositsMinor,
         int $baseMinor,
     ): array {
         $user = $config->getUser();
-        $entry = $this->ledgerRepository->findLastAtOrBefore($user, $query->dateTo);
+        $reindexFrom = $config->getReindexFromDate()?->format('Y-m-d');
+        $entry = $this->ledgerRepository->findLatestEntry($user, $reindexFrom);
 
         if ($entry === null) {
             return $this->buildNextDepositFromOpening($config, $query, $standardDepositsMinor, $baseMinor);
@@ -205,7 +204,7 @@ class SettlementService
         $suggestedMinor = max(0, $suggestedRaw);
         $paidMinor      = $standardDepositsMinor[$person]['total'];
 
-        return $this->formatNextDeposit(
+        $result = $this->formatNextDeposit(
             $person,
             $baseMinor,
             $walletNetMinor,
@@ -217,6 +216,9 @@ class SettlementService
             $engine->getWalletBalancesMinor(),
             $config->getWalletSettlementOwner(),
         );
+        $result['asOfDate'] = $entry->getOperationDate()->format('Y-m-d');
+
+        return $result;
     }
 
     /**
@@ -234,7 +236,7 @@ class SettlementService
             $baseMinor,
             $config->getWalletSettlementOwner(),
             $config->getOpeningNextDepositor(),
-            $config->getOpeningRotationCarryMinor(),
+            0,
             $config->getOpeningRotationPrepaidMaciekMinor(),
             $config->getOpeningRotationPrepaidBasiaMinor(),
             $config->getOpeningWalletBalancesJson(),

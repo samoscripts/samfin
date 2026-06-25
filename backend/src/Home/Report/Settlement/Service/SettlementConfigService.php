@@ -93,7 +93,8 @@ class SettlementConfigService
         }
 
         if (array_key_exists('openingRotationCarry', $data)) {
-            $config->setOpeningRotationCarryMinor((int) round((float) $data['openingRotationCarry'] * 100));
+            // Deprecated — carry na start nie jest używany; reindeks startuje z carry=0.
+            $config->setOpeningRotationCarryMinor(0);
             $dirty = true;
         }
 
@@ -119,6 +120,8 @@ class SettlementConfigService
         if ($dirty) {
             $config->setNeedsRefresh(true);
         }
+
+        $config->setOpeningRotationCarryMinor(0);
 
         $this->em->flush();
 

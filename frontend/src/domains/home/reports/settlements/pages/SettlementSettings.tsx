@@ -250,7 +250,9 @@ export default function SettlementSettings() {
         </legend>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Po zmianie konfiguracji lub transakcji odśwież indeks w zakładce Raport.
-          Salda początkowe obowiązują od daty reindeksu.
+          Transakcje sprzed daty reindeksu nie wchodzą do indeksu. Na start liczą się
+          kolej rotacji, prepaid (ręcznie wpisany) i opcjonalnie salda portfeli.
+          Prepaid nie jest sumowany automatycznie z wpłat — tylko pola poniżej.
         </p>
         <label className="block text-sm text-gray-600 dark:text-gray-400">
           Data początkowa reindeksu
@@ -277,19 +279,6 @@ export default function SettlementSettings() {
             <option value="maciek">Maciek</option>
             <option value="basia">Basia</option>
           </select>
-        </label>
-        <label className="block text-sm text-gray-600 dark:text-gray-400">
-          Carry rotacji na start (PLN)
-          <input
-            type="number"
-            step={0.01}
-            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-            value={draft.openingRotationCarry}
-            onChange={(e) => setDraft((p) => ({
-              ...p,
-              openingRotationCarry: Number(e.target.value),
-            }))}
-          />
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm text-gray-600 dark:text-gray-400">

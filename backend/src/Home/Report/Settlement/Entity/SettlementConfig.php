@@ -126,7 +126,7 @@ class SettlementConfig
             'carryOverBasia'        => round($this->carryOverBasiaMinor / 100, 2),
             'reindexFromDate'       => $this->reindexFromDate?->format('Y-m-d'),
             'openingWalletBalances' => $this->openingWalletBalancesToApi(),
-            'openingRotationCarry'  => round($this->openingRotationCarryMinor / 100, 2),
+            'openingRotationCarry'  => 0,
             'openingRotationPrepaidMaciek' => round($this->openingRotationPrepaidMaciekMinor / 100, 2),
             'openingRotationPrepaidBasia'  => round($this->openingRotationPrepaidBasiaMinor / 100, 2),
             'openingNextDepositor'  => $this->openingNextDepositor,

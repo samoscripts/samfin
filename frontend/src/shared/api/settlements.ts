@@ -14,6 +14,7 @@ export interface SettlementConfig {
   carryOverBasia: number
   reindexFromDate: string | null
   openingWalletBalances: Record<string, number>
+  /** @deprecated zawsze 0 — nie używane przy reindeksie */
   openingRotationCarry: number
   openingRotationPrepaidMaciek: number
   openingRotationPrepaidBasia: number
@@ -68,6 +69,8 @@ export interface SettlementNextDeposit {
   overpayment: number
   carryForward: number
   walletBreakdown?: { walletId: number; balance: number }[]
+  /** Data ostatniego wpisu ledgera (niezależna od zakresu raportu). */
+  asOfDate?: string
 }
 
 export interface SettlementReportResponse {

@@ -96,7 +96,9 @@ Indeks rozliczeń (`settlement_ledger_entry`) jest budowany z pozycji 1:1; stan 
 suggested = baseDeposit − rotation_carry + wallet_balance[osoba] − rotation_prepaid[osoba]
 ```
 
-(w UI: `max(0, raw)`). Slot rotacji zamyka pierwsza wpłata `standard_deposit` osoby na kolejce; wpłata poza kolejką zwiększa `rotation_prepaid`.
+(w UI: `max(0, raw)`). Slot rotacji zamyka wpłata `standard_deposit` osoby na kolejce; wpłata poza kolejką **też zamyka bieżący slot** (bez naliczania prepaid w indeksie).
+
+`rotation_prepaid` w formule to wyłącznie **Prepaid Maciek/Basia na start** z konfiguracji (od `reindexFromDate`). Transakcje z indeksu **nie zwiększają** prepaid — tylko carry, kolej i salda portfeli.
 
 ### API: `GET /api/reports/settlements`
 
@@ -113,7 +115,7 @@ Odpowiedź (skrót):
 
 - `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net`
 - `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego
-- `nextDeposit` — m.in. `suggestedAmount`, `rotationCarry`, `rotationPrepaid`, `walletBreakdown`, oraz legacy: `dueAmount`, `carryOver`, `paidInPeriod`, `carryForward`
+- `nextDeposit` — m.in. `suggestedAmount`, `rotationCarry`, `rotationPrepaid`, `walletBreakdown`, `asOfDate` (ostatni wpis ledgera — **niezależny od zakresu raportu**); `paidInPeriod` dotyczy wybranego okresu
 - `indexState` — `needsRefresh`, `refreshInProgress`, `lastRefreshedAt`, `lastRefreshStats`
 - `warnings`, `excludedItemsCount`
 
@@ -123,7 +125,9 @@ Gdy `needsRefresh=true`, szczegóły okresu liczone są na żywo; `nextDeposit` 
 
 ### API: `POST /api/reports/settlements/refresh`
 
-Atomowy rebuild indeksu od `reindexFromDate` (domyślnie `2000-01-01` przy pierwszym odświeżeniu). Odpowiedź: `{ ok, config, factsIndexed, skippedCount, refreshedAt }`. `409` gdy `refresh_in_progress`.
+Atomowy rebuild indeksu: **czyści cały ledger użytkownika**, potem indeksuje wyłącznie transakcje z `operation_date >= reindexFromDate`. Stan początkowy silnika: `openingNextDepositor`, prepaid Maciek/Basia, opcjonalnie `openingWalletBalances`; **carry rotacji na start = 0** (pole `openingRotationCarry` w API zawsze 0, deprecated).
+
+Raport z ledgera ignoruje wiersze sprzed `reindexFromDate`; dla okresów przed pierwszą pozycją indeksu używa sald początkowych (prepaid + kolej).
 
 ### API: konfiguracja
 
@@ -137,7 +141,8 @@ Pola konfiguracji (per użytkownik, tabela `settlement_config`):
 - `settlementPartyId`, `homeBudgetWalletId`, `baseDepositAmount`
 - `maciekSourcePartyIds`, `basiaSourcePartyIds`, `walletSettlementOwner`
 - `defaultNextDepositor`
-- **Indeks:** `reindexFromDate`, `openingWalletBalances`, `openingRotationCarry`, `openingRotationPrepaidMaciek`, `openingRotationPrepaidBasia`, `openingNextDepositor`
+- **Indeks:** `reindexFromDate`, `openingWalletBalances` (opcjonalnie), `openingRotationPrepaidMaciek`, `openingRotationPrepaidBasia`, `openingNextDepositor`
+- **Deprecated (ignorowane):** `openingRotationCarry` — zawsze 0
 - **Stan indeksu (read-only z API):** `needsRefresh`, `refreshInProgress`, `lastRefreshedAt`, `lastRefreshStats`, `configVersion`
 - **Legacy:** `carryOverMaciek`, `carryOverBasia` — fallback gdy indeks nieaktualny
 

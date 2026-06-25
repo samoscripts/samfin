@@ -36,7 +36,6 @@ class SettlementIndexStateService
             'walletSettlementOwner' => $config->getWalletSettlementOwner(),
             'defaultNextDepositor'  => $config->getDefaultNextDepositor(),
             'openingWalletBalances' => $config->getOpeningWalletBalancesJson(),
-            'openingRotationCarry'  => $config->getOpeningRotationCarryMinor(),
             'openingPrepaidMaciek'  => $config->getOpeningRotationPrepaidMaciekMinor(),
             'openingPrepaidBasia'   => $config->getOpeningRotationPrepaidBasiaMinor(),
             'openingNextDepositor'  => $config->getOpeningNextDepositor(),

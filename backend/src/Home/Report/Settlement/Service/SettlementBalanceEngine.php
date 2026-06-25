@@ -5,7 +5,8 @@ namespace App\Home\Report\Settlement\Service;
 use App\Home\Report\Settlement\Entity\SettlementConfig;
 
 /**
- * Model A („dopasuj”): suggested[next] ≈ wpłata poprzedniego rotatora + saldo portfeli.
+ * Model A („dopasuj”): suggested[next] ≈ base − carry + saldo portfeli − prepaid_na_start.
+ * Prepaid na start z configu; wpłaty w indeksie nie zwiększają prepaid.
  */
 class SettlementBalanceEngine
 {
@@ -58,11 +59,14 @@ class SettlementBalanceEngine
         if ($person === $this->nextDepositor) {
             $this->rotationCarryMinor = $this->baseDepositMinor - $amountMinor;
             $this->nextDepositor = self::otherPerson($person);
-        } elseif ($person === SettlementConfig::DEPOSITOR_MACIEK) {
-            $this->rotationPrepaidMaciekMinor += $amountMinor;
-        } else {
-            $this->rotationPrepaidBasiaMinor += $amountMinor;
+
+            return;
         }
+
+        // Wpłata poza kolejką zamyka bieżący slot rotacji (jak wpłata za rotatora).
+        // Prepaid nie rośnie w trakcie indeksu — tylko wartości z configu na start reindeksu.
+        $this->rotationCarryMinor = $this->baseDepositMinor - $amountMinor;
+        $this->nextDepositor = self::otherPerson($this->nextDepositor);
     }
 
     public function applyFact(array $fact): void

@@ -48,6 +48,18 @@ class SettlementBalanceEngineTest extends TestCase
         self::assertSame(300_000, $engine->computeSuggested());
     }
 
+    public function testOffQueueDepositClosesSlotWithoutPrepaid(): void
+    {
+        $engine = new SettlementBalanceEngine(self::BASE, [], SettlementConfig::DEPOSITOR_MACIEK);
+
+        $engine->applyStandardDeposit('basia', 500_000);
+
+        self::assertSame(0, $engine->getRotationPrepaidBasiaMinor());
+        self::assertSame(0, $engine->getRotationCarryMinor());
+        self::assertSame(SettlementConfig::DEPOSITOR_BASIA, $engine->getNextDepositor());
+        self::assertSame(500_000, $engine->computeSuggested());
+    }
+
     public function testOverpaymentSequenceModelA(): void
     {
         $engine = new SettlementBalanceEngine(self::BASE, [], SettlementConfig::DEPOSITOR_BASIA);

@@ -49,9 +49,9 @@ class SettlementIndexerService
         $connection->beginTransaction();
 
         try {
-            $this->ledgerRepository->deleteFromDate($user, $reindexFrom->format('Y-m-d'));
+            $this->ledgerRepository->deleteAllForUser($user);
 
-            $engine = $this->buildInitialEngine($config, $user, $reindexFrom);
+            $engine = $this->buildInitialEngine($config);
 
             $settlementPartyId = $config->getSettlementParty()->getId();
             $homeBudgetId      = $config->getHomeBudgetWallet()->getId();
@@ -66,7 +66,7 @@ class SettlementIndexerService
                 false,
             );
 
-            $sequence  = $this->nextSequenceStart($user, $reindexFrom);
+            $sequence  = 1;
             $indexed   = 0;
             $skipped   = 0;
             $now       = new \DateTimeImmutable();
@@ -145,53 +145,18 @@ class SettlementIndexerService
         }
     }
 
-    private function buildInitialEngine(
-        SettlementConfig $config,
-        User $user,
-        \DateTimeImmutable $reindexFrom,
-    ): SettlementBalanceEngine {
-        $before = $this->ledgerRepository->findLastBeforeDate(
-            $user,
-            $reindexFrom->format('Y-m-d'),
-        );
-
-        if ($before !== null) {
-            return SettlementBalanceEngine::fromLedgerRow(
-                [
-                    'wallet_balances_json'           => $before->getWalletBalancesJson(),
-                    'rotation_carry_minor'           => $before->getRotationCarryMinor(),
-                    'rotation_prepaid_maciek_minor'  => $before->getRotationPrepaidMaciekMinor(),
-                    'rotation_prepaid_basia_minor'   => $before->getRotationPrepaidBasiaMinor(),
-                    'next_depositor'                 => $before->getNextDepositor(),
-                ],
-                $config->getBaseDepositAmountMinor(),
-                $config->getWalletSettlementOwner(),
-            );
-        }
-
+    private function buildInitialEngine(SettlementConfig $config): SettlementBalanceEngine
+    {
         $openingBalances = $config->getOpeningWalletBalancesJson();
-        if ($openingBalances === []) {
-            $openingBalances = [];
-        }
 
         return new SettlementBalanceEngine(
             $config->getBaseDepositAmountMinor(),
             $config->getWalletSettlementOwner(),
             $config->getOpeningNextDepositor(),
-            $config->getOpeningRotationCarryMinor(),
+            0,
             $config->getOpeningRotationPrepaidMaciekMinor(),
             $config->getOpeningRotationPrepaidBasiaMinor(),
             $openingBalances,
         );
-    }
-
-    private function nextSequenceStart(User $user, \DateTimeImmutable $reindexFrom): int
-    {
-        $before = $this->ledgerRepository->findLastBeforeDate(
-            $user,
-            $reindexFrom->format('Y-m-d'),
-        );
-
-        return $before !== null ? $before->getLedgerSequence() + 1 : 1;
     }
 }

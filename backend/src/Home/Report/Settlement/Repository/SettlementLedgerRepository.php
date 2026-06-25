@@ -26,14 +26,47 @@ class SettlementLedgerRepository extends ServiceEntityRepository
             ->execute();
     }
 
-    public function findLastAtOrBefore(User $user, string $dateTo): ?SettlementLedgerEntry
+    public function deleteAllForUser(User $user): int
     {
         return $this->createQueryBuilder('e')
+            ->delete()
+            ->where('e.user = :user')
+            ->setParameter('user', $user)
+            ->getQuery()
+            ->execute();
+    }
+
+    public function findLastAtOrBefore(User $user, string $dateTo, ?string $reindexFromDate = null): ?SettlementLedgerEntry
+    {
+        $qb = $this->createQueryBuilder('e')
             ->where('e.user = :user')
             ->andWhere('e.operationDate <= :dateTo')
             ->setParameter('user', $user)
-            ->setParameter('dateTo', $dateTo)
-            ->orderBy('e.ledgerSequence', 'DESC')
+            ->setParameter('dateTo', $dateTo);
+
+        if ($reindexFromDate !== null) {
+            $qb->andWhere('e.operationDate >= :reindexFrom')
+                ->setParameter('reindexFrom', $reindexFromDate);
+        }
+
+        return $qb->orderBy('e.ledgerSequence', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findLatestEntry(User $user, ?string $reindexFromDate = null): ?SettlementLedgerEntry
+    {
+        $qb = $this->createQueryBuilder('e')
+            ->where('e.user = :user')
+            ->setParameter('user', $user);
+
+        if ($reindexFromDate !== null) {
+            $qb->andWhere('e.operationDate >= :reindexFrom')
+                ->setParameter('reindexFrom', $reindexFromDate);
+        }
+
+        return $qb->orderBy('e.ledgerSequence', 'DESC')
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -54,18 +87,5 @@ class SettlementLedgerRepository extends ServiceEntityRepository
             ->orderBy('e.ledgerSequence', 'ASC')
             ->getQuery()
             ->getResult();
-    }
-
-    public function findLastBeforeDate(User $user, string $date): ?SettlementLedgerEntry
-    {
-        return $this->createQueryBuilder('e')
-            ->where('e.user = :user')
-            ->andWhere('e.operationDate < :date')
-            ->setParameter('user', $user)
-            ->setParameter('date', $date)
-            ->orderBy('e.ledgerSequence', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
     }
 }

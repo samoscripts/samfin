@@ -57,12 +57,13 @@ export default function SettlementReport() {
 
   const dateFromParam = searchParams.get('dateFrom')
   const dateToParam = searchParams.get('dateTo')
+  const isCustomRange = Boolean(dateFromParam && dateToParam)
   const period = useMemo(() => {
-    if (dateFromParam && dateToParam) {
-      return { dateFrom: dateFromParam, dateTo: dateToParam }
+    if (isCustomRange) {
+      return { dateFrom: dateFromParam!, dateTo: dateToParam! }
     }
     return monthRange(year, month)
-  }, [dateFromParam, dateToParam, year, month])
+  }, [isCustomRange, dateFromParam, dateToParam, year, month])
 
   const [data, setData] = useState<SettlementReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -97,13 +98,31 @@ export default function SettlementReport() {
     (patch: { dateFrom?: string; dateTo?: string }) => {
       const nextFrom = patch.dateFrom ?? period.dateFrom
       const nextTo = patch.dateTo ?? period.dateTo
-      setSearchParams(buildSearchParams({
+      if (nextFrom > nextTo) {
+        return
+      }
+      const params = buildSearchParams({
         dateFrom: nextFrom,
         dateTo: nextTo,
-      }), { replace: true })
+      })
+      setSearchParams(params, { replace: true })
     },
     [period.dateFrom, period.dateTo, setSearchParams],
   )
+
+  const resetToMonthRange = useCallback(() => {
+    setSearchParams(buildSearchParams({
+      year: year !== defaults.year ? year : undefined,
+      month: month !== defaults.month ? month : undefined,
+    }), { replace: true })
+  }, [year, month, defaults.year, defaults.month, setSearchParams])
+
+  const applyFullIndexRange = useCallback((reindexFrom: string | null) => {
+    const today = new Date()
+    const dateTo = today.toISOString().slice(0, 10)
+    const dateFrom = reindexFrom ?? dateTo
+    setSearchParams(buildSearchParams({ dateFrom, dateTo }), { replace: true })
+  }, [setSearchParams])
 
   useEffect(() => {
     let cancelled = false
@@ -171,8 +190,10 @@ export default function SettlementReport() {
         <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
           Rok
           <select
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm disabled:opacity-50"
             value={year}
+            disabled={isCustomRange}
+            title={isCustomRange ? 'Wyłącz zakres niestandardowy, aby wybrać miesiąc' : undefined}
             onChange={(e) => updateMonthParams({ year: Number(e.target.value) })}
           >
             {years.map((y) => (
@@ -183,8 +204,10 @@ export default function SettlementReport() {
         <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
           Miesiąc
           <select
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm disabled:opacity-50"
             value={month}
+            disabled={isCustomRange}
+            title={isCustomRange ? 'Wyłącz zakres niestandardowy, aby wybrać miesiąc' : undefined}
             onChange={(e) => updateMonthParams({ month: Number(e.target.value) })}
           >
             {MONTH_NAMES.map((name, idx) => (
@@ -210,6 +233,24 @@ export default function SettlementReport() {
             onChange={(e) => updateDateRange({ dateTo: e.target.value })}
           />
         </label>
+        {isCustomRange && (
+          <button
+            type="button"
+            onClick={resetToMonthRange}
+            className="text-sm text-gray-600 dark:text-gray-400 underline-offset-2 hover:underline"
+          >
+            Miesiąc zamiast zakresu
+          </button>
+        )}
+        {data?.config.reindexFromDate && (
+          <button
+            type="button"
+            onClick={() => applyFullIndexRange(data.config.reindexFromDate)}
+            className="text-sm text-[#c9a96e] underline-offset-2 hover:underline"
+          >
+            Cały indeks
+          </button>
+        )}
         <button
           type="button"
           onClick={handleRefresh}
@@ -236,12 +277,11 @@ export default function SettlementReport() {
 
 function SettlementContent({ data }: { data: SettlementReportResponse }) {
   const nd = data.nextDeposit
-  const personNet = data.walletGroups[nd.person].net
 
   return (
     <>
       <p className="text-sm text-gray-500 dark:text-gray-400">
-        Okres: {data.dateFrom} — {data.dateTo}
+        Okres raportu: {data.dateFrom} — {data.dateTo}
       </p>
 
       {data.indexState?.needsRefresh && (
@@ -268,20 +308,23 @@ function SettlementContent({ data }: { data: SettlementReportResponse }) {
         <StatCard
           label={`Następna wpłata: ${PERSON_LABELS[nd.person]}`}
           value={formatAmount(nd.suggestedAmount ?? nd.dueAmount)}
-          sub={`${formatAmount(nd.baseAmount)} − carry ${formatAmount(nd.rotationCarry ?? nd.carryOver)} + portfele ${formatAmount(nd.walletNet)}${(nd.rotationPrepaid ?? 0) > 0 ? ` − prepaid ${formatAmount(nd.rotationPrepaid)}` : ''}`}
+          sub={[
+            nd.asOfDate ? `Stan indeksu na ${nd.asOfDate}.` : null,
+            `${formatAmount(nd.baseAmount)} − carry ${formatAmount(nd.rotationCarry ?? nd.carryOver)} + portfele ${formatAmount(nd.walletNet)}${(nd.rotationPrepaid ?? 0) > 0 ? ` − prepaid ${formatAmount(nd.rotationPrepaid)}` : ''}`,
+          ].filter(Boolean).join(' ')}
           icon={<Wallet size={18} className="text-[#c9a96e]" />}
           highlight
         />
         <StatCard
           label="Wpłacono w okresie"
           value={formatAmount(nd.paidInPeriod)}
-          sub={nd.underpayment > 0 ? `Niedopłata: ${formatAmount(nd.underpayment)}` : nd.overpayment > 0 ? `Nadpłata: ${formatAmount(nd.overpayment)}` : 'Rozliczone'}
+          sub={nd.underpayment > 0 ? `Niedopłata: ${formatAmount(nd.underpayment)}` : nd.overpayment > 0 ? `Nadpłata: ${formatAmount(nd.overpayment)}` : 'Rozliczone w wybranym okresie'}
           icon={<ArrowDownLeft size={18} className="text-emerald-600" />}
         />
         <StatCard
           label={`Saldo portfeli (${PERSON_LABELS[nd.person]})`}
-          value={formatAmount(personNet)}
-          sub={personNet !== 0 ? `Wpływ na wpłatę: ${formatAmount(nd.walletNet)}` : 'Bez wpływu na wpłatę'}
+          value={formatAmount(nd.walletNet)}
+          sub="Skumulowane w indeksie (nie tylko w okresie)"
           icon={<ArrowUpRight size={18} className="text-orange-600" />}
         />
         <StatCard
