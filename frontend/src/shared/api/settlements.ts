@@ -8,8 +8,21 @@ export interface SettlementConfig {
   basiaSourcePartyIds: number[]
   walletSettlementOwner: Record<string, 'maciek' | 'basia'>
   defaultNextDepositor: 'maciek' | 'basia'
+  /** @deprecated legacy — użyj openingRotationCarry */
   carryOverMaciek: number
+  /** @deprecated legacy — użyj openingRotationCarry */
   carryOverBasia: number
+  reindexFromDate: string | null
+  openingWalletBalances: Record<string, number>
+  openingRotationCarry: number
+  openingRotationPrepaidMaciek: number
+  openingRotationPrepaidBasia: number
+  openingNextDepositor: 'maciek' | 'basia'
+  needsRefresh: boolean
+  refreshInProgress: boolean
+  lastRefreshedAt: string | null
+  lastRefreshStats: { factsIndexed?: number; skippedCount?: number; refreshedAt?: string } | null
+  configVersion: string | null
 }
 
 export interface SettlementItemRef {
@@ -37,6 +50,26 @@ export interface WalletSettlementGroup {
 
 export type WalletGroupKey = 'maciek' | 'basia' | 'other'
 
+export interface SettlementNextDeposit {
+  person: 'maciek' | 'basia'
+  baseAmount: number
+  walletNet: number
+  rotationCarry: number
+  rotationPrepaid: number
+  suggestedAmount: number
+  suggestedAmountRaw?: number
+  overpaymentCredit?: number
+  corrections: number
+  carryOver: number
+  dueAmount: number
+  paidInPeriod: number
+  balance: number
+  underpayment: number
+  overpayment: number
+  carryForward: number
+  walletBreakdown?: { walletId: number; balance: number }[]
+}
+
 export interface SettlementReportResponse {
   dateFrom: string
   dateTo: string
@@ -46,26 +79,21 @@ export interface SettlementReportResponse {
     maciek: WalletGroupBucket
     basia: WalletGroupBucket
   }
-  nextDeposit: {
-    person: 'maciek' | 'basia'
-    baseAmount: number
-    walletNet: number
-    corrections: number
-    carryOver: number
-    dueAmount: number
-    paidInPeriod: number
-    balance: number
-    underpayment: number
-    overpayment: number
-    carryForward: number
-  }
+  nextDeposit: SettlementNextDeposit
   balances: Record<string, {
     walletNet: number
     carryOver: number
     paidInPeriod: number
+    walletNetLedger?: number
   }>
   warnings: string[]
   excludedItemsCount: number
+  indexState?: {
+    needsRefresh: boolean
+    refreshInProgress: boolean
+    lastRefreshedAt: string | null
+    lastRefreshStats: SettlementConfig['lastRefreshStats']
+  }
 }
 
 export interface SettlementReportParams {
@@ -75,6 +103,14 @@ export interface SettlementReportParams {
   dateTo?: string
   nextDepositor?: 'maciek' | 'basia'
   includePartial?: boolean
+}
+
+export interface SettlementRefreshResponse {
+  ok: boolean
+  config: SettlementConfig
+  factsIndexed: number
+  skippedCount: number
+  refreshedAt: string
 }
 
 export const fetchSettlementConfig = async (): Promise<SettlementConfig> =>
@@ -87,3 +123,6 @@ export const fetchSettlementReport = async (
   params: SettlementReportParams,
 ): Promise<SettlementReportResponse> =>
   (await api.get<SettlementReportResponse>('/reports/settlements', { params })).data
+
+export const refreshSettlementIndex = async (): Promise<SettlementRefreshResponse> =>
+  (await api.post<SettlementRefreshResponse>('/reports/settlements/refresh')).data

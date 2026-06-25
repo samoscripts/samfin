@@ -27,13 +27,16 @@ class SettlementConfigService
     public function update(User $user, array $data): SettlementConfig
     {
         $config = $this->repository->findOrCreateForUser($user);
+        $dirty  = false;
 
         if (array_key_exists('settlementPartyId', $data)) {
             $config->setSettlementParty($this->resolveParty($data['settlementPartyId']));
+            $dirty = true;
         }
 
         if (array_key_exists('homeBudgetWalletId', $data)) {
             $config->setHomeBudgetWallet($this->resolveWallet($data['homeBudgetWalletId']));
+            $dirty = true;
         }
 
         if (array_key_exists('baseDepositAmount', $data)) {
@@ -42,18 +45,22 @@ class SettlementConfigService
                 throw new \InvalidArgumentException('Kwota bazowa musi być większa od zera.');
             }
             $config->setBaseDepositAmountMinor((int) round($amount * 100));
+            $dirty = true;
         }
 
         if (array_key_exists('maciekSourcePartyIds', $data)) {
             $config->setMaciekSourcePartyIds($this->normalizeIdList($data['maciekSourcePartyIds']));
+            $dirty = true;
         }
 
         if (array_key_exists('basiaSourcePartyIds', $data)) {
             $config->setBasiaSourcePartyIds($this->normalizeIdList($data['basiaSourcePartyIds']));
+            $dirty = true;
         }
 
         if (array_key_exists('walletSettlementOwner', $data)) {
             $config->setWalletSettlementOwner($this->normalizeWalletOwner($data['walletSettlementOwner']));
+            $dirty = true;
         }
 
         if (array_key_exists('defaultNextDepositor', $data)) {
@@ -62,14 +69,55 @@ class SettlementConfigService
                 throw new \InvalidArgumentException('defaultNextDepositor: dozwolone maciek lub basia.');
             }
             $config->setDefaultNextDepositor($v);
+            $dirty = true;
         }
 
         if (array_key_exists('carryOverMaciek', $data)) {
             $config->setCarryOverMaciekMinor((int) round((float) $data['carryOverMaciek'] * 100));
+            $dirty = true;
         }
 
         if (array_key_exists('carryOverBasia', $data)) {
             $config->setCarryOverBasiaMinor((int) round((float) $data['carryOverBasia'] * 100));
+            $dirty = true;
+        }
+
+        if (array_key_exists('reindexFromDate', $data)) {
+            $config->setReindexFromDate($this->parseDate($data['reindexFromDate']));
+            $dirty = true;
+        }
+
+        if (array_key_exists('openingWalletBalances', $data)) {
+            $config->setOpeningWalletBalancesJson($this->normalizeOpeningWalletBalances($data['openingWalletBalances']));
+            $dirty = true;
+        }
+
+        if (array_key_exists('openingRotationCarry', $data)) {
+            $config->setOpeningRotationCarryMinor((int) round((float) $data['openingRotationCarry'] * 100));
+            $dirty = true;
+        }
+
+        if (array_key_exists('openingRotationPrepaidMaciek', $data)) {
+            $config->setOpeningRotationPrepaidMaciekMinor((int) round((float) $data['openingRotationPrepaidMaciek'] * 100));
+            $dirty = true;
+        }
+
+        if (array_key_exists('openingRotationPrepaidBasia', $data)) {
+            $config->setOpeningRotationPrepaidBasiaMinor((int) round((float) $data['openingRotationPrepaidBasia'] * 100));
+            $dirty = true;
+        }
+
+        if (array_key_exists('openingNextDepositor', $data)) {
+            $v = strtolower((string) $data['openingNextDepositor']);
+            if (!in_array($v, [SettlementConfig::DEPOSITOR_MACIEK, SettlementConfig::DEPOSITOR_BASIA], true)) {
+                throw new \InvalidArgumentException('openingNextDepositor: dozwolone maciek lub basia.');
+            }
+            $config->setOpeningNextDepositor($v);
+            $dirty = true;
+        }
+
+        if ($dirty) {
+            $config->setNeedsRefresh(true);
         }
 
         $this->em->flush();
@@ -125,5 +173,28 @@ class SettlementConfigService
             $result[(string) $walletId] = $ownerStr;
         }
         return $result;
+    }
+
+    /** @return array<string, int> */
+    private function normalizeOpeningWalletBalances(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+        $result = [];
+        foreach ($value as $walletId => $amount) {
+            $result[(string) $walletId] = (int) round((float) $amount * 100);
+        }
+
+        return $result;
+    }
+
+    private function parseDate(mixed $value): ?\DateTimeImmutable
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return new \DateTimeImmutable((string) $value);
     }
 }

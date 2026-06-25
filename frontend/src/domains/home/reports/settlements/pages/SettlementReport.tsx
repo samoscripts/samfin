@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, Loader2, Wallet, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { AlertTriangle, Loader2, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw } from 'lucide-react'
 import {
   fetchSettlementReport,
+  refreshSettlementIndex,
   type SettlementReportResponse,
   type SettlementItemRef,
   type WalletGroupKey,
@@ -32,6 +33,15 @@ function currentYearMonth() {
   return { year: now.getFullYear(), month: now.getMonth() + 1 }
 }
 
+function monthRange(year: number, month: number) {
+  const mm = String(month).padStart(2, '0')
+  const lastDay = new Date(year, month, 0).getDate()
+  return {
+    dateFrom: `${year}-${mm}-01`,
+    dateTo: `${year}-${mm}-${String(lastDay).padStart(2, '0')}`,
+  }
+}
+
 export default function SettlementReport() {
   const [searchParams, setSearchParams] = useSearchParams()
   const defaults = currentYearMonth()
@@ -45,12 +55,29 @@ export default function SettlementReport() {
     return m >= 1 && m <= 12 ? m : defaults.month
   }, [searchParams, defaults.month])
 
+  const dateFromParam = searchParams.get('dateFrom')
+  const dateToParam = searchParams.get('dateTo')
+  const period = useMemo(() => {
+    if (dateFromParam && dateToParam) {
+      return { dateFrom: dateFromParam, dateTo: dateToParam }
+    }
+    return monthRange(year, month)
+  }, [dateFromParam, dateToParam, year, month])
+
   const [data, setData] = useState<SettlementReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [configMissing, setConfigMissing] = useState(false)
 
-  const updateParams = useCallback(
+  const loadReport = useCallback(() => {
+    return fetchSettlementReport({
+      dateFrom: period.dateFrom,
+      dateTo: period.dateTo,
+    })
+  }, [period.dateFrom, period.dateTo])
+
+  const updateMonthParams = useCallback(
     (patch: { year?: number; month?: number }) => {
       const nextYear = patch.year ?? year
       const nextMonth = patch.month ?? month
@@ -58,9 +85,24 @@ export default function SettlementReport() {
         year: nextYear !== defaults.year ? nextYear : undefined,
         month: nextMonth !== defaults.month ? nextMonth : undefined,
       })
+      // Miesiąc/rok nadpisują jawny zakres dat w URL.
+      params.delete('dateFrom')
+      params.delete('dateTo')
       setSearchParams(params, { replace: true })
     },
     [year, month, defaults.year, defaults.month, setSearchParams],
+  )
+
+  const updateDateRange = useCallback(
+    (patch: { dateFrom?: string; dateTo?: string }) => {
+      const nextFrom = patch.dateFrom ?? period.dateFrom
+      const nextTo = patch.dateTo ?? period.dateTo
+      setSearchParams(buildSearchParams({
+        dateFrom: nextFrom,
+        dateTo: nextTo,
+      }), { replace: true })
+    },
+    [period.dateFrom, period.dateTo, setSearchParams],
   )
 
   useEffect(() => {
@@ -69,7 +111,7 @@ export default function SettlementReport() {
     setError(null)
     setConfigMissing(false)
 
-    fetchSettlementReport({ year, month })
+    loadReport()
       .then((resp) => {
         if (!cancelled) setData(resp)
       })
@@ -88,7 +130,21 @@ export default function SettlementReport() {
       })
 
     return () => { cancelled = true }
-  }, [year, month])
+  }, [loadReport])
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    setError(null)
+    try {
+      await refreshSettlementIndex()
+      const resp = await loadReport()
+      setData(resp)
+    } catch {
+      setError('Nie udało się odświeżyć indeksu rozliczeń.')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const years = useMemo(() => {
     const y = new Date().getFullYear()
@@ -111,13 +167,13 @@ export default function SettlementReport() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
         <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
           Rok
           <select
             className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
             value={year}
-            onChange={(e) => updateParams({ year: Number(e.target.value) })}
+            onChange={(e) => updateMonthParams({ year: Number(e.target.value) })}
           >
             {years.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -129,13 +185,40 @@ export default function SettlementReport() {
           <select
             className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
             value={month}
-            onChange={(e) => updateParams({ month: Number(e.target.value) })}
+            onChange={(e) => updateMonthParams({ month: Number(e.target.value) })}
           >
             {MONTH_NAMES.map((name, idx) => (
               <option key={name} value={idx + 1}>{name}</option>
             ))}
           </select>
         </label>
+        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
+          Od
+          <input
+            type="date"
+            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            value={period.dateFrom}
+            onChange={(e) => updateDateRange({ dateFrom: e.target.value })}
+          />
+        </label>
+        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
+          Do
+          <input
+            type="date"
+            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            value={period.dateTo}
+            onChange={(e) => updateDateRange({ dateTo: e.target.value })}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing || loading}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+        >
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          Odśwież rozliczenia
+        </button>
       </div>
 
       {loading ? (
@@ -161,6 +244,12 @@ function SettlementContent({ data }: { data: SettlementReportResponse }) {
         Okres: {data.dateFrom} — {data.dateTo}
       </p>
 
+      {data.indexState?.needsRefresh && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+          Indeks rozliczeń wymaga odświeżenia — dane mogą być nieaktualne. Kliknij „Odśwież rozliczenia”.
+        </div>
+      )}
+
       {data.warnings.length > 0 && (
         <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 flex gap-2">
           <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
@@ -178,8 +267,8 @@ function SettlementContent({ data }: { data: SettlementReportResponse }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label={`Następna wpłata: ${PERSON_LABELS[nd.person]}`}
-          value={formatAmount(nd.dueAmount)}
-          sub={`bazowo ${formatAmount(nd.baseAmount)} + saldo portfeli ${formatAmount(nd.walletNet)} + przeniesienie ${formatAmount(nd.carryOver)}`}
+          value={formatAmount(nd.suggestedAmount ?? nd.dueAmount)}
+          sub={`${formatAmount(nd.baseAmount)} − carry ${formatAmount(nd.rotationCarry ?? nd.carryOver)} + portfele ${formatAmount(nd.walletNet)}${(nd.rotationPrepaid ?? 0) > 0 ? ` − prepaid ${formatAmount(nd.rotationPrepaid)}` : ''}`}
           icon={<Wallet size={18} className="text-[#c9a96e]" />}
           highlight
         />

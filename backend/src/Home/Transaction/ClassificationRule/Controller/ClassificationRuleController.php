@@ -8,6 +8,7 @@ use App\Home\Transaction\ClassificationRule\Entity\ClassificationRule;
 use App\Home\Transaction\ClassificationRule\Repository\ClassificationRuleRepository;
 use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleDefinitionValidator;
 use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleReorderService;
+use App\Home\Report\Settlement\Service\SettlementIndexStateService;
 use App\Home\Transaction\Repository\TransactionRepository;
 use App\Identity\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,6 +28,7 @@ class ClassificationRuleController extends AbstractController
         private TransactionRepository                $transactionRepository,
         private ClassificationRuleDefinitionValidator $validator,
         private ClassificationRuleReorderService     $reorderService,
+        private SettlementIndexStateService          $settlementIndexStateService,
         private Security                             $security,
     ) {}
 
@@ -82,6 +84,7 @@ class ClassificationRuleController extends AbstractController
 
         $this->em->persist($rule);
         $this->em->flush();
+        $this->markSettlementDirty();
 
         return $this->json($rule->toApiArray(), 201);
     }
@@ -108,6 +111,8 @@ class ClassificationRuleController extends AbstractController
         } catch (\InvalidArgumentException $e) {
             return $this->json(['message' => $e->getMessage()], 422);
         }
+
+        $this->markSettlementDirty();
 
         return $this->json(['updated' => count($orderedRuleIds)]);
     }
@@ -141,6 +146,7 @@ class ClassificationRuleController extends AbstractController
         $rule->setUpdatedBy($user);
 
         $this->em->flush();
+        $this->markSettlementDirty();
 
         return $this->json($rule->toApiArray());
     }
@@ -159,8 +165,16 @@ class ClassificationRuleController extends AbstractController
         $rule->setActive(false);
         $rule->setUpdatedBy($user);
         $this->em->flush();
+        $this->markSettlementDirty();
 
         return $this->json(null, 204);
+    }
+
+    private function markSettlementDirty(): void
+    {
+        /** @var User $user */
+        $user = $this->security->getUser();
+        $this->settlementIndexStateService->markDirty($user);
     }
 
     private function requireParty(int $partyId): Party|JsonResponse

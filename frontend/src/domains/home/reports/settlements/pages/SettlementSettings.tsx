@@ -23,6 +23,17 @@ const EMPTY_DRAFT: Draft = {
   defaultNextDepositor: 'maciek',
   carryOverMaciek: 0,
   carryOverBasia: 0,
+  reindexFromDate: null,
+  openingWalletBalances: {},
+  openingRotationCarry: 0,
+  openingRotationPrepaidMaciek: 0,
+  openingRotationPrepaidBasia: 0,
+  openingNextDepositor: 'maciek',
+  needsRefresh: true,
+  refreshInProgress: false,
+  lastRefreshedAt: null,
+  lastRefreshStats: null,
+  configVersion: null,
 }
 
 export default function SettlementSettings() {
@@ -66,6 +77,16 @@ export default function SettlementSettings() {
       }
       return { ...prev, walletSettlementOwner: next }
     })
+  }, [])
+
+  const setOpeningWalletBalance = useCallback((walletId: number, amount: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      openingWalletBalances: {
+        ...prev.openingWalletBalances,
+        [String(walletId)]: amount,
+      },
+    }))
   }, [])
 
   const handleSave = async () => {
@@ -225,7 +246,113 @@ export default function SettlementSettings() {
 
       <fieldset className="space-y-3">
         <legend className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          Saldo przeniesione z poprzedniego okresu
+          Indeks rozliczeń
+        </legend>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Po zmianie konfiguracji lub transakcji odśwież indeks w zakładce Raport.
+          Salda początkowe obowiązują od daty reindeksu.
+        </p>
+        <label className="block text-sm text-gray-600 dark:text-gray-400">
+          Data początkowa reindeksu
+          <input
+            type="date"
+            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            value={draft.reindexFromDate ?? ''}
+            onChange={(e) => setDraft((p) => ({
+              ...p,
+              reindexFromDate: e.target.value || null,
+            }))}
+          />
+        </label>
+        <label className="block text-sm text-gray-600 dark:text-gray-400">
+          Kolej na start reindeksu
+          <select
+            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            value={draft.openingNextDepositor}
+            onChange={(e) => setDraft((p) => ({
+              ...p,
+              openingNextDepositor: e.target.value as 'maciek' | 'basia',
+            }))}
+          >
+            <option value="maciek">Maciek</option>
+            <option value="basia">Basia</option>
+          </select>
+        </label>
+        <label className="block text-sm text-gray-600 dark:text-gray-400">
+          Carry rotacji na start (PLN)
+          <input
+            type="number"
+            step={0.01}
+            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            value={draft.openingRotationCarry}
+            onChange={(e) => setDraft((p) => ({
+              ...p,
+              openingRotationCarry: Number(e.target.value),
+            }))}
+          />
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-sm text-gray-600 dark:text-gray-400">
+            Prepaid Maciek na start (PLN)
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+              value={draft.openingRotationPrepaidMaciek}
+              onChange={(e) => setDraft((p) => ({
+                ...p,
+                openingRotationPrepaidMaciek: Number(e.target.value),
+              }))}
+            />
+          </label>
+          <label className="text-sm text-gray-600 dark:text-gray-400">
+            Prepaid Basia na start (PLN)
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+              value={draft.openingRotationPrepaidBasia}
+              onChange={(e) => setDraft((p) => ({
+                ...p,
+                openingRotationPrepaidBasia: Number(e.target.value),
+              }))}
+            />
+          </label>
+        </div>
+        {nonHomeWallets.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Salda portfeli na start reindeksu (PLN)
+            </p>
+            <ul className="space-y-2">
+              {nonHomeWallets.map((w) => (
+                <li key={w.id} className="flex items-center gap-3 text-sm">
+                  <span className="flex-1 text-gray-700 dark:text-gray-300">{w.name}</span>
+                  <input
+                    type="number"
+                    step={0.01}
+                    className="w-32 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                    value={draft.openingWalletBalances[String(w.id)] ?? 0}
+                    onChange={(e) => setOpeningWalletBalance(w.id, Number(e.target.value))}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {draft.needsRefresh && (
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            Indeks wymaga odświeżenia.
+            {draft.lastRefreshedAt ? ` Ostatnio: ${new Date(draft.lastRefreshedAt).toLocaleString('pl-PL')}.` : ''}
+          </p>
+        )}
+      </fieldset>
+
+      <fieldset className="space-y-3 hidden">
+        <legend className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          Saldo przeniesione (legacy)
         </legend>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm text-gray-600 dark:text-gray-400">

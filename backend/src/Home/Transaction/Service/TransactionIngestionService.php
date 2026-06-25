@@ -12,6 +12,7 @@ use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleEngine;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Entity\TransactionItem;
 use App\Home\Transaction\Repository\TransactionRepository;
+use App\Home\Report\Settlement\Service\SettlementIndexStateService;
 use App\Identity\Entity\User;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,6 +25,7 @@ class TransactionIngestionService
         private CsvImportRowRepository $rowRepository,
         private TransactionStatusCalculator $statusCalculator,
         private ClassificationRuleEngine $classificationRuleEngine,
+        private SettlementIndexStateService $settlementIndexStateService,
     ) {
     }
 
@@ -97,6 +99,10 @@ class TransactionIngestionService
 
         $csvImport->setStatus(CsvImport::STATUS_IMPORTED);
         $this->em->flush();
+
+        if ($imported > 0) {
+            $this->settlementIndexStateService->markDirty($user);
+        }
 
         return new ImportIngestionResult($imported, $skipped, $duplicates);
     }

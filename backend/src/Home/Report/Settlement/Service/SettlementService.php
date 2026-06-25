@@ -4,12 +4,17 @@ namespace App\Home\Report\Settlement\Service;
 
 use App\Home\Report\Settlement\DTO\SettlementQuery;
 use App\Home\Report\Settlement\Entity\SettlementConfig;
+use App\Home\Report\Settlement\Entity\SettlementLedgerEntry;
 use App\Home\Report\Settlement\Repository\SettlementItemQuery;
+use App\Home\Report\Settlement\Repository\SettlementLedgerRepository;
+use App\Identity\Entity\User;
 
 class SettlementService
 {
     public function __construct(
         private SettlementItemQuery $itemQuery,
+        private SettlementLedgerRepository $ledgerRepository,
+        private SettlementItemClassifier $classifier,
     ) {}
 
     /**
@@ -50,6 +55,17 @@ class SettlementService
         foreach ($items as $item) {
             $amountMinor = abs($item['amountMinor']);
 
+            $this->classifier->collectWarnings(
+                $item,
+                $settlementPartyId,
+                $homeBudgetId,
+                $maciekSources,
+                $basiaSources,
+                $walletOwners,
+                $warnings,
+                $excludedCount,
+            );
+
             if ($item['direction'] === 'EXPENSE') {
                 $this->processExpense(
                     $item,
@@ -87,6 +103,264 @@ class SettlementService
             'basia'  => $this->finalizeBucket($standardDepositsMinor['basia']),
         ];
 
+        $user = $config->getUser();
+        $useLedger = $user !== null && !$config->isNeedsRefresh();
+
+        if ($useLedger) {
+            $nextDeposit = $this->buildNextDepositFromLedger(
+                $config,
+                $query,
+                $walletGroups,
+                $standardDepositsMinor,
+                $baseMinor,
+            );
+        } else {
+            $nextDeposit = $this->buildNextDepositLegacy(
+                $query,
+                $config,
+                $walletGroups,
+                $standardDepositsMinor,
+                $settlementPartyId,
+                $homeBudgetId,
+                $maciekSources,
+                $basiaSources,
+                $baseMinor,
+            );
+        }
+
+        $balances = [];
+        foreach (['maciek', 'basia'] as $person) {
+            $balances[$person] = [
+                'walletNet'      => $walletGroups[$person]['net'],
+                'carryOver'      => 0,
+                'paidInPeriod'   => $standardDeposits[$person]['total'],
+            ];
+        }
+
+        if ($useLedger && $user !== null) {
+            $ledgerEntry = $this->ledgerRepository->findLastAtOrBefore($user, $query->dateTo);
+            if ($ledgerEntry !== null) {
+                $balances['maciek']['walletNetLedger'] = $this->walletNetFromLedger($ledgerEntry, 'maciek', $walletOwners);
+                $balances['basia']['walletNetLedger']  = $this->walletNetFromLedger($ledgerEntry, 'basia', $walletOwners);
+            }
+        }
+
+        return [
+            'dateFrom'           => $query->dateFrom,
+            'dateTo'             => $query->dateTo,
+            'config'             => $config->toApiArray(),
+            'walletGroups'       => $walletGroups,
+            'standardDeposits'   => $standardDeposits,
+            'nextDeposit'        => $nextDeposit,
+            'balances'           => $balances,
+            'warnings'           => array_values(array_unique($warnings)),
+            'excludedItemsCount' => $excludedCount,
+            'indexState'         => [
+                'needsRefresh'      => $config->isNeedsRefresh(),
+                'refreshInProgress' => $config->isRefreshInProgress(),
+                'lastRefreshedAt'   => $config->getLastRefreshedAt()?->format(\DateTimeInterface::ATOM),
+                'lastRefreshStats'  => $config->getLastRefreshStatsJson(),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, array{expenses: array{total: float, items: list}, incomes: array{total: float, items: list}, net: float}> $walletGroups
+     * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $standardDepositsMinor
+     *
+     * @return array<string, mixed>
+     */
+    private function buildNextDepositFromLedger(
+        SettlementConfig $config,
+        SettlementQuery $query,
+        array $walletGroups,
+        array $standardDepositsMinor,
+        int $baseMinor,
+    ): array {
+        $user = $config->getUser();
+        $entry = $this->ledgerRepository->findLastAtOrBefore($user, $query->dateTo);
+
+        if ($entry === null) {
+            return $this->buildNextDepositFromOpening($config, $query, $standardDepositsMinor, $baseMinor);
+        }
+
+        $engine = SettlementBalanceEngine::fromLedgerRow(
+            [
+                'wallet_balances_json'           => $entry->getWalletBalancesJson(),
+                'rotation_carry_minor'           => $entry->getRotationCarryMinor(),
+                'rotation_prepaid_maciek_minor'  => $entry->getRotationPrepaidMaciekMinor(),
+                'rotation_prepaid_basia_minor'   => $entry->getRotationPrepaidBasiaMinor(),
+                'next_depositor'                 => $entry->getNextDepositor(),
+            ],
+            $baseMinor,
+            $config->getWalletSettlementOwner(),
+        );
+
+        $person = $query->nextDepositor ?? $engine->getNextDepositor();
+        $walletNetMinor = $engine->walletBalanceForPerson($person);
+        $prepaidMinor   = $person === SettlementConfig::DEPOSITOR_MACIEK
+            ? $engine->getRotationPrepaidMaciekMinor()
+            : $engine->getRotationPrepaidBasiaMinor();
+        $suggestedRaw   = $baseMinor - $engine->getRotationCarryMinor() + $walletNetMinor - $prepaidMinor;
+        $suggestedMinor = max(0, $suggestedRaw);
+        $paidMinor      = $standardDepositsMinor[$person]['total'];
+
+        return $this->formatNextDeposit(
+            $person,
+            $baseMinor,
+            $walletNetMinor,
+            $engine->getRotationCarryMinor(),
+            $prepaidMinor,
+            $suggestedMinor,
+            $suggestedRaw,
+            $paidMinor,
+            $engine->getWalletBalancesMinor(),
+            $config->getWalletSettlementOwner(),
+        );
+    }
+
+    /**
+     * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $standardDepositsMinor
+     *
+     * @return array<string, mixed>
+     */
+    private function buildNextDepositFromOpening(
+        SettlementConfig $config,
+        SettlementQuery $query,
+        array $standardDepositsMinor,
+        int $baseMinor,
+    ): array {
+        $engine = new SettlementBalanceEngine(
+            $baseMinor,
+            $config->getWalletSettlementOwner(),
+            $config->getOpeningNextDepositor(),
+            $config->getOpeningRotationCarryMinor(),
+            $config->getOpeningRotationPrepaidMaciekMinor(),
+            $config->getOpeningRotationPrepaidBasiaMinor(),
+            $config->getOpeningWalletBalancesJson(),
+        );
+
+        $person = $query->nextDepositor ?? $engine->getNextDepositor();
+        $walletNetMinor = $engine->walletBalanceForPerson($person);
+        $prepaidMinor   = $person === SettlementConfig::DEPOSITOR_MACIEK
+            ? $engine->getRotationPrepaidMaciekMinor()
+            : $engine->getRotationPrepaidBasiaMinor();
+        $suggestedRaw   = $baseMinor - $engine->getRotationCarryMinor() + $walletNetMinor - $prepaidMinor;
+        $suggestedMinor = max(0, $suggestedRaw);
+        $paidMinor      = $standardDepositsMinor[$person]['total'];
+
+        return $this->formatNextDeposit(
+            $person,
+            $baseMinor,
+            $walletNetMinor,
+            $engine->getRotationCarryMinor(),
+            $prepaidMinor,
+            $suggestedMinor,
+            $suggestedRaw,
+            $paidMinor,
+            $engine->getWalletBalancesMinor(),
+            $config->getWalletSettlementOwner(),
+        );
+    }
+
+    /**
+     * @param array<string, int> $walletBalancesMinor
+     * @param array<string, string> $walletOwners
+     *
+     * @return array<string, mixed>
+     */
+    private function formatNextDeposit(
+        string $person,
+        int $baseMinor,
+        int $walletNetMinor,
+        int $rotationCarryMinor,
+        int $prepaidMinor,
+        int $suggestedMinor,
+        int $suggestedRawMinor,
+        int $paidMinor,
+        array $walletBalancesMinor,
+        array $walletOwners,
+    ): array {
+        $balanceMinor = $suggestedMinor - $paidMinor;
+
+        return [
+            'person'            => $person,
+            'baseAmount'        => round($baseMinor / 100, 2),
+            'walletNet'         => round($walletNetMinor / 100, 2),
+            'rotationCarry'     => round($rotationCarryMinor / 100, 2),
+            'rotationPrepaid'   => round($prepaidMinor / 100, 2),
+            'suggestedAmount'   => round($suggestedMinor / 100, 2),
+            'suggestedAmountRaw'=> round($suggestedRawMinor / 100, 2),
+            'overpaymentCredit' => round(max(0, -$suggestedRawMinor) / 100, 2),
+            'corrections'       => round($walletNetMinor / 100, 2),
+            'carryOver'         => round($rotationCarryMinor / 100, 2),
+            'dueAmount'         => round($suggestedMinor / 100, 2),
+            'paidInPeriod'      => round($paidMinor / 100, 2),
+            'balance'           => round($balanceMinor / 100, 2),
+            'underpayment'      => round(max(0, $balanceMinor) / 100, 2),
+            'overpayment'       => round(max(0, -$balanceMinor) / 100, 2),
+            'carryForward'      => round(max(0, $balanceMinor) / 100, 2),
+            'walletBreakdown'   => $this->walletBreakdownForPerson($walletBalancesMinor, $walletOwners, $person),
+        ];
+    }
+
+    /**
+     * @param array<string, int> $walletBalancesMinor
+     * @param array<string, string> $walletOwners
+     *
+     * @return list<array{walletId: int, balance: float}>
+     */
+    private function walletBreakdownForPerson(array $walletBalancesMinor, array $walletOwners, string $person): array
+    {
+        $result = [];
+        foreach ($walletBalancesMinor as $walletId => $balanceMinor) {
+            if (($walletOwners[$walletId] ?? null) !== $person) {
+                continue;
+            }
+            if ($balanceMinor === 0) {
+                continue;
+            }
+            $result[] = [
+                'walletId' => (int) $walletId,
+                'balance'  => round($balanceMinor / 100, 2),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, string> $walletOwners
+     */
+    private function walletNetFromLedger(SettlementLedgerEntry $entry, string $person, array $walletOwners): float
+    {
+        $sum = 0;
+        foreach ($entry->getWalletBalancesJson() as $walletId => $balance) {
+            if (($walletOwners[$walletId] ?? null) === $person) {
+                $sum += (int) $balance;
+            }
+        }
+
+        return round($sum / 100, 2);
+    }
+
+    /**
+     * @param array<string, array{expenses: array{total: float, items: list}, incomes: array{total: float, items: list}, net: float}> $walletGroups
+     * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $standardDepositsMinor
+     *
+     * @return array<string, mixed>
+     */
+    private function buildNextDepositLegacy(
+        SettlementQuery $query,
+        SettlementConfig $config,
+        array $walletGroups,
+        array $standardDepositsMinor,
+        int $settlementPartyId,
+        int $homeBudgetId,
+        array $maciekSources,
+        array $basiaSources,
+        int $baseMinor,
+    ): array {
         $nextDepositor = $query->nextDepositor ?? $this->resolveNextDepositor(
             $query->dateTo,
             $settlementPartyId,
@@ -100,45 +374,29 @@ class SettlementService
         $carryOverBasia  = $config->getCarryOverBasiaMinor();
 
         $personNetMinor   = (int) round($walletGroups[$nextDepositor]['net'] * 100);
-        $walletCorrection = $personNetMinor;
         $carryOver        = $nextDepositor === 'maciek' ? $carryOverMaciek : $carryOverBasia;
-        $dueMinor         = $baseMinor + $walletCorrection + $carryOver;
+        $dueMinor         = $baseMinor + $personNetMinor + $carryOver;
         $paidMinor        = $standardDepositsMinor[$nextDepositor]['total'];
         $balanceMinor     = $dueMinor - $paidMinor;
 
-        $nextDeposit = [
-            'person'       => $nextDepositor,
-            'baseAmount'   => round($baseMinor / 100, 2),
-            'walletNet'    => round($personNetMinor / 100, 2),
-            'corrections'  => round($walletCorrection / 100, 2),
-            'carryOver'    => round($carryOver / 100, 2),
-            'dueAmount'    => round($dueMinor / 100, 2),
-            'paidInPeriod' => round($paidMinor / 100, 2),
-            'balance'      => round($balanceMinor / 100, 2),
-            'underpayment' => round(max(0, $balanceMinor) / 100, 2),
-            'overpayment'  => round(max(0, -$balanceMinor) / 100, 2),
-            'carryForward' => round(max(0, $balanceMinor) / 100, 2),
-        ];
-
-        $balances = [];
-        foreach (['maciek', 'basia'] as $person) {
-            $balances[$person] = [
-                'walletNet'      => $walletGroups[$person]['net'],
-                'carryOver'    => round(($person === 'maciek' ? $carryOverMaciek : $carryOverBasia) / 100, 2),
-                'paidInPeriod' => $standardDeposits[$person]['total'],
-            ];
-        }
-
         return [
-            'dateFrom'           => $query->dateFrom,
-            'dateTo'             => $query->dateTo,
-            'config'             => $config->toApiArray(),
-            'walletGroups'       => $walletGroups,
-            'standardDeposits'   => $standardDeposits,
-            'nextDeposit'        => $nextDeposit,
-            'balances'           => $balances,
-            'warnings'           => array_values(array_unique($warnings)),
-            'excludedItemsCount' => $excludedCount,
+            'person'            => $nextDepositor,
+            'baseAmount'        => round($baseMinor / 100, 2),
+            'walletNet'         => round($personNetMinor / 100, 2),
+            'rotationCarry'     => round($carryOver / 100, 2),
+            'rotationPrepaid'   => 0.0,
+            'suggestedAmount'   => round($dueMinor / 100, 2),
+            'suggestedAmountRaw'=> round($dueMinor / 100, 2),
+            'overpaymentCredit' => 0.0,
+            'corrections'       => round($personNetMinor / 100, 2),
+            'carryOver'         => round($carryOver / 100, 2),
+            'dueAmount'         => round($dueMinor / 100, 2),
+            'paidInPeriod'      => round($paidMinor / 100, 2),
+            'balance'           => round($balanceMinor / 100, 2),
+            'underpayment'      => round(max(0, $balanceMinor) / 100, 2),
+            'overpayment'       => round(max(0, -$balanceMinor) / 100, 2),
+            'carryForward'      => round(max(0, $balanceMinor) / 100, 2),
+            'walletBreakdown'   => [],
         ];
     }
 
@@ -252,7 +510,6 @@ class SettlementService
             $groupKey = 'other';
             $walletGroupsMinor[$groupKey]['expenses']['total'] += $amountMinor;
             $walletGroupsMinor[$groupKey]['expenses']['items'][] = $this->itemEntry($item, $amountMinor, 'expense');
-            $warnings[] = 'Wydatek ze wspólnego bez portfela pozycji — trafia do grupy Inne.';
             return;
         }
 
@@ -306,7 +563,6 @@ class SettlementService
 
         if ($fromId === null) {
             $excludedCount++;
-            $warnings[] = 'Wpływ na konto rozliczenia bez Skąd — trafia do grupy Inne.';
         }
 
         if ($item['walletId'] === null) {

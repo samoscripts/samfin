@@ -9,6 +9,7 @@ use App\Home\Configuration\Entity\Wallet;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Entity\TransactionItem;
 use App\Home\Transaction\Repository\TransactionRepository;
+use App\Home\Report\Settlement\Service\SettlementIndexStateService;
 use App\Identity\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -27,6 +28,7 @@ class TransactionBulkUpdateService
         private TransactionRepository $repository,
         private TransactionPartyAssignmentValidator $partyAssignmentValidator,
         private TransactionStatusCalculator $statusCalculator,
+        private SettlementIndexStateService $settlementIndexStateService,
     ) {}
 
     /**
@@ -140,6 +142,10 @@ class TransactionBulkUpdateService
         }
 
         $this->em->flush();
+
+        if (count($transactions) > 0) {
+            $this->settlementIndexStateService->markDirty($user);
+        }
 
         return count($transactions);
     }

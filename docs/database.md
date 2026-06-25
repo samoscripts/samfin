@@ -23,6 +23,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od 
 | `classification_rule` | `ClassificationRule` | Reguły auto-klasyfikacji per podmiot |
 | `transaction_template` | `TransactionTemplate` | Szablony klasyfikacji per użytkownik (wpływ/wydatek) |
 | `settlement_config` | `SettlementConfig` | Konfiguracja rozliczenia wpłat (per `user_id`) |
+| `settlement_ledger_entry` | `SettlementLedgerEntry` | Indeks ledger rozliczeń (1 wiersz = 1 `transaction_item`, running state) |
 
 ## Diagram relacji (FK)
 
@@ -176,6 +177,7 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260625120000` | `common_account_settlement_config` — konfiguracja rozliczenia (historyczna nazwa) |
 | `20260626120000` | Repair: utworzenie `common_account_settlement_config` jeśli brak (gdy `20260625120000` zapisana bez tabeli) |
 | `20260627120000` | Rename: `settlement_config`, kolumna `settlement_party_id` |
+| `20260628120000` | `settlement_ledger_entry`; kolumny indeksu na `settlement_config` (`reindex_from_date`, salda początkowe, `needs_refresh`, …) |
 
 ## Zapytania diagnostyczne (tylko SELECT)
 

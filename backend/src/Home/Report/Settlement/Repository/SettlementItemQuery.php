@@ -93,6 +93,85 @@ class SettlementItemQuery
     }
 
     /**
+     * @return list<array{
+     *   transactionId: int,
+     *   itemId: int,
+     *   operationDate: string,
+     *   direction: string,
+     *   status: string,
+     *   description: ?string,
+     *   paidFromPartyId: ?int,
+     *   paidFrom: ?string,
+     *   paidToPartyId: ?int,
+     *   paidTo: ?string,
+     *   walletId: ?int,
+     *   wallet: ?string,
+     *   amountMinor: int,
+     * }>
+     */
+    public function fetchItemsFromDate(
+        string $dateFrom,
+        int $settlementPartyId,
+        bool $includePartial,
+    ): array {
+        $statusFilter = $includePartial
+            ? "t.status IN ('CLASSIFIED', 'PARTIALLY_CLASSIFIED')"
+            : "t.status = 'CLASSIFIED'";
+
+        $sql = <<<SQL
+            SELECT
+                t.id AS transactionId,
+                ti.id AS itemId,
+                t.operation_date AS operationDate,
+                t.direction AS direction,
+                t.status AS status,
+                t.description AS description,
+                pfp.id AS paidFromPartyId,
+                pfp.name AS paidFrom,
+                ptp.id AS paidToPartyId,
+                ptp.name AS paidTo,
+                w.id AS walletId,
+                w.name AS wallet,
+                ti.amount_minor AS amountMinor
+            FROM transaction_items ti
+            INNER JOIN transactions t ON t.id = ti.transaction_id
+            LEFT JOIN party pfp ON pfp.id = t.paid_from_party_id
+            LEFT JOIN party ptp ON ptp.id = t.paid_to_party_id
+            LEFT JOIN wallet w ON w.id = ti.wallet_id
+            WHERE t.operation_date >= :dateFrom
+              AND {$statusFilter}
+              AND (
+                  t.paid_from_party_id = :settlementPartyId
+                  OR t.paid_to_party_id = :settlementPartyId
+              )
+            ORDER BY t.operation_date ASC, t.id ASC, ti.id ASC
+        SQL;
+
+        $rows = $this->em->getConnection()->fetchAllAssociative($sql, [
+            'dateFrom'          => $dateFrom,
+            'settlementPartyId' => $settlementPartyId,
+        ]);
+
+        return array_map(static function (array $row): array {
+            return [
+                'transactionId'   => (int) $row['transactionId'],
+                'itemId'          => (int) $row['itemId'],
+                'operationDate'   => $row['operationDate'],
+                'direction'       => $row['direction'],
+                'status'          => $row['status'],
+                'description'     => $row['description'],
+                'paidFromPartyId' => $row['paidFromPartyId'] !== null ? (int) $row['paidFromPartyId'] : null,
+                'paidFrom'        => $row['paidFrom'],
+                'paidToPartyId'   => $row['paidToPartyId'] !== null ? (int) $row['paidToPartyId'] : null,
+                'paidTo'          => $row['paidTo'],
+                'walletId'        => $row['walletId'] !== null ? (int) $row['walletId'] : null,
+                'wallet'          => $row['wallet'],
+                'amountMinor'     => (int) $row['amountMinor'],
+            ];
+        }, $rows);
+    }
+
+    /**
      * @return array{person: string, transactionId: int, operationDate: string, amountMinor: int}|null
      */
     public function findLastStandardDeposit(

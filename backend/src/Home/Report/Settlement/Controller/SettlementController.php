@@ -4,6 +4,7 @@ namespace App\Home\Report\Settlement\Controller;
 
 use App\Home\Report\Settlement\DTO\SettlementQuery;
 use App\Home\Report\Settlement\Service\SettlementConfigService;
+use App\Home\Report\Settlement\Service\SettlementIndexerService;
 use App\Home\Report\Settlement\Service\SettlementService;
 use App\Identity\Entity\User;
 use App\Shared\DTO\QueryValidationErrors;
@@ -19,6 +20,7 @@ class SettlementController extends AbstractController
     public function __construct(
         private SettlementService $settlementService,
         private SettlementConfigService $configService,
+        private SettlementIndexerService $indexerService,
         private Security $security,
     ) {}
 
@@ -48,6 +50,34 @@ class SettlementController extends AbstractController
         }
 
         return $this->json($result);
+    }
+
+    #[Route('/refresh', name: 'api_reports_settlements_refresh', methods: ['POST'])]
+    public function refresh(): JsonResponse
+    {
+        /** @var User $user */
+        $user   = $this->security->getUser();
+        $config = $this->configService->getForUser($user);
+
+        if (!$config->isConfigured()) {
+            return $this->json([
+                'message' => 'Skonfiguruj rozliczenie przed odświeżeniem indeksu.',
+            ], 422);
+        }
+
+        try {
+            $stats = $this->indexerService->rebuild($config);
+        } catch (\RuntimeException $e) {
+            return $this->json(['message' => $e->getMessage()], 409);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['message' => $e->getMessage()], 422);
+        }
+
+        return $this->json([
+            'ok'     => true,
+            'config' => $config->toApiArray(),
+            ...$stats,
+        ]);
     }
 
     #[Route('/config', name: 'api_reports_settlements_config_get', methods: ['GET'])]

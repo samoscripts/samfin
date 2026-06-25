@@ -9,6 +9,7 @@ use App\Home\Configuration\Entity\Wallet;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Entity\TransactionItem;
 use App\Identity\Entity\User;
+use App\Home\Report\Settlement\Service\SettlementIndexStateService;
 use Doctrine\ORM\EntityManagerInterface;
 
 class TransactionClassificationService
@@ -18,6 +19,7 @@ class TransactionClassificationService
         private TransactionSnapshotLogService $snapshotLogService,
         private TransactionPartyAssignmentValidator $partyAssignmentValidator,
         private TransactionStatusCalculator $statusCalculator,
+        private SettlementIndexStateService $settlementIndexStateService,
     ) {}
 
     /**
@@ -123,5 +125,6 @@ class TransactionClassificationService
 
         $this->em->flush();
         $this->snapshotLogService->log($tx, $user);
+        $this->settlementIndexStateService->markDirty($user);
     }
 }

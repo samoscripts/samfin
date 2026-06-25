@@ -84,31 +84,46 @@ Docelowo: filtr zakresu dat z presetem „Miesięczny” (nie w URL).
 
 ---
 
-## Rozliczenia (MVP)
+## Rozliczenia (ledger v2)
 
 Raport wylicza sugerowaną kolejną wpłatę Maćka/Basi na podmiot rozliczenia na podstawie **pozycji transakcji** (`transaction_items`): kierunek, Skąd/Dokąd (`paid_from` / `paid_to`), portfel pozycji. **Nie** opiera się na polu `concern`.
+
+Indeks rozliczeń (`settlement_ledger_entry`) jest budowany z pozycji 1:1; stan na dany dzień odczytywany jest z ostatniego wiersza ledgera `operation_date <= dateTo`. Po zmianie transakcji lub konfiguracji ustawiane jest `needsRefresh` — użytkownik odświeża indeks przyciskiem w UI (`POST /refresh`).
+
+### Model A „dopasuj” (sugerowana wpłata)
+
+```
+suggested = baseDeposit − rotation_carry + wallet_balance[osoba] − rotation_prepaid[osoba]
+```
+
+(w UI: `max(0, raw)`). Slot rotacji zamyka pierwsza wpłata `standard_deposit` osoby na kolejce; wpłata poza kolejką zwiększa `rotation_prepaid`.
 
 ### API: `GET /api/reports/settlements`
 
 | Parametr | Wymagany | Opis |
 |----------|----------|------|
 | `year` + `month` | jedna para* | Skrót okresu |
-| `dateFrom` + `dateTo` | alternatywa* | Zakres dat |
-| `nextDepositor` | nie | `maciek` \| `basia` — nadpisuje auto z historii wpłat |
+| `dateFrom` + `dateTo` | alternatywa* | Zakres dat (ma pierwszeństwo w UI gdy oba w URL) |
+| `nextDepositor` | nie | `maciek` \| `basia` — nadpisuje auto z ledgera |
 | `includePartial` | nie | Uwzględnij `PARTIALLY_CLASSIFIED` (domyślnie false) |
 
 \*Podaj albo `year`+`month`, albo `dateFrom`+`dateTo`.
 
 Odpowiedź (skrót):
 
-- `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net` (wydatki − wpływy na przypisanych portfelach, poza budżetem domowym)
-- `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego (Skąd z list Maćka/Basi)
-- `nextDeposit` — `dueAmount`, `paidInPeriod`, `walletNet`, `corrections` (= saldo netto portfeli osoby wpłacającej, ze znakiem), `underpayment`, `carryForward`
+- `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net`
+- `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego
+- `nextDeposit` — m.in. `suggestedAmount`, `rotationCarry`, `rotationPrepaid`, `walletBreakdown`, oraz legacy: `dueAmount`, `carryOver`, `paidInPeriod`, `carryForward`
+- `indexState` — `needsRefresh`, `refreshInProgress`, `lastRefreshedAt`, `lastRefreshStats`
 - `warnings`, `excludedItemsCount`
 
-Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `nextDeposit`. Korekta wpłaty to pełne saldo netto grupy portfeli wpłacającej osoby (dodatnie zwiększa należność, ujemne ją zmniejsza).
+Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `nextDeposit`.
 
-Implementacja: `SettlementService`, `SettlementItemQuery`, `SettlementQuery`.
+Gdy `needsRefresh=true`, szczegóły okresu liczone są na żywo; `nextDeposit` korzysta z legacy `carryOver*` z configu.
+
+### API: `POST /api/reports/settlements/refresh`
+
+Atomowy rebuild indeksu od `reindexFromDate` (domyślnie `2000-01-01` przy pierwszym odświeżeniu). Odpowiedź: `{ ok, config, factsIndexed, skippedCount, refreshedAt }`. `409` gdy `refresh_in_progress`.
 
 ### API: konfiguracja
 
@@ -119,33 +134,32 @@ Implementacja: `SettlementService`, `SettlementItemQuery`, `SettlementQuery`.
 
 Pola konfiguracji (per użytkownik, tabela `settlement_config`):
 
-- `settlementPartyId`, `homeBudgetWalletId`
-- `baseDepositAmount` (domyślnie 5000)
-- `maciekSourcePartyIds`, `basiaSourcePartyIds` — podmioty Skąd uznawane za wpłaty danej osoby
-- `walletSettlementOwner` — mapowanie portfela → `maciek` \| `basia` dla korekt
-- `defaultNextDepositor`, `carryOverMaciek`, `carryOverBasia`
+- `settlementPartyId`, `homeBudgetWalletId`, `baseDepositAmount`
+- `maciekSourcePartyIds`, `basiaSourcePartyIds`, `walletSettlementOwner`
+- `defaultNextDepositor`
+- **Indeks:** `reindexFromDate`, `openingWalletBalances`, `openingRotationCarry`, `openingRotationPrepaidMaciek`, `openingRotationPrepaidBasia`, `openingNextDepositor`
+- **Stan indeksu (read-only z API):** `needsRefresh`, `refreshInProgress`, `lastRefreshedAt`, `lastRefreshStats`, `configVersion`
+- **Legacy:** `carryOverMaciek`, `carryOverBasia` — fallback gdy indeks nieaktualny
 
 Wymaga skonfigurowania podmiotu rozliczenia i portfela budżetu domowego — inaczej `422`.
+
+`needsRefresh` ustawiane przy: PUT config, klasyfikacji transakcji, imporcie, bulk update, zmianie reguł klasyfikacji.
 
 ### Backend (pliki)
 
 ```
-backend/src/Home/Report/
-├── Analytics/
-│   ├── Controller/AnalyticsController.php
-│   └── DTO/AnalyticsQuery.php
-└── Settlement/
-    ├── Controller/SettlementController.php
-    ├── DTO/SettlementQuery.php
-    ├── Entity/SettlementConfig.php
-    ├── Repository/SettlementConfigRepository.php
-    ├── Repository/SettlementItemQuery.php
-    └── Service/
-        ├── SettlementService.php
-        └── SettlementConfigService.php
+backend/src/Home/Report/Settlement/
+├── Controller/SettlementController.php
+├── DTO/SettlementQuery.php
+├── Entity/SettlementConfig.php, SettlementLedgerEntry.php
+├── Repository/SettlementConfigRepository.php, SettlementItemQuery.php, SettlementLedgerRepository.php
+└── Service/
+    ├── SettlementService.php, SettlementConfigService.php
+    ├── SettlementItemClassifier.php, SettlementBalanceEngine.php
+    ├── SettlementIndexerService.php, SettlementIndexStateService.php
 ```
 
-Migracje: `Version20260625120000` (tabela config), `Version20260626120000` (repair), `Version20260627120000` (rename → `settlement_config`).
+Migracje: `Version20260625120000` (config), `Version20260627120000` (rename → `settlement_config`), `Version20260628120000` (`settlement_ledger_entry` + kolumny indeksu).
 
 ---
 
