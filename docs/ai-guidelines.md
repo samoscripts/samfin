@@ -58,7 +58,7 @@ App\System\               — health
 
 1. Klasa w `Entity/` z atrybutami Doctrine.
 2. `Repository/` extends `ServiceEntityRepository`.
-3. Migracja: `make migrate` lub `docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff` (w kontenerze — patrz `.cursor/rules/docker-migrations.mdc`).
+3. Migracja: `make migrate` lub `docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff` (w kontenerze — patrz `.cursor/rules/docker-migrations.mdc`). **Nie** dokładaj kolejnej migracji z ręcznym `Version…120000` dla tego samego refaktoru — rozszerz ostatnią niewdrożoną migrację lub wygeneruj timestamp przez CLI.
 4. Konwencja FK: `fk_{table}_{column}` (patrz istniejące migracje).
 
 ### Import nowego banku
@@ -105,7 +105,7 @@ Przy modyfikacji klasyfikacji lub importu sprawdź:
 - [ ] Bulk update: kategoria `directions` zawiera `transaction.direction`
 - [ ] Kategoria CRUD: `directions` min. 1 element; parent obsługuje wszystkie kierunki dziecka
 - [ ] Dezaktywacja kategorii: blokada przy użyciu w pozycjach transakcji, szablonach lub regułach (`CategoryUsageService`, ADR-027); merge przepina referencje
-- [ ] Import: duplikat po party + date + amount + description
+- [ ] Import: duplikat po party + date + amount + trans_title/description (canonical_text)
 - [ ] Import: EXPENSE → `paid_from`, INCOME → `paid_to` z `csv_import.party`
 - [ ] Historia: czy zmiana powinna wołać `TransactionSnapshotLogService`?
 

@@ -105,7 +105,7 @@ export default function ClassificationRulesFiltersForm({
           />
         </FieldRow>
         <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-relaxed">
-          Szuka w warunkach typu „opis transakcji” (pole description w JSON reguły), nie w opisie reguły.
+          Szuka w warunkach typu „opis/tytuł transakcji” (pola operation_desc / operation_title w JSON reguły), nie w opisie reguły.
         </p>
       </div>
     </div>

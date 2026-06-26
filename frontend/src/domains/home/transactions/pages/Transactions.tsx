@@ -32,9 +32,10 @@ import { useRightPanelPortal } from '@/layout/RightPanelContext'
 import { Transaction } from '@/shared/types'
 import { formatDate } from '@/shared/utils/format'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
-import ListTextTooltip from '@/shared/components/ListTextTooltip'
+import TransactionOperationText from '../components/TransactionOperationText'
 import ApplyClassificationRulesDialog from '../components/ApplyClassificationRulesDialog'
-import { applyClassificationRules, fetchTransaction } from '@/shared/api/transactions'
+import { applyClassificationRules, deleteTransaction, fetchTransaction } from '@/shared/api/transactions'
+import { getApiErrorMessage } from '@/shared/utils/errors'
 import { fetchCategories, type Category } from '@/shared/api/categories'
 import { flowFiltersToTransactionFilters } from '../utils/flowFilters'
 
@@ -89,6 +90,8 @@ export default function Transactions() {
   const isEditing = editMode !== null
   const [isDirty, setIsDirty]             = useState(false)
   const [editConfirm, setEditConfirm]     = useState<'save' | 'cancel' | null>(null)
+  const [deleteTarget, setDeleteTarget]   = useState<Transaction | null>(null)
+  const [deleting, setDeleting]           = useState(false)
   const [confirmLoading, setConfirmLoading] = useState(false)
 
   const [applyRulesOpen, setApplyRulesOpen] = useState(false)
@@ -404,6 +407,27 @@ export default function Transactions() {
     setRefreshKey((k) => k + 1)
     setSelectedTx(updated)
   }, [])
+
+  const handleRequestDelete = useCallback((tx: Transaction) => {
+    setDeleteTarget(tx)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await deleteTransaction(deleteTarget.transactionId)
+      setDeleteTarget(null)
+      setSelectedTx(null)
+      setSelectedIds(new Set())
+      setRefreshKey((k) => k + 1)
+      closePanel()
+    } catch (err: unknown) {
+      setApplyRulesMessage(getApiErrorMessage(err, 'Nie udało się usunąć transakcji.'))
+    } finally {
+      setDeleting(false)
+    }
+  }, [deleteTarget, closePanel])
 
   const handleCreateRule = useCallback(
     (tx: Transaction) => {
@@ -729,7 +753,7 @@ export default function Transactions() {
                           ].join(' ')}
                         >
                           <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono">
-                            {tx.date}
+                            {tx.transDate}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <Pill variant={DIRECTION_PILL[tx.direction]}>
@@ -743,7 +767,7 @@ export default function Transactions() {
                             {tx.paidTo ?? '—'}
                           </td>
                           <td className="px-4 py-3 text-gray-800 dark:text-gray-200 max-w-[220px]">
-                            <ListTextTooltip text={tx.description} />
+                            <TransactionOperationText tx={tx} />
                           </td>
                           <td className="px-4 py-3">
                             <ItemField items={tx.items} field="wallet" />
@@ -798,6 +822,7 @@ export default function Transactions() {
             onSingleSaved={handleSingleSaved}
             onCreated={handleCreated}
             onRestored={handleRestored}
+            onDelete={handleRequestDelete}
             onSaveClick={requestSaveEdit}
             onCancelClick={requestCancelEdit}
             onRegisterSave={handleRegisterSave}
@@ -810,6 +835,17 @@ export default function Transactions() {
           />,
           portalRoot,
         )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Usuń transakcję"
+        message="Czy na pewno chcesz usunąć tę transakcję?"
+        confirmLabel="Usuń"
+        cancelLabel="Anuluj"
+        loading={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       <ConfirmDialog
         open={editConfirm === 'save' && editMode === 'bulk'}
@@ -958,13 +994,13 @@ function TransactionCard({
         <div className="flex-1 min-w-0">
       <div className="flex items-start justify-between gap-3">
         <span className="text-xs text-gray-400 dark:text-gray-500 font-mono shrink-0 pt-0.5">
-          {formatDate(tx.date)}
+          {formatDate(tx.transDate)}
         </span>
         <ItemAmounts tx={tx} />
       </div>
 
       <div className="mt-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-        <ListTextTooltip text={tx.description} lines={2} />
+        <TransactionOperationText tx={tx} lines={2} />
       </div>
 
       <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">

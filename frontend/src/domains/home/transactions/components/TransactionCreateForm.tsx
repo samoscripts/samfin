@@ -33,9 +33,9 @@ import { applyTemplateToDraft, templatePayloadFromDraft } from '../utils/transac
 
 interface CreateDraft {
   direction: Direction
-  date: string
+  transDate: string
   amount: number | null
-  description: string
+  transDescription: string
   paidFromPartyId: number | null
   paidToPartyId: number | null
   items: ClassificationItemDraft[]
@@ -49,9 +49,10 @@ function prefillToDraft(prefill: TransactionNewUrlPrefill): CreateDraft {
 
   return {
     direction: prefill.direction ?? 'EXPENSE',
-    date: prefill.date ?? defaultNewTransactionDate(),
+    transDate: prefill.transDate ?? prefill.date ?? defaultNewTransactionDate(),
     amount,
-    description: prefill.description ?? '',
+    transDescription:
+      prefill.transDescription ?? prefill.operationDesc ?? prefill.description ?? '',
     paidFromPartyId: parseIdFromUrl(prefill.paidFromPartyId),
     paidToPartyId: parseIdFromUrl(prefill.paidToPartyId),
     items: [
@@ -148,11 +149,11 @@ export default function TransactionCreateForm({
       setError('Podaj kwotę większą od zera.')
       return
     }
-    if (!draft.description.trim()) {
-      setError('Opis jest wymagany.')
+    if (!draft.transDescription.trim()) {
+      setError('Opis transakcji jest wymagany.')
       return
     }
-    if (!draft.date) {
+    if (!draft.transDate) {
       setError('Data jest wymagana.')
       return
     }
@@ -168,9 +169,9 @@ export default function TransactionCreateForm({
     try {
       const payload = {
         direction: draft.direction,
-        date: draft.date,
+        transDate: draft.transDate,
         amount: draft.amount,
-        description: draft.description.trim(),
+        transDescription: draft.transDescription.trim(),
         paidFromPartyId: draft.paidFromPartyId,
         paidToPartyId: draft.paidToPartyId,
         ...(includeClassification
@@ -234,8 +235,8 @@ export default function TransactionCreateForm({
               <input
                 type="date"
                 className={inputCls}
-                value={draft.date}
-                onChange={(e) => setDraft((prev) => ({ ...prev, date: e.target.value }))}
+                value={draft.transDate}
+                onChange={(e) => setDraft((prev) => ({ ...prev, transDate: e.target.value }))}
                 required
               />
             </FieldRow>
@@ -254,12 +255,12 @@ export default function TransactionCreateForm({
               />
             </FieldRow>
           </div>
-          <FieldRow label="Opis">
+          <FieldRow label="Opis transakcji">
             <input
               type="text"
               className={inputCls}
-              value={draft.description}
-              onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
+              value={draft.transDescription}
+              onChange={(e) => setDraft((prev) => ({ ...prev, transDescription: e.target.value }))}
               placeholder="Opis transakcji…"
               required
             />

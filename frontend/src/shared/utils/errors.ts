@@ -23,8 +23,9 @@ export interface ClassificationRuleErrorContext {
   }
   transaction: {
     lineNo: number | null
-    description: string | null
-    operationDate: string | null
+    transTitle: string | null
+    transDescription: string | null
+    transDate: string | null
     direction: string
     amountMinor: number
     source: string
@@ -51,8 +52,9 @@ export interface DuplicateImportRowErrorContext {
   }
   existingTransaction: {
     id: number
-    operationDate: string | null
-    description: string | null
+    transDate: string | null
+    transTitle: string | null
+    transDescription: string | null
     amountMinor: number
     direction: string
     importId: number | null

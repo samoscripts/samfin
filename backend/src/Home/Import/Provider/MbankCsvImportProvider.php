@@ -4,15 +4,20 @@ namespace App\Home\Import\Provider;
 
 use App\Home\Import\DTO\ImportErrorData;
 use App\Home\Import\DTO\ImportResult;
-use App\Home\Import\DTO\ImportRowData;
-use App\Home\Import\Util\CounterpartyAccountExtractor;
+use App\Home\Import\Enum\CsvFormatVersion;
+use App\Home\Import\Mapper\CsvFormatMapperInterface;
+use App\Home\Import\Mapper\Mbank\MbankCsvFormatMapperRegistry;
+use App\Home\Import\Util\CsvEncodingNormalizer;
+use App\Home\Import\Util\MbankCsvRowBoundary;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 #[AutoconfigureTag('app.bank_import_provider')]
 class MbankCsvImportProvider implements BankImportProviderInterface
 {
     public function __construct(
-        private readonly CounterpartyAccountExtractor $counterpartyAccountExtractor,
+        private readonly MbankCsvFormatMapperRegistry $mapperRegistry,
+        private readonly MbankCsvRowBoundary $rowBoundary,
+        private readonly CsvEncodingNormalizer $encodingNormalizer,
     ) {}
 
     public function getCode(): string { return 'MBANK'; }
@@ -47,6 +52,8 @@ class MbankCsvImportProvider implements BankImportProviderInterface
         $accounts               = [];
         $detectedCurrency       = null;
         $dataStartLine          = null;
+        $csvFormat              = null;
+        $activeMapper           = null;
         $lineNo                 = 0;
         $pendingNextLine        = null;
 
@@ -72,12 +79,12 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 $candidate2 = trim($nextCols[1] ?? '');
 
                 if ($candidate1 !== '' && $candidate2 !== '') {
-                    $periodFrom = $this->parseDate($candidate1);
-                    $periodTo   = $this->parseDate($candidate2);
+                    $periodFrom = $this->parsePeriodDate($candidate1);
+                    $periodTo   = $this->parsePeriodDate($candidate2);
                 } elseif ($candidate1 !== '') {
                     $line2      = $this->readNextLine($file, $pendingNextLine, $lineNo) ?? '';
-                    $periodFrom = $this->parseDate($candidate1);
-                    $periodTo   = $this->parseDate($line2);
+                    $periodFrom = $this->parsePeriodDate($candidate1);
+                    $periodTo   = $this->parsePeriodDate($line2);
                 }
 
                 if ($periodFrom === null || $periodTo === null) {
@@ -103,10 +110,20 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                         break;
                     }
                     $nextCols   = $this->parseCsvLine($nextLine);
-                    $rawAccount = trim($nextCols[0] ?? '');
+                    $rawAccount = $this->normalizeAccountRaw($nextCols[0] ?? '');
                     if ($rawAccount !== '') {
                         $accounts[] = $rawAccount;
                     }
+                }
+                continue;
+            }
+
+            if ($this->startsWithMarker($cols, '#Numer rachunku')) {
+                $next     = $this->readNextLine($file, $pendingNextLine, $lineNo) ?? '';
+                $nextCols = $this->parseCsvLine($next);
+                $rawAccount = $this->normalizeAccountRaw($nextCols[0] ?? '');
+                if ($rawAccount !== '') {
+                    $accounts[] = $rawAccount;
                 }
                 continue;
             }
@@ -121,7 +138,20 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 continue;
             }
 
-            if ($this->startsWithMarker($cols, '#Data operacji')) {
+            if ($this->startsWithMarker($cols, '#Data księgowania')
+                || $this->startsWithMarker($cols, '#Data operacji')) {
+                $activeMapper = $this->mapperRegistry->resolveForHeader($cols);
+                if ($activeMapper === null) {
+                    $errors[] = new ImportErrorData(
+                        scope: 'HEADER',
+                        code: 'DATA_SECTION_UNSUPPORTED',
+                        message: 'Nieobsługiwany układ nagłówka sekcji danych w pliku CSV mBank.',
+                        fatal: true,
+                    );
+                    break;
+                }
+
+                $csvFormat     = $activeMapper->getFormatVersion();
                 $dataStartLine = $lineNo + 1;
                 break;
             }
@@ -143,7 +173,7 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 message: 'Nie wykryto rachunku w nagłówku pliku CSV.',
                 fatal: true,
             );
-        } elseif (count($accounts) > 1) {
+        } elseif (count($accounts) > 1 && $csvFormat !== CsvFormatVersion::MbankElectronicStatement) {
             $errors[] = new ImportErrorData(
                 scope: 'HEADER',
                 code: 'MULTI_ACCOUNT_CSV',
@@ -151,21 +181,16 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 fatal: true,
             );
         } else {
-            $raw = $accounts[0];
-            if (preg_match('/(\d[\d\s]{15,})$/', $raw, $m)) {
-                $detectedAccountNumber  = preg_replace('/\s+/', '', $m[1]);
-                $detectedAccountDisplay = $raw;
-            } else {
-                $detectedAccountNumber  = preg_replace('/\s+/', '', $raw);
-                $detectedAccountDisplay = $raw;
-            }
+            $raw                      = $this->normalizeAccountRaw($accounts[0]);
+            $detectedAccountNumber  = $this->extractAccountDigits($raw);
+            $detectedAccountDisplay = $raw;
         }
 
         if ($dataStartLine === null) {
             $errors[] = new ImportErrorData(
                 scope: 'HEADER',
                 code: 'DATA_SECTION_NOT_FOUND',
-                message: 'Nie znaleziono sekcji danych (#Data operacji) w pliku CSV. Nieobsługiwany format.',
+                message: 'Nie znaleziono sekcji danych w pliku CSV. Nieobsługiwany format.',
                 fatal: true,
             );
         }
@@ -177,41 +202,8 @@ class MbankCsvImportProvider implements BankImportProviderInterface
             false,
         );
 
-        if ($dataStartLine !== null && !$hasFatalHeaderError) {
-            if ($pendingNextLine !== null) {
-                $lineNo = $dataStartLine - 1;
-                $line   = $pendingNextLine;
-                $pendingNextLine = null;
-            } else {
-                $line = null;
-            }
-
-            while (true) {
-                if ($line === null) {
-                    $line = $this->readNextLine($file, $pendingNextLine, $lineNo);
-                    if ($line === null) {
-                        break;
-                    }
-                }
-
-                $currentLine = $line;
-                $line        = null;
-
-                if (trim($currentLine) === '') {
-                    continue;
-                }
-
-                $rowResult = $this->parseDataLine($lineNo, $currentLine);
-                if ($rowResult['fatalError'] !== null) {
-                    $errors[] = $rowResult['fatalError'];
-                    $rows     = [];
-                    break;
-                }
-
-                if ($rowResult['row'] !== null) {
-                    $rows[] = $rowResult['row'];
-                }
-            }
+        if ($dataStartLine !== null && $activeMapper !== null && !$hasFatalHeaderError) {
+            $rows = $this->parseDataRows($file, $activeMapper, $dataStartLine, $pendingNextLine, $lineNo, $errors);
         }
 
         $headerValid = !array_reduce(
@@ -222,6 +214,7 @@ class MbankCsvImportProvider implements BankImportProviderInterface
 
         return new ImportResult(
             headerValid: $headerValid,
+            csvFormat: $csvFormat,
             detectedClientName: $detectedClientName,
             detectedAccountNumber: $detectedAccountNumber,
             detectedAccountDisplay: $detectedAccountDisplay,
@@ -232,146 +225,89 @@ class MbankCsvImportProvider implements BankImportProviderInterface
         );
     }
 
-    /** @return array{row: ?ImportRowData, fatalError: ?ImportErrorData} */
-    private function parseDataLine(int $lineNo, string $line): array
-    {
-        $cols     = $this->normalizeDataColumns($this->parseCsvLine($line));
-        $colCount = count($cols);
+    /**
+     * @param ImportErrorData[] $errors
+     * @return list<\App\Home\Import\DTO\NormalizedImportRow>
+     */
+    private function parseDataRows(
+        \SplFileObject $file,
+        CsvFormatMapperInterface $mapper,
+        int $dataStartLine,
+        ?string &$pendingNextLine,
+        int &$lineNo,
+        array &$errors,
+    ): array {
+        $rows = [];
 
-        if ($colCount < 5) {
-            return [
-                'row' => null,
-                'fatalError' => new ImportErrorData(
-                    scope: 'ROW',
-                    code: 'CSV_COLUMN_LAYOUT_MISMATCH',
-                    message: sprintf(
-                        'Import przerwany: wiersz %d ma za mało kolumn (%d z 5 wymaganych: data operacji, opis, rachunek, kategoria banku, kwota). Sprawdź format pliku CSV mBank.',
-                        $lineNo,
-                        $colCount,
-                    ),
-                    lineNo: $lineNo,
-                    fatal: true,
-                ),
-            ];
-        }
-
-        if ($colCount > 5) {
-            return [
-                'row' => null,
-                'fatalError' => new ImportErrorData(
-                    scope: 'ROW',
-                    code: 'CSV_COLUMN_LAYOUT_MISMATCH',
-                    message: sprintf(
-                        'Import przerwany: wiersz %d zawiera dodatkowe kolumny (%d zamiast 5). Obsługiwany jest wyłącznie standardowy układ eksportu mBank.',
-                        $lineNo,
-                        $colCount,
-                    ),
-                    lineNo: $lineNo,
-                    fatal: true,
-                ),
-            ];
-        }
-
-        $dateStr                = trim($cols[0]);
-        $description            = trim($cols[1]);
-        $ownAccountLabelRaw     = trim($cols[2]);
-        $bankCategory           = trim($cols[3]);
-        $amountRaw              = trim($cols[4]);
-        $counterpartyAccountRaw = $this->counterpartyAccountExtractor->extract($description);
-
-        if ($dateStr === '') {
-            return [
-                'row' => new ImportRowData(
-                    lineNo: $lineNo,
-                    operationDate: null,
-                    descriptionRaw: $description ?: null,
-                    ownAccountLabelRaw: $ownAccountLabelRaw ?: null,
-                    counterpartyAccountRaw: $counterpartyAccountRaw,
-                    bankCategoryRaw: $bankCategory ?: null,
-                    amountRaw: $amountRaw ?: null,
-                    amountMinor: null,
-                    parseStatus: 'ERROR',
-                    parseError: 'Brak daty operacji — linia pominięta.',
-                ),
-                'fatalError' => null,
-            ];
-        }
-
-        $parseStatus   = 'OK';
-        $parseError    = null;
-        $operationDate = null;
-        $amountMinor   = null;
-
-        $dt = \DateTimeImmutable::createFromFormat('Y-m-d', $dateStr);
-        if ($dt !== false) {
-            $operationDate = $dt;
+        if ($pendingNextLine !== null) {
+            $lineNo = $dataStartLine - 1;
+            $line   = $pendingNextLine;
+            $pendingNextLine = null;
         } else {
-            $parseStatus = 'ERROR';
-            $parseError  = "Nieprawidłowy format daty: {$dateStr}";
+            $line = null;
         }
 
-        if ($amountRaw !== '') {
-            $result = $this->parseAmount($amountRaw);
-            if ($result === null) {
-                $parseStatus = 'ERROR';
-                $parseError  = ($parseError ? $parseError . '; ' : '') . "Nieprawidłowa kwota: {$amountRaw}";
-            } else {
-                [$amountMinor, $currency] = $result;
-                if ($currency !== 'PLN') {
-                    $parseStatus = 'ERROR';
-                    $parseError  = ($parseError ? $parseError . '; ' : '') . "Obsługiwana jest tylko waluta PLN (wykryto: {$currency})";
+        while (true) {
+            if ($line === null) {
+                $line = $this->readNextLine($file, $pendingNextLine, $lineNo);
+                if ($line === null) {
+                    break;
                 }
             }
+
+            $currentLine = $line;
+            $line        = null;
+
+            if (trim($currentLine) === '') {
+                continue;
+            }
+
+            if ($this->rowBoundary->isMetadataLine($currentLine)) {
+                break;
+            }
+
+            if ($this->rowBoundary->isDisclaimerLine($currentLine)) {
+                break;
+            }
+
+            while (!$this->rowBoundary->isCsvRecordComplete($currentLine)) {
+                $nextPart = $this->readNextLine($file, $pendingNextLine, $lineNo);
+                if ($nextPart === null) {
+                    break;
+                }
+                $currentLine .= "\n" . $nextPart;
+            }
+
+            if ($this->rowBoundary->isMetadataLine($currentLine)) {
+                break;
+            }
+
+            if ($this->rowBoundary->isDisclaimerLine($currentLine)) {
+                break;
+            }
+
+            $rowResult = $mapper->mapDataLine($lineNo, $this->parseCsvLine($currentLine));
+            if (!empty($rowResult['stopParsing'])) {
+                break;
+            }
+
+            if ($rowResult['fatalError'] !== null) {
+                $errors[] = $rowResult['fatalError'];
+                return [];
+            }
+
+            if ($rowResult['row'] !== null) {
+                $rows[] = $rowResult['row'];
+            }
         }
 
-        return [
-            'row' => new ImportRowData(
-                lineNo: $lineNo,
-                operationDate: $operationDate,
-                descriptionRaw: $description ?: null,
-                ownAccountLabelRaw: $ownAccountLabelRaw ?: null,
-                counterpartyAccountRaw: $counterpartyAccountRaw,
-                bankCategoryRaw: $bankCategory ?: null,
-                amountRaw: $amountRaw ?: null,
-                amountMinor: $amountMinor,
-                parseStatus: $parseStatus,
-                parseError: $parseError,
-            ),
-            'fatalError' => null,
-        ];
+        return $rows;
     }
 
-    /** @return array{0: string, 1: bool} resolved path and whether it is a temp file */
+    /** @return array{0: string, 1: bool} */
     private function resolveUtf8FilePath(string $filePath): array
     {
-        $sample = file_get_contents($filePath, false, null, 0, 131072);
-        if ($sample === false) {
-            return [$filePath, false];
-        }
-
-        $encoding = mb_detect_encoding($sample, ['UTF-8', 'ISO-8859-2', 'Windows-1252'], true);
-
-        if ($encoding === false || $encoding === 'UTF-8') {
-            return [$filePath, false];
-        }
-
-        try {
-            $converted = mb_convert_encoding(file_get_contents($filePath), 'UTF-8', $encoding);
-            if ($converted === false) {
-                return [$filePath, false];
-            }
-
-            $tmp = tempnam(sys_get_temp_dir(), 'csv_import_');
-            if ($tmp === false) {
-                return [$filePath, false];
-            }
-
-            file_put_contents($tmp, $converted);
-
-            return [$tmp, true];
-        } catch (\ValueError) {
-            return [$filePath, false];
-        }
+        return $this->encodingNormalizer->resolveUtf8FilePath($filePath);
     }
 
     private function readNextLine(\SplFileObject $file, ?string &$pendingNextLine, int &$lineNo): ?string
@@ -401,23 +337,15 @@ class MbankCsvImportProvider implements BankImportProviderInterface
     {
         $clean = preg_replace('/[^a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ ]/u', '', $raw);
         $clean = preg_replace('/\s+/', ' ', $clean ?? '');
+
         return trim($clean ?? '');
     }
 
     private function parseCsvLine(string $line): array
     {
         $result = str_getcsv($line, ';', '"');
+
         return array_map('trim', $result);
-    }
-
-    /** @param list<string> $cols */
-    private function normalizeDataColumns(array $cols): array
-    {
-        while ($cols !== [] && ($cols[array_key_last($cols)] ?? '') === '') {
-            array_pop($cols);
-        }
-
-        return $cols;
     }
 
     private function startsWithMarker(array $cols, string $marker): bool
@@ -426,10 +354,11 @@ class MbankCsvImportProvider implements BankImportProviderInterface
         $first       = rtrim($first, ':');
         $checkMarker = ltrim($marker, '#');
         $checkMarker = rtrim($checkMarker, ':');
+
         return mb_strtolower(trim($first)) === mb_strtolower(trim($checkMarker));
     }
 
-    private function parseDate(string $raw): ?\DateTimeImmutable
+    private function parsePeriodDate(string $raw): ?\DateTimeImmutable
     {
         $clean = trim(trim($raw), ';');
         $dt = \DateTimeImmutable::createFromFormat('d.m.Y', $clean);
@@ -440,28 +369,25 @@ class MbankCsvImportProvider implements BankImportProviderInterface
         if ($dt !== false) {
             return $dt->setTime(0, 0, 0);
         }
+
         return null;
     }
 
-    /** @return array{int, string}|null */
-    private function parseAmount(string $raw): ?array
+    private function normalizeAccountRaw(string $raw): string
     {
-        $currency = 'PLN';
-        if (preg_match('/([A-Z]{3})\s*$/', $raw, $m)) {
-            $currency = $m[1];
-            $raw      = trim(substr($raw, 0, -strlen($m[0])));
+        $clean = preg_replace('/[\x{00A0}\x{2007}\x{202F}]+/u', ' ', $raw);
+        $clean = preg_replace('/\s+/u', ' ', $clean ?? '');
+
+        return trim($clean ?? '');
+    }
+
+    private function extractAccountDigits(string $raw): string
+    {
+        $raw = $this->normalizeAccountRaw($raw);
+        if (preg_match('/(\d[\d\s]{15,})/', $raw, $match)) {
+            return preg_replace('/\D+/', '', $match[1]) ?? '';
         }
 
-        $raw = preg_replace('/\s/', '', $raw);
-        $raw = str_replace(',', '.', $raw);
-
-        if (!is_numeric($raw)) {
-            return null;
-        }
-
-        $float       = (float)$raw;
-        $amountMinor = (int)round($float * 100);
-
-        return [$amountMinor, $currency];
+        return preg_replace('/\D+/', '', $raw) ?? '';
     }
 }

@@ -40,7 +40,12 @@ export function additionalConditionsCount(conditions: RuleCondition[]): number {
   return stripDirectionCondition(conditions).length
 }
 
-const TEXT_FIELDS: RuleConditionField[] = ['description', 'counterparty_account_number']
+const TEXT_FIELDS: RuleConditionField[] = [
+  'trans_description',
+  'trans_title',
+  'counterparty_name',
+  'counterparty_account_number',
+]
 
 const TEXT_OPERATORS: RuleOperator[] = [
   'equals',
@@ -84,12 +89,14 @@ const DATE_OPERATORS: RuleOperator[] = [
 ]
 
 const OPERATORS_BY_FIELD: Record<RuleConditionField, RuleOperator[]> = {
-  description: TEXT_OPERATORS,
+  trans_description: TEXT_OPERATORS,
+  trans_title: TEXT_OPERATORS,
+  counterparty_name: TEXT_OPERATORS,
   counterparty_account_number: TEXT_OPERATORS,
   direction: ENUM_OPERATORS,
   classification_status: ENUM_OPERATORS,
   amount_minor: NUMERIC_OPERATORS,
-  operation_date: DATE_OPERATORS,
+  trans_date: DATE_OPERATORS,
 }
 
 export function operatorsForField(field: RuleConditionField) {

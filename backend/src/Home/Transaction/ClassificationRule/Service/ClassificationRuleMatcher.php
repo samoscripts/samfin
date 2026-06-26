@@ -46,10 +46,12 @@ class ClassificationRuleMatcher
     private function fieldValue(Transaction $tx, string $field): mixed
     {
         return match ($field) {
-            'description'                  => $tx->getDescription(),
+            'trans_description'            => $tx->getTransDescription(),
+            'trans_title'                  => $tx->getTransTitle(),
+            'counterparty_name'            => $tx->getCounterpartyName(),
             'direction'                    => $tx->getDirection(),
             'amount_minor'                 => $tx->getAmountMinor(),
-            'operation_date'               => $tx->getOperationDate()?->format('Y-m-d'),
+            'trans_date'                   => $tx->getTransDate()?->format('Y-m-d'),
             'classification_status'          => $tx->getStatus(),
             'counterparty_account_number'  => $tx->getCounterpartyAccountNumber(),
             default                        => null,

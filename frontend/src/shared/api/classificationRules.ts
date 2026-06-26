@@ -2,10 +2,12 @@ import api from './client'
 import type { TransactionFilters } from './transactions'
 
 export type RuleConditionField =
-  | 'description'
+  | 'trans_description'
+  | 'trans_title'
+  | 'counterparty_name'
   | 'direction'
   | 'amount_minor'
-  | 'operation_date'
+  | 'trans_date'
   | 'classification_status'
   | 'counterparty_account_number'
 

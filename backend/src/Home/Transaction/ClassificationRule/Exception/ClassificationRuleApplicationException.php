@@ -67,8 +67,9 @@ class ClassificationRuleApplicationException extends \InvalidArgumentException
             ],
             'transaction' => [
                 'lineNo'        => $importRow?->getLineNo(),
-                'description'   => $tx->getDescription(),
-                'operationDate' => $tx->getOperationDate()?->format('Y-m-d'),
+                'transTitle'    => $tx->getTransTitle(),
+                'transDescription' => $tx->getTransDescription(),
+                'transDate'     => $tx->getTransDate()?->format('Y-m-d'),
                 'direction'     => $tx->getDirection(),
                 'amountMinor'   => $tx->getAmountMinor(),
                 'source'        => $tx->getSource(),
@@ -102,8 +103,8 @@ class ClassificationRuleApplicationException extends \InvalidArgumentException
 
         $lines[] = sprintf(
             'Transakcja: %s, „%s”, %s %s',
-            $tx['operationDate'] ?? '—',
-            $tx['description'] ?? '—',
+            $tx['transDate'] ?? '—',
+            self::formatTransactionLabel($tx),
             self::directionLabel($tx['direction'] ?? ''),
             self::formatAmount($tx['amountMinor'] ?? 0),
         );
@@ -206,5 +207,21 @@ class ClassificationRuleApplicationException extends \InvalidArgumentException
         $abs  = abs($amountMinor);
 
         return sprintf('%s%s,%02d zł', $sign, intdiv($abs, 100), $abs % 100);
+    }
+
+    /** @param array<string, mixed> $tx */
+    private static function formatTransactionLabel(array $tx): string
+    {
+        $title = $tx['transTitle'] ?? null;
+        if (is_string($title) && trim($title) !== '') {
+            return $title;
+        }
+
+        $desc = $tx['transDescription'] ?? null;
+        if (is_string($desc) && trim($desc) !== '') {
+            return $desc;
+        }
+
+        return '—';
     }
 }

@@ -3,8 +3,14 @@ import { buildSearchParams, parseOptionalString, parsePositiveInt } from '@/shar
 
 export interface TransactionNewUrlPrefill {
   direction?: Direction
+  transDate?: string
+  /** @deprecated użyj transDate */
   date?: string
   amount?: string
+  transDescription?: string
+  /** @deprecated użyj transDescription */
+  operationDesc?: string
+  /** @deprecated użyj transDescription */
   description?: string
   paidFromPartyId?: string
   paidToPartyId?: string
@@ -24,9 +30,13 @@ export function parseTransactionNewSearchParams(params: URLSearchParams): Transa
 
   return {
     direction,
-    date: parseOptionalString(params.get('date')),
+    transDate:
+      parseOptionalString(params.get('transDate')) ?? parseOptionalString(params.get('date')),
     amount: parseOptionalString(params.get('amount')),
-    description: parseOptionalString(params.get('description')),
+    transDescription:
+      parseOptionalString(params.get('transDescription')) ??
+      parseOptionalString(params.get('operationDesc')) ??
+      parseOptionalString(params.get('description')),
     paidFromPartyId: parseOptionalString(params.get('paidFromPartyId')),
     paidToPartyId: parseOptionalString(params.get('paidToPartyId')),
     walletId: parseOptionalString(params.get('walletId')),
@@ -38,9 +48,9 @@ export function parseTransactionNewSearchParams(params: URLSearchParams): Transa
 export function serializeTransactionNewSearchParams(prefill: TransactionNewUrlPrefill): URLSearchParams {
   return buildSearchParams({
     direction: prefill.direction,
-    date: prefill.date,
+    transDate: prefill.transDate ?? prefill.date,
     amount: prefill.amount,
-    description: prefill.description,
+    transDescription: prefill.transDescription ?? prefill.description ?? prefill.operationDesc,
     paidFromPartyId: prefill.paidFromPartyId,
     paidToPartyId: prefill.paidToPartyId,
     walletId: prefill.walletId,

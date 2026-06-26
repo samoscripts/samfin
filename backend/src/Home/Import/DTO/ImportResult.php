@@ -2,12 +2,15 @@
 
 namespace App\Home\Import\DTO;
 
+use App\Home\Import\Enum\CsvFormatVersion;
+
 final class ImportResult
 {
-    /** @param ImportRowData[]   $rows */
-    /** @param ImportErrorData[] $errors */
+    /** @param NormalizedImportRow[] $rows */
+    /** @param ImportErrorData[]     $errors */
     public function __construct(
         public readonly bool   $headerValid,
+        public readonly ?CsvFormatVersion $csvFormat,
         public readonly ?string $detectedClientName,
         public readonly ?string $detectedAccountNumber,
         public readonly ?string $detectedAccountDisplay,
@@ -30,6 +33,7 @@ final class ImportResult
                 return true;
             }
         }
+
         return false;
     }
 }

@@ -20,6 +20,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od 
 | `transactions` | `Transaction` | Transakcje |
 | `transaction_items` | `TransactionItem` | Pozycje transakcji |
 | `transactions_change_log` | `TransactionChangeLog` | Historia klasyfikacji |
+| `transactions_trash` | `TransactionTrash` | Snapshot usuniętych transakcji (przed hard DELETE) |
 | `classification_rule` | `ClassificationRule` | Reguły auto-klasyfikacji per podmiot |
 | `transaction_template` | `TransactionTemplate` | Szablony klasyfikacji per użytkownik (wpływ/wydatek) |
 | `settlement_config` | `SettlementConfig` | Konfiguracja rozliczenia wpłat (per `user_id`) |
@@ -143,7 +144,7 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 
 ## Indeksy istotne dla zapytań
 
-**transactions:** `operation_date`, `status`, `direction`, `import_id`, `paid_from_party_id`, `paid_to_party_id`, unikalny `import_row_id`.
+**transactions:** `trans_date`, `status`, `direction`, `import_id`, `paid_from_party_id`, `paid_to_party_id`, unikalny `import_row_id`.
 
 **transaction_items:** `transaction_id`, `wallet_id`, `concern_id`, `category_id`.
 
@@ -178,6 +179,12 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260626120000` | Repair: utworzenie `common_account_settlement_config` jeśli brak (gdy `20260625120000` zapisana bez tabeli) |
 | `20260627120000` | Rename: `settlement_config`, kolumna `settlement_party_id` |
 | `20260628120000` | `settlement_ledger_entry`; kolumny indeksu na `settlement_config` (`reindex_from_date`, salda początkowe, `needs_refresh`, …) |
+| `20260629120000` | `transactions_trash` — kosz snapshotów przed usunięciem transakcji |
+| `20260627120000` | CSV mBank v2: `csv_format`, pola booking/title/kontrahent; reset `classification_rule` |
+| `20260630120000` | Repair: DDL z `20260627120000` jeśli kolumny nie powstały przy pierwszym uruchomieniu |
+| `20260701143022` | `transactions`: rename `title`→`operation_title`, `description`→`operation_desc`, `balance_after_minor`; reset `classification_rule` |
+| `20260702120000` | `transactions`: rename `operation_*`→`trans_*`, `trans_localization`, drop `operation_type`, pełna kolejność kolumn; `csv_import_row.title_localization_raw`; reset `classification_rule` |
+| `20260704143000` | Drop `trans_localization`, `csv_import_row.title_localization_raw`; reorder kolumn `transactions` po dropie |
 
 ## Zapytania diagnostyczne (tylko SELECT)
 
@@ -262,7 +269,9 @@ Wszystkie kwoty pieniężne w DB: **`INT` grosze** (`amount_minor`).
 
 ## Soft delete
 
-Brak kolumny `deleted_at`. Dezaktywacja przez `active = false` w: `party`, `party_bank_account`, `wallet`, `concern`, `category`, `app_user`.
+Brak kolumny `deleted_at` na encjach operacyjnych. Dezaktywacja przez `active = false` w: `party`, `party_bank_account`, `wallet`, `concern`, `category`, `app_user`.
+
+**Transakcje:** usunięcie użytkownika = hard `DELETE` z `transactions` po zapisie pełnego snapshotu w `transactions_trash` (`snapshot_json`, `original_transaction_id`, `deleted_at`, `deleted_by`). Usunięty wpis nie występuje w listach, statystykach, regułach ani raportach. Przyszły widok kosza — osobny endpoint na `transactions_trash` (poza MVP).
 
 ## Seed danych
 

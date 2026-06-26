@@ -7,9 +7,11 @@ export type RuleDirection = 'EXPENSE' | 'INCOME' | ''
 
 export const CONDITION_FIELDS: { value: RuleConditionField; label: string }[] = [
   { value: 'direction', label: 'Kierunek' },
-  { value: 'description', label: 'Opis' },
+  { value: 'trans_description', label: 'Opis transakcji' },
+  { value: 'trans_title', label: 'Tytuł transakcji' },
+  { value: 'counterparty_name', label: 'Kontrahent' },
   { value: 'amount_minor', label: 'Kwota (grosze)' },
-  { value: 'operation_date', label: 'Data operacji' },
+  { value: 'trans_date', label: 'Data transakcji' },
   { value: 'classification_status', label: 'Status klasyfikacji' },
   { value: 'counterparty_account_number', label: 'NRB kontrahenta' },
 ]
@@ -54,7 +56,7 @@ export const OPERATORS: { value: RuleOperator; label: string }[] = [
 
 export const EMPTY_CONDITION: RuleCondition = {
 
-  field: 'description',
+  field: 'trans_description',
 
   operator: 'contains',
 

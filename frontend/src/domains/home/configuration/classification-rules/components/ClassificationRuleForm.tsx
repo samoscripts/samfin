@@ -102,7 +102,12 @@ export default function ClassificationRuleForm({
   const [form, setForm] = useState<FormState>(() => initialFormState(rule, initialDraft))
 
   const [transactionSeeds, setTransactionSeeds] = useState<TransactionConditionSeeds>(() =>
-    initialDraft?.transactionSeeds ?? { description: false, counterparty: false },
+    initialDraft?.transactionSeeds ?? {
+      transTitle: false,
+      transDescription: false,
+      counterparty: false,
+      counterpartyName: false,
+    },
   )
 
   const [saving, setSaving] = useState(false)

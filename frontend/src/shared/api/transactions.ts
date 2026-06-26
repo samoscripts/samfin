@@ -32,9 +32,10 @@ export interface TransactionStats {
 
 export interface CreateTransactionPayload {
   direction: string
-  date: string
+  transDate: string
   amount: number
-  description: string
+  transDescription: string
+  transTitle?: string | null
   paidFromPartyId?: number | null
   paidToPartyId?: number | null
   items?: ItemPayload[]
@@ -67,6 +68,10 @@ export const fetchTransactions = async (
 
 export const fetchTransaction = async (id: number): Promise<Transaction> =>
   (await api.get<Transaction>(`/transactions/${id}`)).data
+
+export const deleteTransaction = async (id: number): Promise<void> => {
+  await api.delete(`/transactions/${id}`)
+}
 
 export const createTransaction = async (payload: CreateTransactionPayload): Promise<Transaction> =>
   (await api.post<Transaction>('/transactions', payload)).data

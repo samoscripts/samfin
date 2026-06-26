@@ -40,6 +40,14 @@ function formatAmount(minor: number | null): string {
   return `${sign}${zloty},${grosze} PLN`
 }
 
+function rowTitle(row: CsvImportRow): string | null {
+  return row.titleClean ?? row.descriptionRaw
+}
+
+function isLegacyRow(row: CsvImportRow): boolean {
+  return row.csvFormat === 'MBANK_OPERATIONS_LIST' || (!row.csvFormat && row.bankCategoryRaw != null)
+}
+
 export default function ImportWiersze() {
   const { id } = useParams<{ id: string }>()
   const importId = parseInt(id ?? '0')
@@ -145,10 +153,10 @@ export default function ImportWiersze() {
                 <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-12">#</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-24">Data</th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400">Opis</th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-36">Własny rachunek</th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-44">Konto kontrahenta</th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-32">Kategoria banku</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400">Tytuł / opis</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-40">Typ</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-36">Kontrahent</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 dark:text-gray-400 w-44">NRB</th>
                   <th className="px-3 py-2.5 text-right font-semibold text-gray-500 dark:text-gray-400 w-36">Kwota</th>
                   <th className="px-3 py-2.5 text-center font-semibold text-gray-500 dark:text-gray-400 w-20">Status</th>
                 </tr>
@@ -167,21 +175,24 @@ export default function ImportWiersze() {
                       {row.operationDate ?? '—'}
                     </td>
                     <td className="px-3 py-2.5 text-gray-800 dark:text-gray-200 max-w-sm">
-                      <ListTextTooltip text={row.descriptionRaw} />
+                      <ListTextTooltip text={rowTitle(row)} />
+                      {isLegacyRow(row) && row.bankCategoryRaw && (
+                        <p className="text-xs text-gray-400 mt-0.5 truncate">{row.bankCategoryRaw}</p>
+                      )}
                       {row.parseStatus === 'PARSE_ERROR' && row.parseError && (
                         <p className="text-red-600 dark:text-red-400 mt-0.5 text-xs">
                           {row.parseError}
                         </p>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[140px] truncate" title={row.ownAccountLabelRaw ?? ''}>
-                      {row.ownAccountLabelRaw ?? '—'}
+                    <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[160px] truncate" title={row.operationTypeRaw ?? ''}>
+                      {row.operationTypeRaw ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[140px] truncate" title={row.counterpartyNameRaw ?? ''}>
+                      {row.counterpartyNameRaw ?? '—'}
                     </td>
                     <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[180px] truncate font-mono text-[11px]" title={row.counterpartyAccountRaw ?? ''}>
                       {row.counterpartyAccountRaw ?? '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[120px] truncate">
-                      {row.bankCategoryRaw ?? '—'}
                     </td>
                     <td className={[
                       'px-3 py-2.5 text-right font-mono whitespace-nowrap',
@@ -217,14 +228,17 @@ export default function ImportWiersze() {
                     {ROW_STATUS_LABEL[row.parseStatus] ?? row.parseStatus}
                   </span></div>
                 <div className="text-sm text-gray-800 dark:text-gray-200">
-                  <ListTextTooltip text={row.descriptionRaw} lines={2} />
+                  <ListTextTooltip text={rowTitle(row)} lines={2} />
+                  {row.operationTypeRaw && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{row.operationTypeRaw}</p>
+                  )}
                 </div>
-                {(row.ownAccountLabelRaw || row.counterpartyAccountRaw) && (
+                {(row.counterpartyNameRaw || row.counterpartyAccountRaw) && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                    {row.ownAccountLabelRaw && (
-                      <span title={row.ownAccountLabelRaw}>{row.ownAccountLabelRaw}</span>
+                    {row.counterpartyNameRaw && (
+                      <span title={row.counterpartyNameRaw}>{row.counterpartyNameRaw}</span>
                     )}
-                    {row.ownAccountLabelRaw && row.counterpartyAccountRaw && (
+                    {row.counterpartyNameRaw && row.counterpartyAccountRaw && (
                       <span className="mx-1 text-gray-300 dark:text-gray-600">·</span>
                     )}
                     {row.counterpartyAccountRaw && (

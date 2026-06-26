@@ -4,7 +4,7 @@ namespace App\Home\Import\Service;
 
 use App\Home\Configuration\Repository\PartyBankAccountRepository;
 use App\Home\Import\DTO\ImportErrorData;
-use App\Home\Import\DTO\ImportRowData;
+use App\Home\Import\DTO\NormalizedImportRow;
 use App\Home\Import\Entity\CsvImport;
 use App\Home\Import\Entity\CsvImportError;
 use App\Home\Import\Entity\CsvImportRow;
@@ -59,6 +59,7 @@ class CsvImportService
             $csvImport->setDetectedAccountDisplay($result->detectedAccountDisplay);
             $csvImport->setPeriodFrom($result->periodFrom);
             $csvImport->setPeriodTo($result->periodTo);
+            $csvImport->setCsvFormat($result->csvFormat?->value);
 
             $businessErrors = [];
 
@@ -91,19 +92,26 @@ class CsvImportService
             $batchCount  = 0;
 
             foreach ($result->rows as $rowData) {
-                /** @var ImportRowData $rowData */
+                /** @var NormalizedImportRow $rowData */
                 $csvImport = $this->requireImport($importId);
 
                 $row = new CsvImportRow();
                 $row->setCsvImport($csvImport);
+                $row->setCsvFormat($rowData->csvFormat->value);
                 $row->setLineNo($rowData->lineNo);
+                $row->setBookingDate($rowData->bookingDate);
                 $row->setOperationDate($rowData->operationDate);
                 $row->setDescriptionRaw($rowData->descriptionRaw);
+                $row->setOperationTypeRaw($rowData->operationType);
+                $row->setTitleRaw($rowData->titleRaw);
+                $row->setTitleClean($rowData->title);
+                $row->setCounterpartyNameRaw($rowData->counterpartyName);
                 $row->setOwnAccountLabelRaw($rowData->ownAccountLabelRaw);
-                $row->setCounterpartyAccountRaw($rowData->counterpartyAccountRaw);
+                $row->setCounterpartyAccountRaw($rowData->counterpartyAccount);
                 $row->setBankCategoryRaw($rowData->bankCategoryRaw);
                 $row->setAmountRaw($rowData->amountRaw);
                 $row->setAmountMinor($rowData->amountMinor);
+                $row->setBalanceAfterMinor($rowData->balanceAfterMinor);
                 $row->setParseStatus(
                     $rowData->parseStatus === 'OK'
                         ? CsvImportRow::STATUS_VALIDATED
@@ -208,12 +216,12 @@ class CsvImportService
             return $errors;
         }
 
-        $normalizedDetected = preg_replace('/\D/', '', $detectedAccountNumber);
+        $normalizedDetected = preg_replace('/\D+/u', '', $detectedAccountNumber);
 
         $allAccounts = $this->partyBankAccountRepository->findAll();
         $matched     = null;
         foreach ($allAccounts as $pba) {
-            $normalizedDb = preg_replace('/\D/', '', (string)$pba->getAccountNumber());
+            $normalizedDb = preg_replace('/\D+/u', '', (string) $pba->getAccountNumber());
             if ($normalizedDb === $normalizedDetected) {
                 $matched = $pba;
                 break;

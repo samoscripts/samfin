@@ -16,10 +16,7 @@ import {
 import { useAuth } from '@/app/providers/AuthProvider'
 import { useAppInfo } from '@/shared/hooks/useAppInfo'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
-import {
-  ENV_ACCENT_OVERLAY_CLASS,
-  isProductionEnvironment,
-} from '@/shared/utils/environmentDisplay'
+import { getSidebarShellClass } from '@/shared/utils/environmentDisplay'
 
 interface NavItem {
   to: string
@@ -93,8 +90,6 @@ function SidebarNav({
   isMobile?: boolean
 }) {
   const { user, logout } = useAuth()
-  const info = useAppInfo()
-  const isNonProd = info != null && !isProductionEnvironment(info.environment)
   const location = useLocation()
   const navigate = useNavigate()
   const navCollapsed = isMobile ? false : collapsed
@@ -133,7 +128,6 @@ function SidebarNav({
           navCollapsed ? 'justify-center px-0' : 'justify-start pl-3 pr-4',
         ].join(' ')}
       >
-        {isNonProd && <div className={ENV_ACCENT_OVERLAY_CLASS} aria-hidden="true" />}
         {navCollapsed ? (
           <img src="/app/images/samfin_logo_ico.png" alt="SamFin" className="relative h-9 w-9 object-contain" />
         ) : (
@@ -318,11 +312,15 @@ function SidebarNav({
 }
 
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
+  const info = useAppInfo()
+  const shellBg = getSidebarShellClass(info?.environment)
+
   return (
     <>
       <aside
         className={[
-          'hidden md:flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden bg-gray-900',
+          'hidden md:flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden',
+          shellBg,
           collapsed ? 'w-16' : 'w-64',
         ].join(' ')}
       >
@@ -336,7 +334,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
             onClick={onMobileClose}
             aria-hidden="true"
           />
-          <aside className="md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col overflow-hidden bg-gray-900">
+          <aside className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col overflow-hidden ${shellBg}`}>
             <SidebarNav
               collapsed={false}
               onToggle={onToggle}

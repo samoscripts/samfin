@@ -48,10 +48,10 @@ class TransactionRepository extends ServiceEntityRepository
         }
 
         $allowedSortFields = [
-            'date'   => 't.operationDate',
+            'date'   => 't.transDate',
             'amount' => 't.amountMinor',
         ];
-        $orderExpr = $allowedSortFields[$sortField] ?? 't.operationDate';
+        $orderExpr = $allowedSortFields[$sortField] ?? 't.transDate';
         $orderDir  = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
 
         $iqb = $this->createQueryBuilder('t')
@@ -170,28 +170,133 @@ class TransactionRepository extends ServiceEntityRepository
         ?Party $party,
         ?\DateTimeImmutable $operationDate,
         int $amountMinor,
-        ?string $description,
+        ?string $counterpartyAccount,
+        ?string $canonicalText,
     ): ?Transaction {
         if ($party === null || $operationDate === null) {
             return null;
         }
 
-        // csv_import_row stores DATETIME (often with spurious time); transactions use DATE only.
         $dateOnly = $operationDate->setTime(0, 0);
+        $fingerprint = self::duplicateFingerprint(
+            $dateOnly,
+            $amountMinor,
+            $counterpartyAccount,
+            $canonicalText,
+        );
 
-        return $this->createQueryBuilder('t')
+        $rows = $this->createQueryBuilder('t')
+            ->select('t')
             ->join('t.import', 'i')
             ->where('i.party = :party')
-            ->andWhere('t.operationDate = :date')
+            ->andWhere('t.transDate = :date')
             ->andWhere('t.amountMinor = :amount')
-            ->andWhere('t.description = :description')
             ->setParameter('party', $party)
             ->setParameter('date', $dateOnly)
             ->setParameter('amount', $amountMinor)
-            ->setParameter('description', $description)
-            ->setMaxResults(1)
             ->getQuery()
-            ->getOneOrNullResult();
+            ->getResult();
+
+        foreach ($rows as $tx) {
+            if (!$tx instanceof Transaction) {
+                continue;
+            }
+
+            $candidate = self::duplicateFingerprint(
+                $dateOnly,
+                $amountMinor,
+                $tx->getCounterpartyAccountNumber(),
+                self::canonicalDuplicateText(
+                    $tx->getTransTitle(),
+                    $tx->getTransDescription(),
+                ),
+            );
+
+            if ($candidate === $fingerprint) {
+                return $tx;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, true> fingerprint => true
+     */
+    public function buildDuplicateLookup(
+        Party $party,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+    ): array {
+        $rows = $this->createQueryBuilder('t')
+            ->select('t.transDate, t.amountMinor, t.transTitle, t.transDescription, t.counterpartyAccountNumber')
+            ->join('t.import', 'i')
+            ->where('i.party = :party')
+            ->andWhere('t.transDate >= :dateFrom')
+            ->andWhere('t.transDate <= :dateTo')
+            ->setParameter('party', $party)
+            ->setParameter('dateFrom', $dateFrom->setTime(0, 0))
+            ->setParameter('dateTo', $dateTo->setTime(0, 0))
+            ->getQuery()
+            ->getArrayResult();
+
+        $lookup = [];
+        foreach ($rows as $row) {
+            $immutable = self::normalizeOperationDate($row['transDate'] ?? null);
+            if ($immutable === null) {
+                continue;
+            }
+
+            $fingerprint = self::duplicateFingerprint(
+                $immutable,
+                (int) $row['amountMinor'],
+                $row['counterpartyAccountNumber'] ?? null,
+                self::canonicalDuplicateText(
+                    $row['transTitle'] ?? null,
+                    $row['transDescription'] ?? null,
+                ),
+            );
+            $lookup[$fingerprint] = true;
+        }
+
+        return $lookup;
+    }
+
+    public static function canonicalDuplicateText(
+        ?string $transTitle,
+        ?string $transDescription,
+    ): string {
+        $candidate = $transTitle ?? $transDescription ?? '';
+
+        return mb_strtolower(trim($candidate));
+    }
+
+    public static function duplicateFingerprint(
+        \DateTimeImmutable $operationDate,
+        int $amountMinor,
+        ?string $counterpartyAccount,
+        ?string $canonicalText,
+    ): string {
+        $dateOnly = $operationDate->setTime(0, 0);
+        $account  = $counterpartyAccount ?? '';
+        $text     = mb_strtolower(trim($canonicalText ?? ''));
+
+        return $dateOnly->format('Y-m-d') . '|' . $amountMinor . '|' . $account . '|' . $text;
+    }
+
+    private static function normalizeOperationDate(mixed $value): ?\DateTimeImmutable
+    {
+        if ($value instanceof \DateTimeImmutable) {
+            return $value;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return \DateTimeImmutable::createFromInterface($value);
+        }
+        if (is_string($value) && $value !== '') {
+            return new \DateTimeImmutable($value);
+        }
+
+        return null;
     }
 
     public function findByImportRow(CsvImportRow $row): ?Transaction
@@ -202,11 +307,11 @@ class TransactionRepository extends ServiceEntityRepository
     private function applyFilters(QueryBuilder $qb, array $f, bool $itemJoined): void
     {
         if (!empty($f['dateFrom'])) {
-            $qb->andWhere('t.operationDate >= :dateFrom')
+            $qb->andWhere('t.transDate >= :dateFrom')
                ->setParameter('dateFrom', new \DateTimeImmutable($f['dateFrom']));
         }
         if (!empty($f['dateTo'])) {
-            $qb->andWhere('t.operationDate <= :dateTo')
+            $qb->andWhere('t.transDate <= :dateTo')
                ->setParameter('dateTo', new \DateTimeImmutable($f['dateTo']));
         }
         if (!empty($f['direction'])) {
@@ -254,8 +359,12 @@ class TransactionRepository extends ServiceEntityRepository
                ->setParameter('amountMax', $maxMinor);
         }
         if (!empty($f['description'])) {
-            $qb->andWhere('LOWER(t.description) LIKE LOWER(:description)')
-               ->setParameter('description', '%' . trim((string) $f['description']) . '%');
+            $needle = '%' . trim((string) $f['description']) . '%';
+            $qb->andWhere(
+                'LOWER(t.transDescription) LIKE LOWER(:description)
+                OR LOWER(t.transTitle) LIKE LOWER(:description)
+                OR LOWER(t.counterpartyName) LIKE LOWER(:description)',
+            )->setParameter('description', $needle);
         }
     }
 

@@ -140,9 +140,10 @@ export function serializeTransactionSearchParams(state: TransactionUrlState): UR
     base.set('tab', 'create')
     const prefillParams = buildSearchParams({
       direction: createPrefill.direction,
-      date: createPrefill.date,
+      transDate: createPrefill.transDate ?? createPrefill.date,
       amount: createPrefill.amount,
-      description: createPrefill.description,
+      transDescription:
+        createPrefill.transDescription ?? createPrefill.description ?? createPrefill.operationDesc,
       paidFromPartyId: createPrefill.paidFromPartyId,
       paidToPartyId: createPrefill.paidToPartyId,
       walletId: createPrefill.walletId,

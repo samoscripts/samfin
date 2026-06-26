@@ -56,12 +56,12 @@ function firstIndexOfField(conditions: RuleCondition[], field: RuleConditionFiel
   return conditions.findIndex((c) => c.field === field)
 }
 
-function isSeededDescriptionRow(
+function isSeededTransTitleRow(
   index: number,
   conditions: RuleCondition[],
   seeds: TransactionConditionSeeds,
 ): boolean {
-  return seeds.description && firstIndexOfField(conditions, 'description') === index
+  return seeds.transTitle && firstIndexOfField(conditions, 'trans_title') === index
 }
 
 function isSeededCounterpartyRow(
@@ -89,7 +89,7 @@ export default function RuleConditionsEditor({
   transactionSeeds,
   onTransactionSeedsChange,
 }: RuleConditionsEditorProps) {
-  const seeds = transactionSeeds ?? { description: false, counterparty: false }
+  const seeds = transactionSeeds ?? { transTitle: false, transDescription: false, counterparty: false, counterpartyName: false }
   const normalized = ensureDirectionCondition(conditions)
   const direction = extractDirectionFromConditions(normalized)
   const additional = stripDirectionCondition(normalized)
@@ -120,8 +120,8 @@ export default function RuleConditionsEditor({
     const globalIndex = i + 1
     if (fromTransaction && onTransactionSeedsChange) {
       const nextSeeds = { ...seeds }
-      if (isSeededDescriptionRow(globalIndex, normalized, seeds)) {
-        nextSeeds.description = false
+      if (isSeededTransTitleRow(globalIndex, normalized, seeds)) {
+        nextSeeds.transTitle = false
       }
       if (isSeededCounterpartyRow(globalIndex, normalized, seeds)) {
         nextSeeds.counterparty = false
@@ -188,9 +188,9 @@ export default function RuleConditionsEditor({
         {additional.map((cond, i) => {
           const globalIndex = i + 1
           const fieldOperators = operatorsForField(cond.field)
-          const seededDesc = fromTransaction && isSeededDescriptionRow(globalIndex, normalized, seeds)
+          const seededTitle = fromTransaction && isSeededTransTitleRow(globalIndex, normalized, seeds)
           const seededNrb = fromTransaction && isSeededCounterpartyRow(globalIndex, normalized, seeds)
-          const manualRow = !seededDesc && !seededNrb
+          const manualRow = !seededTitle && !seededNrb
           const fields = selectableFields(fromTransaction, manualRow)
 
           return (
@@ -199,7 +199,7 @@ export default function RuleConditionsEditor({
               className="flex flex-wrap gap-2 items-end p-3 rounded-lg bg-gray-50 dark:bg-gray-800/40"
             >
               <FormField label="Pole" className="flex-1 min-w-[120px]">
-                {seededDesc || seededNrb ? (
+                {seededTitle || seededNrb ? (
                   <ReadOnlyField value={fieldLabel(cond.field)} />
                 ) : (
                   <Select

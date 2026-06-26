@@ -6,6 +6,7 @@ import type { Concern } from '@/shared/api/concerns'
 import type { Category } from '@/shared/api/categories'
 import type { Party } from '@/domains/home/configuration/parties/types'
 import { classifyTransactionItems, type ItemPayload } from '@/shared/api/transactions'
+import { transactionDisplayLabel } from '../utils/transactionDisplay'
 import ClassificationItemsEditor, {
   type ClassificationItemDraft,
 } from '@/shared/components/classification/ClassificationItemsEditor'
@@ -185,11 +186,11 @@ export default function TransactionEditForm({
 
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{tx.date}</span>
+          <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{tx.transDate}</span>
           <Pill variant={DIRECTION_PILL[tx.direction]}>{directionLabel}</Pill>
         </div>
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2 mb-1">
-          {tx.description ?? '—'}
+          {transactionDisplayLabel(tx)}
         </p>
         <p className="text-base font-bold text-gray-900 dark:text-gray-100">{formatAmount(tx.amount)}</p>
       </div>
@@ -326,7 +327,7 @@ export function TransactionEditBreadcrumb({
       </button>
       <ChevronRight size={12} className="shrink-0" />
       <span className="text-gray-600 dark:text-gray-400 font-medium">
-        Edycja{tx ? `: ${tx.description ?? tx.transactionId}` : ''}
+        Edycja{tx ? `: ${transactionDisplayLabel(tx)}` : ''}
       </span>
     </nav>
   )

@@ -35,6 +35,9 @@ class CsvImport
     #[ORM\Column(name: 'file_sha256', length: 64, nullable: true)]
     private ?string $fileSha256 = null;
 
+    #[ORM\Column(name: 'csv_format', length: 40, nullable: true)]
+    private ?string $csvFormat = null;
+
     #[ORM\Column(name: 'period_from', nullable: true)]
     private ?\DateTimeImmutable $periodFrom = null;
 
@@ -106,6 +109,7 @@ class CsvImport
             'status'                 => $this->status,
             'originalFilename'       => $this->originalFilename,
             'fileSha256'             => $this->fileSha256,
+            'csvFormat'              => $this->csvFormat,
             'periodFrom'             => $this->periodFrom?->format('Y-m-d'),
             'periodTo'               => $this->periodTo?->format('Y-m-d'),
             'detectedClientName'     => $this->detectedClientName,
@@ -137,6 +141,9 @@ class CsvImport
 
     public function getFileSha256(): ?string { return $this->fileSha256; }
     public function setFileSha256(?string $v): static { $this->fileSha256 = $v; return $this; }
+
+    public function getCsvFormat(): ?string { return $this->csvFormat; }
+    public function setCsvFormat(?string $v): static { $this->csvFormat = $v; return $this; }
 
     public function getPeriodFrom(): ?\DateTimeImmutable { return $this->periodFrom; }
     public function setPeriodFrom(?\DateTimeImmutable $v): static { $this->periodFrom = $v; return $this; }

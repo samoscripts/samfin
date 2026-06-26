@@ -2,8 +2,11 @@
 
 namespace App\Home\Transaction\ClassificationRule\Service;
 
+use App\Home\Configuration\Entity\Party;
 use App\Home\Transaction\ClassificationRule\Mapper\ClassificationRuleJsonMapper;
 use App\Home\Transaction\ClassificationRule\Repository\ClassificationRuleRepository;
+use App\Home\Transaction\ClassificationRule\ValueObject\PreparedClassificationRuleEntry;
+use App\Home\Transaction\ClassificationRule\ValueObject\PreparedClassificationRules;
 use App\Home\Transaction\Entity\Transaction;
 use App\Identity\Entity\User;
 
@@ -18,22 +21,10 @@ class ClassificationRuleEngine
         private ClassificationRuleConditionsNormalizer   $conditionsNormalizer,
     ) {}
 
-    /**
-     * Applies matching rules to a transaction. Returns true when at least one rule was applied.
-     */
-    public function applyToTransaction(Transaction $tx, User $user, bool $overwrite): bool
+    public function prepareForParty(Party $party): PreparedClassificationRules
     {
-        if (!$overwrite && $tx->getStatus() === Transaction::STATUS_CLASSIFIED) {
-            return false;
-        }
-
-        $party = $this->partyResolver->resolve($tx);
-        if ($party === null) {
-            return false;
-        }
-
         $rules = $this->ruleRepository->findActiveByPartyOrdered($party);
-        $applied = false;
+        $entries = [];
 
         foreach ($rules as $rule) {
             $partyId = $rule->getParty()?->getId();
@@ -45,15 +36,69 @@ class ClassificationRuleEngine
                 $rule->getConditionsJson(),
                 $this->conditionsNormalizer->inferDirectionFromActions($partyId, $rule->getActionsJson()),
             );
-            $conditions = $this->mapper->mapConditions($conditionsJson);
-            if (!$this->matcher->matches($tx, $conditions)) {
+
+            $entries[] = new PreparedClassificationRuleEntry(
+                (int) $rule->getId(),
+                $this->mapper->mapConditions($conditionsJson),
+                $rule->isStopOnMatch(),
+            );
+        }
+
+        return new PreparedClassificationRules($entries);
+    }
+
+    /**
+     * Applies matching rules to a transaction. Returns true when at least one rule was applied.
+     */
+    public function applyToTransaction(
+        Transaction $tx,
+        User $user,
+        bool $overwrite,
+        ?PreparedClassificationRules $prepared = null,
+    ): bool {
+        if (!$overwrite && $tx->getStatus() === Transaction::STATUS_CLASSIFIED) {
+            return false;
+        }
+
+        if ($prepared !== null) {
+            return $this->applyPreparedRules($tx, $user, $overwrite, $prepared);
+        }
+
+        $party = $this->partyResolver->resolve($tx);
+        if ($party === null) {
+            return false;
+        }
+
+        return $this->applyPreparedRules(
+            $tx,
+            $user,
+            $overwrite,
+            $this->prepareForParty($party),
+        );
+    }
+
+    private function applyPreparedRules(
+        Transaction $tx,
+        User $user,
+        bool $overwrite,
+        PreparedClassificationRules $prepared,
+    ): bool {
+        $applied = false;
+
+        foreach ($prepared->entries as $entry) {
+            if (!$this->matcher->matches($tx, $entry->conditions)) {
+                continue;
+            }
+
+            $rule = $this->ruleRepository->find($entry->ruleId);
+            if ($rule === null) {
                 continue;
             }
 
             $this->applier->applyRule($tx, $rule, $user, $overwrite);
             $applied = true;
 
-            if ($rule->isStopOnMatch()) {
+            if ($entry->stopOnMatch) {
                 break;
             }
         }

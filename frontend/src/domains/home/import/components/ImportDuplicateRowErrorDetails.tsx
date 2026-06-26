@@ -55,11 +55,11 @@ export default function ImportDuplicateRowErrorDetails({
             {tx.importId != null ? ` (import #${tx.importId})` : ''}
           </dd>
           <dt className="text-red-600/80 dark:text-red-400/80">Data</dt>
-          <dd>{tx.operationDate ?? '—'}</dd>
+          <dd>{tx.transDate ?? '—'}</dd>
           <dt className="text-red-600/80 dark:text-red-400/80">Kwota</dt>
           <dd>{formatAmount(tx.amountMinor ?? 0)}</dd>
           <dt className="text-red-600/80 dark:text-red-400/80">Opis</dt>
-          <dd>„{tx.description ?? '—'}”</dd>
+          <dd>„{tx.transTitle ?? tx.transDescription ?? '—'}”</dd>
         </dl>
       </div>
     </div>

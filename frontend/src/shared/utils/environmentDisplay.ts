@@ -12,8 +12,20 @@ export const ENV_SHORT_LABELS: Record<string, string> = {
   staging: 'STAGING',
 }
 
+/** Dev shell: sidebar + topbar share deep red (#360000). */
+export const DEV_SHELL_BG_CLASS = 'bg-[#360000]'
+
+export const PROD_SIDEBAR_BG_CLASS = 'bg-gray-900'
+
+export const PROD_TOPBAR_CLASS =
+  'bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800'
+
 export function isProductionEnvironment(environment: string | null | undefined): boolean {
   return environment === 'prod'
+}
+
+export function isDevEnvironment(environment: string | null | undefined): boolean {
+  return environment === 'dev'
 }
 
 export function getEnvironmentShortLabel(environment: string): string {
@@ -24,10 +36,21 @@ export function getEnvironmentLabel(environment: string): string {
   return ENV_LABELS[environment] ?? environment
 }
 
+export function getSidebarShellClass(environment: string | null | undefined): string {
+  return isDevEnvironment(environment) ? DEV_SHELL_BG_CLASS : PROD_SIDEBAR_BG_CLASS
+}
+
+export function getTopbarShellClass(environment: string | null | undefined): string {
+  if (isDevEnvironment(environment)) {
+    return `${DEV_SHELL_BG_CLASS} border-b border-white/10`
+  }
+  return PROD_TOPBAR_CLASS
+}
+
 export function getEnvironmentPillClass(environment: string): string {
   switch (environment) {
     case 'dev':
-      return 'bg-[#6b1d3a]/10 text-[#6b1d3a] border border-[#6b1d3a]/30 dark:bg-[#6b1d3a]/25 dark:text-[#f0b8c4] dark:border-[#6b1d3a]/40'
+      return 'bg-[#c9a96e]/15 text-[#e0cfad] border border-[#c9a96e]/35'
     case 'staging':
       return 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800'
     case 'test':
@@ -36,10 +59,3 @@ export function getEnvironmentPillClass(environment: string): string {
       return 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800'
   }
 }
-
-/** Overlay: single bordo hue fading to transparent, top → bottom */
-export const ENV_ACCENT_OVERLAY_CLASS =
-  'absolute inset-0 bg-gradient-to-b from-[#6b1d3a]/22 to-transparent dark:from-[#6b1d3a]/32 pointer-events-none'
-
-export const ENV_TOPBAR_BASE_CLASS =
-  'bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800'

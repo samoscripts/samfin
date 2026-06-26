@@ -1,4 +1,4 @@
-import { Pencil, Sparkles } from 'lucide-react'
+import { Pencil, Sparkles, Trash2 } from 'lucide-react'
 import type { Transaction } from '@/shared/types'
 import ExpandableText from '@/shared/components/ExpandableText'
 import TransactionHistorySection from './TransactionHistorySection'
@@ -7,6 +7,7 @@ import TransactionSummaryCard from './TransactionSummaryCard'
 export interface TransactionDetailsPanelProps {
   tx: Transaction
   onEdit: () => void
+  onDelete: () => void
   onRestored: (updated: Transaction) => void
   onCreateRule?: () => void
   canCreateRule?: boolean
@@ -15,6 +16,7 @@ export interface TransactionDetailsPanelProps {
 export default function TransactionDetailsPanel({
   tx,
   onEdit,
+  onDelete,
   onRestored,
   onCreateRule,
   canCreateRule = false,
@@ -81,6 +83,14 @@ export default function TransactionDetailsPanel({
             Utwórz regułę
           </button>
         )}
+        <button
+          type="button"
+          onClick={onDelete}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+        >
+          <Trash2 size={14} />
+          Usuń
+        </button>
       </div>
     </div>
   )

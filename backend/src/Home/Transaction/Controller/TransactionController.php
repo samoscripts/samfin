@@ -12,6 +12,7 @@ use App\Shared\DTO\QueryValidationErrors;
 use App\Home\Transaction\Service\TransactionBulkUpdateService;
 use App\Home\Transaction\Service\TransactionClassificationService;
 use App\Home\Transaction\Service\TransactionCreateService;
+use App\Home\Transaction\Service\TransactionDeleteService;
 use App\Home\Transaction\Service\TransactionSnapshotLogService;
 use App\Identity\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -30,6 +31,7 @@ class TransactionController extends AbstractController
         private ClassificationRuleApplyService     $classificationRuleApplyService,
         private TransactionSnapshotLogService    $snapshotLogService,
         private TransactionCreateService         $createService,
+        private TransactionDeleteService         $deleteService,
         private Security                         $security,
     ) {}
 
@@ -80,21 +82,22 @@ class TransactionController extends AbstractController
         $body = json_decode($request->getContent(), true) ?? [];
 
         $direction = $body['direction'] ?? null;
-        $date      = $body['date'] ?? $body['operationDate'] ?? null;
+        $transDate = $body['transDate'] ?? $body['date'] ?? $body['operationDate'] ?? null;
         $amount    = $body['amount'] ?? null;
-        $description = $body['description'] ?? null;
+        $transDescription = $body['transDescription'] ?? $body['operationDesc'] ?? $body['description'] ?? null;
+        $transTitle = $body['transTitle'] ?? $body['operationTitle'] ?? null;
 
         if (!is_string($direction) || $direction === '') {
             return $this->json(['message' => 'Pole direction jest wymagane.'], 422);
         }
-        if (!is_string($date) || $date === '') {
-            return $this->json(['message' => 'Pole date jest wymagane.'], 422);
+        if (!is_string($transDate) || $transDate === '') {
+            return $this->json(['message' => 'Pole transDate jest wymagane.'], 422);
         }
         if ($amount === null || $amount === '') {
             return $this->json(['message' => 'Pole amount jest wymagane.'], 422);
         }
-        if (!is_string($description) || trim($description) === '') {
-            return $this->json(['message' => 'Pole description jest wymagane.'], 422);
+        if (!is_string($transDescription) || trim($transDescription) === '') {
+            return $this->json(['message' => 'Pole transDescription jest wymagane.'], 422);
         }
 
         $paidFromPartyId = array_key_exists('paidFromPartyId', $body)
@@ -120,9 +123,10 @@ class TransactionController extends AbstractController
         try {
             $tx = $this->createService->createManual(
                 $direction,
-                $date,
+                $transDate,
                 (float) $amount,
-                $description,
+                $transDescription,
+                is_string($transTitle) ? $transTitle : null,
                 $paidFromPartyId,
                 $paidToPartyId,
                 $items,
@@ -218,6 +222,19 @@ class TransactionController extends AbstractController
         }
 
         return $this->json($tx->toApiArray());
+    }
+
+    #[Route('/{id}', name: 'api_transactions_delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    public function delete(int $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        if (!$this->deleteService->deleteById($id, $user)) {
+            return $this->json(['message' => 'Nie znaleziono transakcji.'], 404);
+        }
+
+        return $this->json(null, 204);
     }
 
     #[Route('/{id}/history', name: 'api_transactions_history', methods: ['GET'], requirements: ['id' => '\d+'])]

@@ -19,7 +19,7 @@ export default function RuleConditionValueInput({ condition, onChange }: RuleCon
 
   if (operator === 'between') {
     const range: [unknown, unknown] = isBetweenValue(value) ? value : ['', '']
-    const inputType = field === 'operation_date' ? 'date' : 'number'
+    const inputType = field === 'trans_date' ? 'date' : 'number'
 
     return (
       <FormField label="Od – do" className="flex-[2] min-w-[180px]">
@@ -97,7 +97,7 @@ export default function RuleConditionValueInput({ condition, onChange }: RuleCon
   }
 
   const inputType =
-    field === 'amount_minor' ? 'number' : field === 'operation_date' ? 'date' : 'text'
+    field === 'amount_minor' ? 'number' : field === 'trans_date' ? 'date' : 'text'
 
   return (
     <FormField label="Wartość" className="flex-[2] min-w-[140px]">

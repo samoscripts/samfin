@@ -15,6 +15,7 @@ export interface CsvImportResult {
   detectedClientName: string | null
   detectedAccountNumber: string | null
   detectedAccountDisplay: string | null
+  csvFormat: string | null
   partyBankAccountId: number | null
   partyId: number | null
   partyName: string | null
@@ -40,14 +41,21 @@ export interface CsvImportError {
 export interface CsvImportRow {
   id: number
   csvImportId: number
+  csvFormat: string | null
   lineNo: number
+  bookingDate: string | null
   operationDate: string | null
   descriptionRaw: string | null
+  operationTypeRaw: string | null
+  titleRaw: string | null
+  titleClean: string | null
+  counterpartyNameRaw: string | null
   ownAccountLabelRaw: string | null
   counterpartyAccountRaw: string | null
   bankCategoryRaw: string | null
   amountRaw: string | null
   amountMinor: number | null
+  balanceAfterMinor: number | null
   parseStatus: 'VALIDATED' | 'PARSE_ERROR' | 'DUPLICATE' | 'IMPORTED'
   parseError: string | null
 }

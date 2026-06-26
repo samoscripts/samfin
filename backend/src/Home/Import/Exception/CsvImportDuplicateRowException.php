@@ -78,8 +78,9 @@ class CsvImportDuplicateRowException extends \InvalidArgumentException
             ],
             'existingTransaction' => [
                 'id'            => $existingTx->getId(),
-                'operationDate' => $existingTx->getOperationDate()?->format('Y-m-d'),
-                'description'   => $existingTx->getDescription(),
+                'transDate'       => $existingTx->getTransDate()?->format('Y-m-d'),
+                'transDescription' => $existingTx->getTransDescription(),
+                'transTitle'      => $existingTx->getTransTitle(),
                 'amountMinor'   => $existingTx->getAmountMinor(),
                 'direction'     => $existingTx->getDirection(),
                 'importId'      => $existingTx->getImport()?->getId(),
@@ -122,10 +123,10 @@ class CsvImportDuplicateRowException extends \InvalidArgumentException
         );
         $lines[] = sprintf(
             'Dane transakcji: %s, %s %s, „%s”',
-            $tx['operationDate'] ?? '—',
+            $tx['transDate'] ?? '—',
             self::directionLabel($tx['direction'] ?? ''),
             self::formatAmount($tx['amountMinor'] ?? 0),
-            $tx['description'] ?? '—',
+            self::formatTransactionLabel($tx),
         );
 
         return implode("\n", $lines);
@@ -146,5 +147,21 @@ class CsvImportDuplicateRowException extends \InvalidArgumentException
         $abs  = abs($amountMinor);
 
         return sprintf('%s%s,%02d zł', $sign, intdiv($abs, 100), $abs % 100);
+    }
+
+    /** @param array<string, mixed> $tx */
+    private static function formatTransactionLabel(array $tx): string
+    {
+        $title = $tx['transTitle'] ?? null;
+        if (is_string($title) && trim($title) !== '') {
+            return $title;
+        }
+
+        $desc = $tx['transDescription'] ?? null;
+        if (is_string($desc) && trim($desc) !== '') {
+            return $desc;
+        }
+
+        return '—';
     }
 }

@@ -90,7 +90,7 @@ export default function TransactionFiltersForm({
           type="search"
           value={draft.description ?? ''}
           onChange={(e) => onFieldChange('description', e.target.value || undefined)}
-          placeholder="Szukaj w opisie…"
+          placeholder="Szukaj w opisie, tytule, kontrahencie…"
           className={inputCls}
           aria-label="Szukaj w opisie transakcji"
         />

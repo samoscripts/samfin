@@ -12,13 +12,13 @@ function itemMatchesId(
   return items.some((item) => item[field] === target)
 }
 
-function descriptionConditionMatches(rule: ClassificationRule, needle: string): boolean {
+function operationDescConditionMatches(rule: ClassificationRule, needle: string): boolean {
   const trimmed = needle.trim()
   if (!trimmed) return true
 
   const conditions = rule.conditions?.conditions ?? []
   for (const cond of conditions) {
-    if (cond.field !== 'description') continue
+    if (cond.field !== 'trans_description' && cond.field !== 'trans_title') continue
     const value = cond.value
     if (typeof value !== 'string' || value === '') continue
 
@@ -53,7 +53,7 @@ export function ruleMatchesFilters(rule: ClassificationRule, filters: RuleListFi
   }
 
   if (isRuleFilterValueActive(filters.descriptionCondition)) {
-    if (!descriptionConditionMatches(rule, filters.descriptionCondition!)) return false
+    if (!operationDescConditionMatches(rule, filters.descriptionCondition!)) return false
   }
 
   return true

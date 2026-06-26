@@ -57,15 +57,21 @@ sequenceDiagram
 
 ### TransactionIngestionService
 
-1. Pobiera wiersze ze statusem `VALIDATED`.
-2. Dla każdego wiersza sprawdza duplikat (`TransactionRepository::findDuplicate`).
-3. Tworzy `Transaction` + jedną `TransactionItem` (pełna kwota, bez portfela/obszaru/kategorii).
-4. **Automatyczne Skąd/Dokąd:** podmiot z `csv_import.party` (ustawiony przy uploadzie z dopasowanego `party_bank_account`):
+1. Pobiera wiersze ze statusem `VALIDATED` **partiami po 500** (`flush` + `clear` EntityManager po każdej partii).
+2. Na start importu: jedno zapytanie o reguły klasyfikacji podmiotu (`PreparedClassificationRules`) i jedno o istniejące duplikaty w zakresie dat (`buildDuplicateLookup`).
+3. Dla każdego wiersza sprawdza duplikat w lookupie O(1); po utworzeniu transakcji dopisuje fingerprint do lookupu (duplikaty wewnątrz tego samego pliku).
+4. Tworzy `Transaction` + jedną `TransactionItem` (pełna kwota, bez portfela/obszaru/kategorii).
+5. **Reguły klasyfikacji:** `ClassificationRuleEngine::applyToTransaction()` z wcześniej przygotowanym zestawem reguł (`overwrite: true`).
+6. **Automatyczne Skąd/Dokąd:** podmiot z `csv_import.party` (ustawiony przy uploadzie z dopasowanego `party_bank_account`):
    - `direction = EXPENSE` (kwota ujemna) → `paid_from_party`
    - `direction = INCOME` (kwota ≥ 0) → `paid_to_party`
-5. Status transakcji: `TransactionStatusCalculator::calculate()` — zwykle `PARTIALLY_CLASSIFIED` (jeden podmiot, brak wymiarów na pozycji).
-6. Ustawia wierszowi status `IMPORTED` lub `DUPLICATE`.
-7. Ustawia importowi status `IMPORTED`.
+7. Status transakcji: `TransactionStatusCalculator::calculate()` — zwykle `PARTIALLY_CLASSIFIED` (jeden podmiot, brak wymiarów na pozycji).
+8. Ustawia wierszowi status `IMPORTED` lub `DUPLICATE`.
+9. Ustawia importowi status `IMPORTED`.
+
+Całość w jednej transakcji DB (`wrapInTransaction`) — błąd w dowolnym momencie wycofuje cały attempt.
+
+**Wymagania runtime:** `max_execution_time` ≥ 300 s (Docker: `docker/php/php.ini`; produkcja: `.htaccess` lub panel hostingu). Przy dużym imporcie historycznym w dev warto wyłączyć Xdebug.
 
 Walidator podmiotów (`TransactionPartyAssignmentValidator`) **nie** jest wywoływany przy imporcie — zakłada się poprawną konfigurację podmiotu powiązanego z rachunkiem bankowym.
 
@@ -74,9 +80,43 @@ Walidator podmiotów (`TransactionPartyAssignmentValidator`) **nie** jest wywoł
 Ta sama kombinacja w ramach importów danego podmiotu:
 
 - `party` (z importu)
-- `operation_date`
+- `trans_date` (data z wiersza CSV: `csv_import_row.operation_date`)
 - `amount_minor`
-- `description` (surowy opis z CSV)
+- `counterparty_account_number`
+- `canonical_text` — `trans_title` lub `trans_description` (pierwsza niepusta wartość, lowercase)
+
+Zakres dat przy budowie lookupu duplikatów: `min(periodFrom, MIN(operation_date wierszy CSV))` … `max(periodTo, MAX(operation_date wierszy CSV))` — transakcje kart z `DATA TRANSAKCJI` w tytule (data wcześniejsza niż okres wyciągu) nadal trafiają do lookupu przy ponownym imporcie. W `transactions` odpowiada to polu `trans_date`.
+
+## Architektura parsowania CSV
+
+```
+Plik CSV → BankImportProvider (np. MbankCsvImportProvider)
+         → detekcja wariantu nagłówka
+         → CsvFormatMapperInterface (per wersja formatu)
+         → NormalizedImportRow (kanoniczny DTO)
+         → csv_import_row (surowe + zmapowane pola)
+         → Transaction (stabilne pola domenowe)
+```
+
+Nowe wersje eksportu banku dodaje się jako kolejny mapper — bez zmiany schematu `transactions`.
+
+### Wersje formatu mBank
+
+| Kod | Eksport | Kolumny danych |
+|-----|---------|----------------|
+| `MBANK_OPERATIONS_LIST` | Lista operacji (legacy) | data, opis, rachunek, kategoria, kwota |
+| `MBANK_ELECTRONIC_STATEMENT` | Elektroniczne zestawienie operacji | data księgowania, data operacji, opis operacji, tytuł, nadawca/odbiorca, NRB, kwota, saldo |
+
+Dla `MBANK_ELECTRONIC_STATEMENT` (mapowanie na `transactions`):
+
+- `trans_date` — z `DATA TRANSAKCJI: YYYY-MM-DD` w tytule (karty), inaczej kolumna „Data operacji”
+- `trans_title` — tytuł po oczyszczeniu (`MbankTitleParser::cleanTitle`): usunięcie wyłącznie sufiksu `DATA TRANSAKCJI: YYYY-MM-DD` (lub uciętego `DATA TRANSAKCJI:` bez daty); reszta tytułu bez zmian (w tym `/LOKALIZACJA`, `/SIERAKOWIC` itd.)
+- `trans_description` — kolumna „Opis operacji” (`description_raw` w `csv_import_row`)
+- `balance_after_minor` — saldo po operacji (tylko format elektroniczny)
+
+W `csv_import_row`: `title_raw` (surowy), `title_clean` (po `cleanTitle`).
+
+Typ operacji z banku (`operation_type_raw` w `csv_import_row`) jest zachowany wyłącznie w audycie importu — **nie** w `transactions`.
 
 ## Provider mBank (`MbankCsvImportProvider`)
 
@@ -86,12 +126,13 @@ Ta sama kombinacja w ramach importów danego podmiotu:
 
 ### Kroki parsowania
 
-1. **Kodowanie** — detekcja UTF-8 / ISO-8859-2 / Windows-1252, konwersja do UTF-8.
-2. **Nagłówek metadanych** — markery `#Klient`, `#Za okres:`, `#Za rachunek`, lista rachunków itd.
-3. **Wiersze danych** — kolumny typu data operacji, opis, konto, kategoria banku, kwota.
-4. **Wynik** — `ImportResult` z `detectedClientName`, `detectedAccountNumber`, `periodFrom/To`, tablicą wierszy i błędów.
+1. **Kodowanie** — pliki mBank (Windows) są zwykle w **CP1250**; konwersja do UTF-8 przez `CsvEncodingNormalizer` (UTF-8 z BOM, CP1250, ISO-8859-2). Wykrywanie „fałszywego UTF-8” (bajty C1 / `U+0080–U+009F` po błędnym odczycie Ś, Ą itd.).
+2. **Nagłówek metadanych** — markery `#Klient`, `#Za okres:`, `#dla rachunków:` lub `#Numer rachunku`, `#Waluta` itd.
+3. **Detekcja wariantu** — `MbankCsvFormatMapperRegistry` wybiera mapper po nagłówku sekcji danych.
+4. **Wiersze danych** — mapper mapuje kolumny na `NormalizedImportRow`; linie metadanych (`#…`), stopka prawna mBank (np. „Niniejszy dokument sporządzono… art. 7 Ustawy Prawo Bankowe”) i inne stopki po transakcjach kończą sekcję danych bez zapisu wiersza i bez błędu parsowania.
+5. **Wynik** — `ImportResult` z `csvFormat`, metadanymi, wierszami i błędami.
 
-Szczegóły formatu pliku są zaimplementowane w `backend/src/Home/Import/Provider/MbankCsvImportProvider.php` — parser jest specyficzny dla eksportu mBank.
+Implementacja: `backend/src/Home/Import/Provider/MbankCsvImportProvider.php`, mapery w `backend/src/Home/Import/Mapper/Mbank/`.
 
 ## Walidacja biznesowa (po parsowaniu)
 
@@ -129,9 +170,10 @@ Porównanie numerów rachunków: usunięcie znaków nienumerycznych, porównanie
 
 | Klasa | Rola |
 |-------|------|
-| `ImportResult` | Wynik `parse()`: metadane, wiersze, błędy, `hasFatalErrors()` |
-| `ImportRowData` | Pojedynczy wiersz: surowe pola + `amountMinor`, `parseStatus` |
+| `ImportResult` | Wynik `parse()`: `csvFormat`, metadane, wiersze, błędy, `hasFatalErrors()` |
+| `NormalizedImportRow` | Kanoniczny wiersz po mapowaniu wersji CSV |
 | `ImportErrorData` | Błąd: `scope`, `code`, `message`, `lineNo`, `fatal` |
+| `CsvFormatMapperInterface` | Kontrakt mappera wersji CSV → `NormalizedImportRow` |
 
 ## Frontend
 

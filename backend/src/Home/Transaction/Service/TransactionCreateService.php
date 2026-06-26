@@ -21,9 +21,10 @@ class TransactionCreateService
      */
     public function createManual(
         string $direction,
-        string $operationDate,
+        string $transDate,
         float $amount,
-        string $description,
+        string $transDescription,
+        ?string $transTitle,
         ?int $paidFromPartyId,
         ?int $paidToPartyId,
         ?array $itemsPayload,
@@ -33,9 +34,9 @@ class TransactionCreateService
             throw new \InvalidArgumentException('Nieprawidłowy kierunek transakcji.');
         }
 
-        $description = trim($description);
-        if ($description === '') {
-            throw new \InvalidArgumentException('Opis jest wymagany.');
+        $transDescription = trim($transDescription);
+        if ($transDescription === '') {
+            throw new \InvalidArgumentException('Opis transakcji jest wymagany.');
         }
 
         if ($amount <= 0) {
@@ -43,7 +44,7 @@ class TransactionCreateService
         }
 
         try {
-            $date = new \DateTimeImmutable($operationDate);
+            $date = new \DateTimeImmutable($transDate);
         } catch (\Exception) {
             throw new \InvalidArgumentException('Nieprawidłowa data operacji.');
         }
@@ -56,8 +57,11 @@ class TransactionCreateService
         }
 
         $tx = new Transaction();
-        $tx->setOperationDate($date);
-        $tx->setDescription($description);
+        $tx->setTransDate($date);
+        $tx->setTransDescription($transDescription);
+        if ($transTitle !== null && trim($transTitle) !== '') {
+            $tx->setTransTitle(trim($transTitle));
+        }
         $tx->setAmountMinor($amountMinor);
         $tx->setDirection($direction);
         $tx->setSource(Transaction::SOURCE_MANUAL);

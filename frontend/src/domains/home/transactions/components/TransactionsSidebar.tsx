@@ -54,6 +54,7 @@ export interface TransactionsSidebarProps {
   onSingleSaved: (updated: Transaction) => void
   onCreated: (tx: Transaction) => void
   onRestored: (updated: Transaction) => void
+  onDelete: (tx: Transaction) => void
   onSaveClick: () => void
   onCancelClick: () => void
   onRegisterSave: (fn: () => Promise<void>) => void
@@ -94,6 +95,7 @@ export default function TransactionsSidebar({
   onSingleSaved,
   onCreated,
   onRestored,
+  onDelete,
   onSaveClick,
   onCancelClick,
   onRegisterSave,
@@ -314,6 +316,7 @@ export default function TransactionsSidebar({
         <TransactionDetailsPanel
           tx={detailsList[0]}
           onEdit={onStartEdit}
+          onDelete={() => onDelete(detailsList[0])}
           onRestored={onRestored}
           onCreateRule={() => onCreateRule(detailsList[0])}
           canCreateRule={canCreateRuleFromTransaction(detailsList[0], ruleContextParties)}

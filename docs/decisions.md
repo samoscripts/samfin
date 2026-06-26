@@ -198,15 +198,15 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | Pole | Wymagane |
 |------|----------|
 | `direction` | tak (INCOME / EXPENSE) |
-| `operation_date` | tak |
+| `operation_date` | tak (`trans_date` w API) |
 | `amount` | tak |
-| `description` | tak |
+| `trans_description` | tak (w API; dawniej `description`) |
 | Skąd / Dokąd | opcjonalne przy tworzeniu; reguły jak ADR-017 (OWN+CASH po stronie własnej) |
 | Pozycje (portfel, dotyczy, kategoria) | opcjonalne; status liczy `TransactionStatusCalculator` |
 
 **Przepływ:** Formularz „Nowa transakcja” (`/app/transactions/new`) → `POST /api/transactions` ze `source: MANUAL` → jedna domyślna pozycja (jak import) → dalsza klasyfikacja przez istniejące `PUT /{id}/items`.
 
-**Stan implementacji:** **ZAIMPLEMENTOWANE** — `TransactionCreateService`, `POST /api/transactions`, strona `TransactionNew.tsx` z prefill z query params (`direction`, `date`, `amount`, `description`, `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`, `categoryId`).
+**Stan implementacji:** **ZAIMPLEMENTOWANE** — `TransactionCreateService`, `POST /api/transactions`, strona `TransactionNew.tsx` z prefill z query params (`direction`, `transDate`, `amount`, `transDescription`, `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`, `categoryId`).
 
 **Pliki:** `TransactionCreateService.php`, `TransactionController::create()`, `TransactionCreateForm.tsx`, `TransactionNew.tsx`, `transactionNewUrlParams.ts`.
 
@@ -424,6 +424,41 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-029: Synchroniczna ingestia CSV z batchowaniem
+
+**Kontekst:** Duży jednorazowy import historyczny przekraczał `max_execution_time = 60` przez N+1 zapytań i jeden ogromny `flush()` w Doctrine UnitOfWork.
+
+**Decyzja:** Pozostajemy przy synchronicznym `POST /csv-imports/{id}/import` (bez Messengera). Optymalizacja w `TransactionIngestionService`:
+- partia 500 wierszy + `flush`/`clear`,
+- `PreparedClassificationRules` — reguły klasyfikacji ładowane raz na import,
+- `buildDuplicateLookup` — duplikaty pobierane jednym zapytaniem, lookup w pamięci aktualizowany po każdej nowej transakcji,
+- `max_execution_time = 300` w Dockerze i `.htaccess`.
+
+**Konsekwencje:** Brak workera/crona/pollingu. Rollback all-or-nothing przez `wrapInTransaction`. Async (Messenger) rozważyć tylko gdy import nadal przekracza limit po optymalizacji.
+
+**Pliki:** `TransactionIngestionService.php`, `TransactionRepository.php`, `ClassificationRuleEngine.php`, `docker/php/php.ini`, `backend/public/.htaccess`.
+
+---
+
+### ADR-030: Usuwanie transakcji — kosz (`transactions_trash`) + hard DELETE
+
+**Kontekst:** Użytkownik potrzebuje usuwać pojedyncze transakcje z potwierdzeniem. Usunięte wpisy nie mogą wpływać na statystyki, listy, reguły ani raporty.
+
+**Decyzja:**
+
+- Zamiast flagi `is_deleted` na `transactions`: przed usunięciem zapis pełnego snapshotu w `transactions_trash` (`snapshot_json` zawiera dane transakcji, pozycje, historię klasyfikacji, metadane importu).
+- Następnie hard `DELETE` z `transactions` (CASCADE: `transaction_items`, `transactions_change_log`; `classification_rule.created_from_transaction_id` → SET NULL).
+- API: `DELETE /api/transactions/{id}` → `204`.
+- Po usunięciu: `SettlementIndexStateService::markDirty` (przebudowa ledgera rozliczeń).
+- Reimport CSV (`ImportIngestionMode::Reimport`) używa tego samego `TransactionDeleteService` (bez wielokrotnego `markDirty` w pętli — raz na końcu importu).
+- Widok kosza w UI — poza MVP; tabela przygotowana pod przyszły endpoint.
+
+**Konsekwencje:** Zapytania operacyjne bez dodatkowego filtra „aktywnych” transakcji. Admin `clearAll` nadal kasuje wszystko bez snapshotu (osobna ścieżka).
+
+**Pliki:** `TransactionDeleteService.php`, `TransactionTrash.php`, `TransactionController.php`, `TransactionIngestionService.php`, `TransactionDetailsPanel.tsx`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -436,3 +471,5 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-24 | ADR-026: lista kategorii — drzewo, DnD przenoszenie, merge subkategorii |
 | 2026-06-24 | ADR-027: blokada dezaktywacji kategorii przy użyciu w transakcjach, szablonach i regułach |
 | 2026-06-24 | ADR-028: kopie zapasowe bazy (ZIP+manifest, CLI, pre-restore) |
+| 2026-06-25 | ADR-029: synchroniczna ingestia CSV — batchowanie, cache reguł, bulk duplikaty |
+| 2026-06-25 | ADR-030: usuwanie transakcji — kosz `transactions_trash` + hard DELETE |

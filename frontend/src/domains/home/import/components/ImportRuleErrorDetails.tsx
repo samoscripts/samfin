@@ -25,7 +25,7 @@ export default function ImportRuleErrorDetails({ context, className }: ImportRul
         <p className="font-semibold text-red-700 dark:text-red-300">Szczegóły błędu reguły</p>
         {tx.lineNo != null && (
           <p className="mt-1 text-red-700/90 dark:text-red-200/90">
-            Wiersz CSV {tx.lineNo}: {tx.operationDate ?? '—'}, {directionLabel}, „{tx.description ?? '—'}”
+            Wiersz CSV {tx.lineNo}: {tx.transDate ?? '—'}, {directionLabel}, „{tx.transTitle ?? tx.transDescription ?? '—'}”
           </p>
         )}
       </div>

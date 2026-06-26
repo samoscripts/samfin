@@ -24,13 +24,12 @@ class ClassificationRuleJsonMapper
 
     private const ALLOWED_FIELDS = [
 
-        'description',
-
+        'trans_description',
+        'trans_title',
+        'counterparty_name',
         'direction',
-
         'amount_minor',
-
-        'operation_date',
+        'trans_date',
 
         'classification_status',
 

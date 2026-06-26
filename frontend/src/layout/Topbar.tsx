@@ -8,9 +8,8 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
 import EnvironmentBadge from '@/shared/components/EnvironmentBadge'
 import {
-  ENV_ACCENT_OVERLAY_CLASS,
-  ENV_TOPBAR_BASE_CLASS,
-  isProductionEnvironment,
+  getTopbarShellClass,
+  isDevEnvironment,
 } from '@/shared/utils/environmentDisplay'
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
@@ -25,13 +24,19 @@ interface TopbarProps {
 
 export default function Topbar({ onMobileMenuOpen }: TopbarProps) {
   const info = useAppInfo()
-  const isNonProd = info != null && !isProductionEnvironment(info.environment)
+  const isDevShell = info != null && isDevEnvironment(info.environment)
 
   const { mode, setMode } = useTheme()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const iconBtnCls = isDevShell
+    ? 'p-2 rounded-md text-white/60 hover:text-white/90 hover:bg-white/10 transition-colors'
+    : 'p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'
+
+  const dividerCls = isDevShell ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700'
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -45,12 +50,11 @@ export default function Topbar({ onMobileMenuOpen }: TopbarProps) {
 
   return (
     <header
-      className={`relative flex items-center h-16 px-4 md:px-6 shrink-0 gap-2 ${ENV_TOPBAR_BASE_CLASS}`}
+      className={`relative flex items-center h-16 px-4 md:px-6 shrink-0 gap-2 ${getTopbarShellClass(info?.environment)}`}
     >
-      {isNonProd && <div className={ENV_ACCENT_OVERLAY_CLASS} aria-hidden="true" />}
       {/* Mobile hamburger */}
       <button
-        className="md:hidden p-2 -ml-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className={`md:hidden -ml-1 ${iconBtnCls}`}
         onClick={onMobileMenuOpen}
         aria-label="Otwórz menu"
       >
@@ -69,12 +73,12 @@ export default function Topbar({ onMobileMenuOpen }: TopbarProps) {
       </div>
 
       {/* Notifications */}
-      <button className="relative p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+      <button className={`relative ${iconBtnCls}`}>
         <Bell size={18} />
         <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#c9a96e] rounded-full" />
       </button>
 
-      <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+      <div className={`w-px h-6 mx-1 ${dividerCls}`} />
 
       {/* User menu */}
       <div className="relative" ref={menuRef}>

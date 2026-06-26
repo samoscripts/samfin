@@ -57,12 +57,13 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 
 | Plik | Opis |
 |------|------|
-| `Transaction/Controller/TransactionController.php` | Lista, tworzenie ręczne, stats, klasyfikacja, bulk update, historia, apply reguł |
+| `Transaction/Controller/TransactionController.php` | Lista, tworzenie ręczne, stats, klasyfikacja, bulk update, historia, apply reguł, **usuwanie** |
 | `Transaction/Controller/TransactionTemplateController.php` | `GET/POST/DELETE /api/transaction-templates` — szablony klasyfikacji per użytkownik (`?direction=INCOME\|EXPENSE`) |
 | `Transaction/Service/TransactionClassificationService.php` | Klasyfikacja pojedynczej transakcji |
 | `Transaction/Service/TransactionBulkUpdateService.php` | Masowa aktualizacja pól |
 | `Transaction/Service/TransactionCreateService.php` | Tworzenie transakcji ręcznych (`source: MANUAL`) |
-| `Transaction/Service/TransactionIngestionService.php` | Tworzenie transakcji z wierszy CSV (auto Skąd/Dokąd) |
+| `Transaction/Service/TransactionDeleteService.php` | Usunięcie transakcji: snapshot do `transactions_trash`, hard DELETE, `markDirty` rozliczeń |
+| `Transaction/Service/TransactionIngestionService.php` | Tworzenie transakcji z wierszy CSV (auto Skąd/Dokąd); reimport używa `TransactionDeleteService` |
 | `Transaction/Service/TransactionStatusCalculator.php` | Wspólna logika statusu klasyfikacji |
 | `Transaction/Service/TransactionPartyAssignmentValidator.php` | Walidacja Skąd/Dokąd wg reguł kontekstowych (ADR-017) |
 | `Transaction/Service/TransactionSnapshotLogService.php` | Snapshoty i historia |
@@ -197,6 +198,10 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 ```
 
 Dozwolone `fields`: `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`, `categoryId`. Wartość `null` czyści pole.
+
+### Usuwanie transakcji — `DELETE /api/transactions/{id}`
+
+Brak body. Odpowiedź `204 No Content`. `404` gdy transakcja nie istnieje. Przed usunięciem snapshot w `transactions_trash`.
 
 ### Apply reguł — `POST /api/transactions/apply-classification-rules`
 

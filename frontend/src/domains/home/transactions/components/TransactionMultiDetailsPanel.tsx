@@ -4,6 +4,7 @@ import Pill from '@/shared/components/Pill'
 import ExpandableText from '@/shared/components/ExpandableText'
 import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
 import { DIRECTION_LABEL_BY_VALUE } from '../constants/labels'
+import { transactionDisplayLabel } from '../utils/transactionDisplay'
 import { formatAmount } from '@/shared/utils/format'
 
 export interface TransactionMultiDetailsPanelProps {
@@ -44,11 +45,11 @@ export default function TransactionMultiDetailsPanel({
               className="rounded-lg border border-gray-200/80 dark:border-gray-700/80 bg-gray-50/50 dark:bg-gray-800/30 px-3 py-2.5"
             >
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{tx.date}</span>
+                <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{tx.transDate}</span>
                 <DirectionBadge direction={tx.direction} />
               </div>
               <ExpandableText
-                text={tx.description}
+                text={transactionDisplayLabel(tx)}
                 textClassName="text-xs font-medium text-gray-900 dark:text-gray-100"
                 lines={2}
               />
