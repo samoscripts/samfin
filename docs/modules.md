@@ -136,6 +136,29 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 
 `MyAccount`, `Settings` (zakładki użytkownicy/system), `Users`, `UserForm`.
 
+### `frontend/src/mobile/` — aplikacja Android (Capacitor)
+
+Logika uruchamiana tylko gdy `isNativeApp()` (`Capacitor.isNativePlatform()`).
+
+| Plik | Rola |
+|------|------|
+| `platform.ts` | Wykrywanie platformy native |
+| `tokenStorage.ts` | Token API w `@capacitor/preferences` + cache RAM (interceptor axios) |
+| `pinAuth.ts` | Hash PIN (SHA-256 + salt) w Preferences |
+| `biometric.ts` | Opcjonalne odblokowanie odciskiem (`@capgo/capacitor-native-biometric`) |
+| `csvIntent.ts` | Wrapper pluginu `CsvIntent` (pending file, base64) |
+| `consumeIncomingCsv.ts` | Odczyt pliku z intentu → `File` + `source: MBANK` |
+| `IncomingCsvHandler.tsx` | Po loginie / unlock: nawigacja na `/import/nowy` |
+| `AppLockScreen.tsx` | Ekran PIN / biometria |
+
+**Bramka w `App.tsx`:** native + token bez unlock → `AppLockScreen`; po unlock → trasy + `IncomingCsvHandler`.
+
+**Plugin natywny:** `mobile/android/.../CsvIntentPlugin.java` — `ACTION_VIEW` na CSV (`text/csv`, `text/plain`, …); plik w cache apki do odczytu przez JS.
+
+**Auth (multi-token):** `POST /api/auth/login` przyjmuje opcjonalne `clientName` (np. `mobile`); tworzy wiersz `user_api_token`. `POST /api/auth/logout` unieważnia **tylko** token z nagłówka `Authorization: Bearer` (nie wszystkie sesje użytkownika). Zmiana hasła (`PUT /api/auth/me`) unieważnia wszystkie tokeny użytkownika.
+
+Szczegóły buildu APK i testów: [`mobile/README.md`](../mobile/README.md).
+
 ---
 
 ## Mapowanie frontend → API
@@ -246,8 +269,14 @@ Typowy kształt (camelCase w JSON):
 ### Auth — `POST /api/auth/login`
 
 ```json
-{ "email": "...", "password": "..." }
+{ "email": "...", "password": "...", "clientName": "web" }
 ```
+
+Pole `clientName` opcjonalne (domyślnie `web`) — zapisane w `user_api_token.name` (np. `mobile` z aplikacji Android).
+
+### Auth — `POST /api/auth/logout`
+
+Brak body. Wymaga nagłówka `Authorization: Bearer <token>`. Usuwa tylko ten token z bazy; inne sesje (np. przeglądarka) pozostają aktywne.
 
 ---
 
@@ -333,6 +362,7 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 
 | Katalog | Status |
 |---------|--------|
+| `mobile/` | Aplikacja Android (Capacitor); remote WebView, plugin CSV, app lock — [`mobile/README.md`](../mobile/README.md) |
 | `mock/` | Statyczne prototypy HTML; **nie podłączone** do React |
 | `scripts/` | Skrypty pomocnicze (np. portproxy) |
 | `docker/` | Konfiguracja kontenera |

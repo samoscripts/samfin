@@ -1,8 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { AuthUser } from '@/shared/types/auth'
 import { apiLogin, apiLogout, fetchMe } from '@/shared/api/auth'
-
-const TOKEN_KEY = 'samfin_token'
+import {
+  clearStoredToken,
+  hasStoredToken,
+  loadTokenToMemory,
+  migrateLegacyTokenIfNeeded,
+  persistToken,
+} from '@/mobile/tokenStorage'
+import { hasPin } from '@/mobile/pinAuth'
+import { isNativeApp } from '@/mobile/platform'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -10,6 +17,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   setCurrentUser: (user: AuthUser) => void
+  restoreSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -18,6 +26,7 @@ const AuthContext = createContext<AuthContextValue>({
   login: async () => {},
   logout: async () => {},
   setCurrentUser: () => {},
+  restoreSession: async () => {},
 })
 
 export function useAuth(): AuthContextValue {
@@ -28,25 +37,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // On mount: try to restore session from stored token
-  useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY)
+  const restoreSession = useCallback(async () => {
+    const token = await loadTokenToMemory()
     if (!token) {
-      setIsLoading(false)
+      setUser(null)
       return
     }
-    fetchMe()
-      .then(setUser)
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY)
-      })
-      .finally(() => setIsLoading(false))
+
+    const me = await fetchMe()
+    setUser(me)
   }, [])
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        await migrateLegacyTokenIfNeeded()
+
+        if (isNativeApp()) {
+          const pinSet = await hasPin()
+          const tokenStored = await hasStoredToken()
+
+          if (pinSet && tokenStored) {
+            setUser(null)
+            return
+          }
+
+          if (tokenStored) {
+            await restoreSession()
+          }
+          return
+        }
+
+        await restoreSession()
+      } catch {
+        await clearStoredToken()
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
+    })()
+  }, [restoreSession])
+
   const login = useCallback(async (email: string, password: string) => {
-    const { token, user } = await apiLogin(email, password)
-    localStorage.setItem(TOKEN_KEY, token)
-    setUser(user)
+    const { token, user: loggedIn } = await apiLogin(email, password)
+    await persistToken(token)
+    setUser(loggedIn)
   }, [])
 
   const logout = useCallback(async () => {
@@ -55,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore — clear client side regardless
     } finally {
-      localStorage.removeItem(TOKEN_KEY)
+      await clearStoredToken()
       setUser(null)
     }
   }, [])
@@ -65,7 +100,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, setCurrentUser }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, logout, setCurrentUser, restoreSession }}
+    >
       {children}
     </AuthContext.Provider>
   )

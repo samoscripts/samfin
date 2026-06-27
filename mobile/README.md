@@ -244,6 +244,16 @@ make mobile-build
 make mobile-install-apk
 ```
 
+### Zmieniłeś app lock / token storage (`frontend/src/mobile/`, pluginy Capacitor)
+
+```bash
+make deploy                 # React (ekran PIN, AuthProvider)
+make mobile-build           # Preferences, App, Native Biometric + USE_BIOMETRIC
+make mobile-install-apk
+```
+
+Pierwsze logowanie na telefonie po deploy: ekran **Ustaw PIN**. Po ustawieniu PIN — przejście w tło i powrót wymaga odblokowania.
+
 ### Zmieniłeś intent CSV / plugin Android (`CsvIntentPlugin`, `AndroidManifest`)
 
 ```bash
@@ -334,8 +344,9 @@ Włącz **„Instalacja z nieznanych źródeł”** dla menedżera plików (Andr
 | Wylogowanie | Powrót do ekranu logowania |
 | **CSV z mBanku (Faza 2)** | Eksport CSV → Udostępnij / Otwórz za pomocą → SamFin → po zalogowaniu ekran Import z wybranym plikiem i bankiem mBank → **Importuj** |
 | **Równoległa sesja (Faza 3)** | Zalogowany na telefonie i w przeglądarce jednocześnie; wylogowanie na jednym urządzeniu nie wylogowuje drugiego |
+| **App lock (Faza 4)** | Po pierwszym logowaniu — ustawienie PIN (4–8 cyfr); opcjonalnie odcisk palca; po przejściu apki w tło — ekran PIN/odcisku; token API w Preferences (nie localStorage) |
 
-**Nie działa jeszcze (kolejne fazy):** PIN / odcisk palca (Faza 4).
+**Nie działa jeszcze (kolejne fazy):** dopracowany UX importu mobile (Faza 5).
 
 ### Test importu CSV z mBanku
 
@@ -444,10 +455,10 @@ server: {
 |------|------|
 | **1** | Szkielet Capacitor, remote URL, pierwszy APK |
 | **2** | Intent CSV z mBanku → ekran importu |
-| **3** (teraz) | Multi-token backend — równoległa sesja web + mobile |
-| **4** | App lock — PIN / odcisk, token w secure storage |
-| **5** | Dopracowanie UX importu na mobile |
-| **6** | Dokumentacja w `docs/` (ADR, modules.md) |
+| **3** | Multi-token backend — równoległa sesja web + mobile |
+| **4** | App lock — PIN / odcisk, token w Preferences (secure storage) |
+| **5** | UX importu na mobile — komunikat mBank, większy przycisk, „Zmień bank” |
+| **6** | Dokumentacja w `docs/` (ADR-033, `modules.md`, `database.md`, reguła języka) |
 
 ---
 

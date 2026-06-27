@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getMemoryToken } from '@/mobile/tokenStorage'
 
 const api = axios.create({
   baseURL: '/api',
@@ -8,9 +9,8 @@ const api = axios.create({
   },
 })
 
-// Attach Bearer token from localStorage to every request
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('samfin_token')
+  const token = getMemoryToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

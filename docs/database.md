@@ -40,6 +40,8 @@ erDiagram
         int user_id FK
         string token UK
         string name
+        datetime created_at
+        datetime last_used_at
     }
     party {
         int id PK
@@ -155,6 +157,21 @@ Nazwy constraintów FK w migracjach: sekcja [Reguły nazewnictwa migracji](#regu
 **transaction_items:** `transaction_id`, `wallet_id`, `concern_id`, `category_id`.
 
 **transactions_change_log:** `transaction_id`, `created_at`.
+
+**user_api_token:** unikalny `token` (64 znaki hex); `user_id` (FK → `app_user`, CASCADE przy usunięciu użytkownika).
+
+### Tabela `user_api_token`
+
+| Kolumna | Typ | Opis |
+|---------|-----|------|
+| `id` | INT PK | |
+| `user_id` | INT FK → `app_user` | Właściciel sesji; ON DELETE CASCADE |
+| `token` | VARCHAR(64) UK | Token Bearer (hex); unikalny w całej bazie |
+| `name` | VARCHAR(64) | Etykieta klienta (`web`, `mobile`, …) z body `clientName` przy logowaniu |
+| `created_at` | DATETIME | Ustawiane w `PrePersist` |
+| `last_used_at` | DATETIME NULL | Aktualizowane przy każdym uwierzytelnionym żądaniu API |
+
+Historia: do 2026-06 jeden token w `app_user.api_token` (usunięty w migracji `Version20260705120000`).
 
 ## Chronologia migracji
 

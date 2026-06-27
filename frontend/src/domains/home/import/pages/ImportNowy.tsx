@@ -8,6 +8,7 @@ import {
   type CsvImportResult,
 } from '@/shared/api/csvImports'
 import { getApiErrorMessage } from '@/shared/utils/errors'
+import { useIsMobile } from '@/shared/hooks/useIsMobile'
 import type { IncomingCsv } from '@/mobile/consumeIncomingCsv'
 
 interface ImportLocationState {
@@ -20,6 +21,7 @@ const selectCls =
 export default function ImportNowy() {
   const navigate = useNavigate()
   const location = useLocation()
+  const isMobile = useIsMobile()
 
   const [providers, setProviders]     = useState<BankProvider[]>([])
   const [source, setSource]           = useState<string>('')
@@ -31,6 +33,7 @@ export default function ImportNowy() {
   const [globalError, setGlobalError] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const bankSelectRef = useRef<HTMLSelectElement>(null)
   const incomingApplied = useRef(false)
 
   useEffect(() => {
@@ -113,17 +116,34 @@ export default function ImportNowy() {
 
       {fromIntent && file && !result && (
         <div className="mb-5 rounded-xl border border-[#c9a96e]/30 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-          Plik <span className="font-medium">{file.name}</span> otwarty z aplikacji bankowej.
-          Wybierz <span className="font-medium">Importuj</span>, aby wysłać plik na serwer.
+          <p className="font-medium text-gray-800 dark:text-gray-100">
+            Plik z mBanku gotowy do importu
+          </p>
+          <p className="mt-1">
+            <span className="font-medium">{file.name}</span> — kliknij{' '}
+            <span className="font-medium">Importuj</span>, aby wysłać plik na serwer.
+          </p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-            Bank *
-          </label>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+              Bank *
+            </label>
+            {fromIntent && source === 'MBANK' && (
+              <button
+                type="button"
+                onClick={() => bankSelectRef.current?.focus()}
+                className="text-xs text-[#c9a96e] hover:underline shrink-0"
+              >
+                Zmień bank
+              </button>
+            )}
+          </div>
           <select
+            ref={bankSelectRef}
             className={selectCls}
             value={source}
             onChange={(e) => setSource(e.target.value)}
@@ -169,11 +189,14 @@ export default function ImportNowy() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className={['flex items-center gap-3', isMobile ? 'flex-col' : ''].join(' ')}>
           <button
             type="submit"
             disabled={!file || !source || uploading}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className={[
+              'inline-flex items-center justify-center gap-2 rounded-lg bg-[#1a472a] hover:bg-[#163526] disabled:opacity-50 text-white font-medium transition-colors',
+              isMobile ? 'w-full px-6 py-3 text-base' : 'px-5 py-2 text-sm',
+            ].join(' ')}
           >
             {uploading
               ? <><Loader2 size={15} className="animate-spin" /> Importowanie…</>

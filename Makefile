@@ -26,6 +26,7 @@ help:
 	@echo "  make test            PHPUnit (APP_ENV=test, w kontenerze)"
 	@echo "  make test-db-migrate migracje na bazie samfin_test"
 	@echo "  make test-db-setup   utwórz samfin_test + migracje (jednorazowo)"
+	@echo "  (CI: .github/workflows/tests.yml — push/PR na main)"
 	@echo ""
 	@echo "Frontend:"
 	@echo "  make npm CMD=...     npm w kontenerze frontend"

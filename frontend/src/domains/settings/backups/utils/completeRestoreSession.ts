@@ -1,13 +1,12 @@
+import { clearStoredToken } from '@/mobile/tokenStorage'
 import type { RestoreResult } from '@/shared/api/backups'
 
-const TOKEN_KEY = 'samfin_token'
-
-/** Po restore cała baza (w tym api_token) jest nadpisana — wymagane ponowne logowanie. */
-export function completeRestoreSession(result: RestoreResult): void {
+/** Po restore cała baza (w tym tokeny API) jest nadpisana — wymagane ponowne logowanie. */
+export async function completeRestoreSession(result: RestoreResult): Promise<void> {
   if (!result.requiresRelogin) {
     return
   }
 
-  localStorage.removeItem(TOKEN_KEY)
+  await clearStoredToken()
   window.location.href = '/?restored=1'
 }

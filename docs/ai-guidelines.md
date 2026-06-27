@@ -147,6 +147,8 @@ Health check: `GET http://localhost:3001/api/health` — zwraca m.in. `version`,
 
 Jednorazowo: `make test-db-setup` (baza `samfin_test` + migracje). Potem: `make test`.
 
+**CI:** przy push/PR na `main` — workflow [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) (PHPUnit + migracje na MariaDB 11).
+
 | Katalog | Zakres |
 |---------|--------|
 | `backend/tests/Smoke/` | health, security (publiczne vs chronione endpointy) |

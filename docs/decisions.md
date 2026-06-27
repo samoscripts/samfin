@@ -471,6 +471,38 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-032: App lock na Androidzie (PIN + biometria)
+
+**Kontekst:** Aplikacja mobilna (Capacitor, remote WebView) przechowuje token API lokalnie. Wymagane zabezpieczenie przed dostępem po przejściu apki w tło.
+
+**Decyzja:** Tylko na native (`isNativeApp()`):
+- Token API w `@capacitor/preferences` (migracja z `localStorage`); w pamięci tylko po odblokowaniu.
+- PIN 4–8 cyfr — hash SHA-256 + salt w Preferences (nie plaintext).
+- Opcjonalnie odblokowanie biometryczne (`@capgo/capacitor-native-biometric`); biometria nie zastępuje PIN przy pierwszym uruchomieniu sesji po zimnym starcie — wymagany PIN lub hasło przy logowaniu.
+- Blokada przy `appStateChange` (tło) po pierwszym odblokowaniu w sesji.
+- Web (przeglądarka) — bez app lock, token nadal w `localStorage`.
+
+**Pliki:** `frontend/src/mobile/` (`tokenStorage.ts`, `pinAuth.ts`, `AppLockScreen.tsx`), `AppLockProvider.tsx`, `AuthProvider.tsx`.
+
+---
+
+### ADR-033: Aplikacja mobilna Android (Capacitor, remote WebView)
+
+**Kontekst:** Użytkownicy chcą importować CSV z mBanku bezpośrednio z telefonu („Otwórz za pomocą”) i mieć osobną sesję obok przeglądarki.
+
+**Decyzja:**
+- Monorepo: katalog `mobile/` (Capacitor 7 + projekt Gradle `android/`) obok `frontend/` i `backend/`.
+- **Remote URL:** APK ładuje produkcyjny frontend (`https://fin.samsoft.pl/app/`) w WebView — bundle React **nie** jest pakowany w APK; zmiany UI wymagają deployu web (lub tymczasowego `server.url` na LAN w dev).
+- **Workflow:** edycja kodu i `cap sync` w WSL; Android Studio / emulator / USB na Windows (`\\wsl.localhost\...`).
+- **Intent CSV:** plugin `CsvIntent` (`ACTION_VIEW`) zapisuje plik w cache natywnym; JS odczytuje surowe bajty (base64) po odblokowaniu apki; nawigacja na `/import/nowy` bez auto-submit.
+- **Multi-token:** wiele wierszy `user_api_token` na użytkownika (ADR-002); logout unieważnia tylko bieżący token z nagłówka `Authorization`.
+
+**Konsekwencje:** Logika natywna za `isNativeApp()`; synchronizacja API pluginu JS ↔ kod Java przy każdej zmianie natywnej; test intentu CSV tylko na fizycznym telefonie.
+
+**Pliki:** `mobile/`, `frontend/src/mobile/`, `UserApiToken.php`, `ApiTokenService.php`, `ImportNowy.tsx`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -486,3 +518,5 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-25 | ADR-029: synchroniczna ingestia CSV — batchowanie, cache reguł, bulk duplikaty |
 | 2026-06-25 | ADR-030: usuwanie transakcji — kosz `transactions_trash` + hard DELETE |
 | 2026-06-26 | ADR-031: wycofanie parsera legacy mBank CSV (5 kolumn) |
+| 2026-06-27 | ADR-032: app lock mobile — PIN, biometria, token w Preferences |
+| 2026-06-27 | ADR-033: aplikacja Android — Capacitor remote URL, intent CSV, workflow WSL+Windows |

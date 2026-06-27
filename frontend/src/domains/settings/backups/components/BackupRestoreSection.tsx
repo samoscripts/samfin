@@ -28,7 +28,7 @@ export default function BackupRestoreSection() {
     try {
       const result = await restoreBackupFromUpload(file, confirm)
       if (result.requiresRelogin) {
-        completeRestoreSession(result)
+        await completeRestoreSession(result)
         return
       }
       setSuccessMessage('Baza została przywrócona z przesłanego pliku.')

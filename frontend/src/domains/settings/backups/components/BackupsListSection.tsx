@@ -104,7 +104,7 @@ export default function BackupsListSection() {
       setRestoreId(null)
       setRestoreConfirm('')
       if (result.requiresRelogin) {
-        completeRestoreSession(result)
+        await completeRestoreSession(result)
         return
       }
       setSuccessMessage('Baza została przywrócona z kopii na serwerze.')
