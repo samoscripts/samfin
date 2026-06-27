@@ -4,7 +4,6 @@ namespace App\Home\Import\Provider;
 
 use App\Home\Import\DTO\ImportErrorData;
 use App\Home\Import\DTO\ImportResult;
-use App\Home\Import\Enum\CsvFormatVersion;
 use App\Home\Import\Mapper\CsvFormatMapperInterface;
 use App\Home\Import\Mapper\Mbank\MbankCsvFormatMapperRegistry;
 use App\Home\Import\Util\CsvEncodingNormalizer;
@@ -138,8 +137,7 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 continue;
             }
 
-            if ($this->startsWithMarker($cols, '#Data księgowania')
-                || $this->startsWithMarker($cols, '#Data operacji')) {
+            if ($this->startsWithMarker($cols, '#Data księgowania')) {
                 $activeMapper = $this->mapperRegistry->resolveForHeader($cols);
                 if ($activeMapper === null) {
                     $errors[] = new ImportErrorData(
@@ -171,13 +169,6 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 scope: 'HEADER',
                 code: 'ACCOUNT_NOT_DETECTED',
                 message: 'Nie wykryto rachunku w nagłówku pliku CSV.',
-                fatal: true,
-            );
-        } elseif (count($accounts) > 1 && $csvFormat !== CsvFormatVersion::MbankElectronicStatement) {
-            $errors[] = new ImportErrorData(
-                scope: 'HEADER',
-                code: 'MULTI_ACCOUNT_CSV',
-                message: 'Plik zawiera więcej niż jeden rachunek. Wygeneruj plik CSV osobno dla każdego rachunku.',
                 fatal: true,
             );
         } else {

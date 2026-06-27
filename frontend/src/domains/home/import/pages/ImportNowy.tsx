@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { CheckCircle, Loader2, Upload, XCircle } from 'lucide-react'
 import {
   fetchProviders,
@@ -8,29 +8,57 @@ import {
   type CsvImportResult,
 } from '@/shared/api/csvImports'
 import { getApiErrorMessage } from '@/shared/utils/errors'
+import type { IncomingCsv } from '@/mobile/consumeIncomingCsv'
+
+interface ImportLocationState {
+  incomingCsv?: IncomingCsv
+}
 
 const selectCls =
   'w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e] transition-colors'
 
 export default function ImportNowy() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [providers, setProviders]     = useState<BankProvider[]>([])
   const [source, setSource]           = useState<string>('')
   const [file, setFile]               = useState<File | null>(null)
+  const [fromIntent, setFromIntent]   = useState(false)
   const [uploading, setUploading]     = useState(false)
   const [result, setResult]           = useState<CsvImportResult | null>(null)
   const [errors, setErrors]           = useState<string[]>([])
   const [globalError, setGlobalError] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const incomingApplied = useRef(false)
 
   useEffect(() => {
     fetchProviders().then((list) => {
       setProviders(list)
-      if (list.length > 0) setSource(list[0].code)
+      if (list.length > 0) setSource((prev) => prev || list[0].code)
     })
   }, [])
+
+  useEffect(() => {
+    if (incomingApplied.current) {
+      return
+    }
+
+    const incoming = (location.state as ImportLocationState | null)?.incomingCsv
+    if (!incoming) {
+      return
+    }
+
+    incomingApplied.current = true
+    setFile(incoming.file)
+    setSource(incoming.source)
+    setFromIntent(incoming.fromIntent ?? false)
+    setResult(null)
+    setErrors([])
+    setGlobalError(null)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.pathname, location.state, navigate])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null
@@ -68,6 +96,7 @@ export default function ImportNowy() {
 
   function reset() {
     setFile(null)
+    setFromIntent(false)
     setResult(null)
     setErrors([])
     setGlobalError(null)
@@ -81,6 +110,13 @@ export default function ImportNowy() {
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         Zaimportuj historię transakcji z pliku CSV eksportowanego z banku.
       </p>
+
+      {fromIntent && file && !result && (
+        <div className="mb-5 rounded-xl border border-[#c9a96e]/30 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+          Plik <span className="font-medium">{file.name}</span> otwarty z aplikacji bankowej.
+          Wybierz <span className="font-medium">Importuj</span>, aby wysłać plik na serwer.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>

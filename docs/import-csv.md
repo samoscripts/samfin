@@ -100,14 +100,15 @@ Plik CSV → BankImportProvider (np. MbankCsvImportProvider)
 
 Nowe wersje eksportu banku dodaje się jako kolejny mapper — bez zmiany schematu `transactions`.
 
-### Wersje formatu mBank
+### Format mBank
+
+Jedyny obsługiwany eksport: **elektroniczne zestawienie operacji** (`MBANK_ELECTRONIC_STATEMENT`).
 
 | Kod | Eksport | Kolumny danych |
 |-----|---------|----------------|
-| `MBANK_OPERATIONS_LIST` | Lista operacji (legacy) | data, opis, rachunek, kategoria, kwota |
 | `MBANK_ELECTRONIC_STATEMENT` | Elektroniczne zestawienie operacji | data księgowania, data operacji, opis operacji, tytuł, nadawca/odbiorca, NRB, kwota, saldo |
 
-Dla `MBANK_ELECTRONIC_STATEMENT` (mapowanie na `transactions`):
+Mapowanie na `transactions`:
 
 - `trans_date` — z `DATA TRANSAKCJI: YYYY-MM-DD` w tytule (karty), inaczej kolumna „Data operacji”
 - `trans_title` — tytuł po oczyszczeniu (`MbankTitleParser::cleanTitle`): usunięcie wyłącznie sufiksu `DATA TRANSAKCJI: YYYY-MM-DD` (lub uciętego `DATA TRANSAKCJI:` bez daty); reszta tytułu bez zmian (w tym `/LOKALIZACJA`, `/SIERAKOWIC` itd.)

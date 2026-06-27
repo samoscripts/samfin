@@ -28,3 +28,12 @@ Thumbs.db
 
 # Docker Compose local overrides
 .env
+
+# Mobile (Capacitor / Android)
+/mobile/node_modules/
+/mobile/android/**/build/
+/mobile/android/.gradle/
+/mobile/android/.idea/
+/mobile/android/local.properties
+/mobile/android/capacitor-cordova-android-plugins/build/
+/mobile/build.env

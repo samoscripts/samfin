@@ -44,10 +44,6 @@ function rowTitle(row: CsvImportRow): string | null {
   return row.titleClean ?? row.descriptionRaw
 }
 
-function isLegacyRow(row: CsvImportRow): boolean {
-  return row.csvFormat === 'MBANK_OPERATIONS_LIST' || (!row.csvFormat && row.bankCategoryRaw != null)
-}
-
 export default function ImportWiersze() {
   const { id } = useParams<{ id: string }>()
   const importId = parseInt(id ?? '0')
@@ -176,9 +172,6 @@ export default function ImportWiersze() {
                     </td>
                     <td className="px-3 py-2.5 text-gray-800 dark:text-gray-200 max-w-sm">
                       <ListTextTooltip text={rowTitle(row)} />
-                      {isLegacyRow(row) && row.bankCategoryRaw && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{row.bankCategoryRaw}</p>
-                      )}
                       {row.parseStatus === 'PARSE_ERROR' && row.parseError && (
                         <p className="text-red-600 dark:text-red-400 mt-0.5 text-xs">
                           {row.parseError}
@@ -255,9 +248,6 @@ export default function ImportWiersze() {
                   ].join(' ')}>
                     {formatAmount(row.amountMinor)}
                   </span>
-                  {row.bankCategoryRaw && (
-                    <span className="text-xs text-gray-400 truncate">{row.bankCategoryRaw}</span>
-                  )}
                 </div>
                 {row.parseStatus === 'PARSE_ERROR' && row.parseError && (
                   <p className="text-xs text-red-600 dark:text-red-400 mt-1">{row.parseError}</p>

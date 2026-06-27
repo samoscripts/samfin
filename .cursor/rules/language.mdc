@@ -1,0 +1,20 @@
+---
+description: Komunikacja w projekcie SamFin odbywa się po polsku
+alwaysApply: true
+---
+
+# Język komunikacji
+
+W tym projekcie (SamFin) komunikacja z użytkownikiem i w dokumentacji dla człowieka **odbywa się po polsku**.
+
+## Zakres
+
+- Odpowiedzi asystenta AI w czacie
+- Komentarze w commitach i PR (jeśli użytkownik nie wskaże inaczej)
+- Pliki README, instrukcje w `mobile/`, docs opisujące workflow
+- Komunikaty błędów widoczne dla użytkownika końcowego aplikacji (UI)
+
+## Wyjątki
+
+- Nazwy techniczne, identyfikatory kodu, komentarze w kodzie mogą pozostać po angielsku (konwencja projektu).
+- Nazwy branchy, commitów technicznych — według istniejącego stylu repozytorium.

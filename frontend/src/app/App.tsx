@@ -1,6 +1,7 @@
 import { useAuth } from './providers/AuthProvider'
 import AppRoutes from './routes'
 import Login from './pages/Login'
+import IncomingCsvHandler from '@/mobile/IncomingCsvHandler'
 
 export default function App() {
   const { user, isLoading } = useAuth()
@@ -17,5 +18,10 @@ export default function App() {
     return <Login />
   }
 
-  return <AppRoutes />
+  return (
+    <>
+      <IncomingCsvHandler />
+      <AppRoutes />
+    </>
+  )
 }

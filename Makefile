@@ -1,4 +1,54 @@
-.PHONY: up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-full-rsync
+.DEFAULT_GOAL := help
+
+.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-full-rsync mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-copy-apk mobile-install-apk mobile-icons
+
+# ── Help ──────────────────────────────────────────────────────────────────────
+
+help:
+	@echo "SamFin — dostępne komendy (uruchamiaj z katalogu fin/)"
+	@echo "Wywołanie: make   lub   make help"
+	@echo ""
+	@echo "Docker:"
+	@echo "  make up              uruchom kontenery"
+	@echo "  make down            zatrzymaj kontenery"
+	@echo "  make build           build + uruchom"
+	@echo "  make restart         restart kontenerów"
+	@echo "  make logs            logi wszystkich serwisów"
+	@echo "  make logs-app        logi kontenera app"
+	@echo ""
+	@echo "Backend (Symfony):"
+	@echo "  make migrate         migracje Doctrine (w kontenerze)"
+	@echo "  make shell           powłoka w kontenerze app"
+	@echo "  make sf CMD=...      php bin/console ..."
+	@echo "  make composer-install  composer install w kontenerze"
+	@echo "  make cc              cache:clear"
+	@echo "  make routes          debug:router"
+	@echo ""
+	@echo "Frontend:"
+	@echo "  make npm CMD=...     npm w kontenerze frontend"
+	@echo "  make build-frontend-prod  build produkcyjny frontendu"
+	@echo "  make build-info      generuj build_info.json"
+	@echo ""
+	@echo "Deploy:"
+	@echo "  make deploy          deploy frontendu na produkcję"
+	@echo "  make deploy-full-rsync   pełny rsync backendu"
+	@echo ""
+	@echo "Mobile (Capacitor / Android):"
+	@echo "  make mobile-install      npm install w mobile/ (Node 20)"
+	@echo "  make mobile-sync         cap sync android (po zmianach capacitor.config / pluginów)"
+	@echo "  make mobile-build-apk    zbuduj debug APK w WSL (Gradle, JDK 21)"
+	@echo "  make mobile-build        mobile-sync + mobile-build-apk"
+	@echo "  make mobile-copy-apk     skopiuj APK do Pobranych Windows"
+	@echo "  make mobile-install-apk  adb install -r na telefon (adb.exe z Windows)"
+	@echo "  make mobile-icons        ikona apki: podmień PNG → generuj mipmap → make mobile-build"
+	@echo "  make mobile-open         otwórz Android Studio (opcjonalnie)"
+	@echo "  make mobile-doctor       diagnostyka Capacitor"
+	@echo "  make mobile-setup-android  pierwszy raz: add android + sync"
+	@echo ""
+	@echo "Inne:"
+	@echo "  make setup           pierwsze uruchomienie projektu"
+	@echo ""
+	@echo "Szczegóły mobile: mobile/README.md"
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +119,46 @@ deploy:
 
 deploy-full-rsync:
 	bash scripts/deploy.sh --full-rsync
+
+# ── Mobile (Capacitor / Android) ──────────────────────────────────────────────
+# npm + cap sync w WSL (Node >= 20). APK: make mobile-build-apk (JDK 21 + Android SDK) — patrz mobile/README.md
+
+# Usuń CRLF z edycji na Windows (inaczej: set: pipefail — invalid option)
+define run_mobile_script
+	sed -i 's/\r$$//' $(1)
+	bash $(1)
+endef
+
+mobile-install:
+	bash -lc 'source $$HOME/.nvm/nvm.sh && nvm use 20 && cd mobile && npm install'
+
+mobile-sync:
+	bash -lc 'source $$HOME/.nvm/nvm.sh && nvm use 20 && cd mobile && npx cap sync android'
+
+mobile-build-apk:
+	$(call run_mobile_script,mobile/scripts/build-apk.sh)
+
+mobile-build: mobile-sync mobile-build-apk
+
+mobile-copy-apk:
+	$(call run_mobile_script,mobile/scripts/copy-apk-windows.sh)
+
+mobile-install-apk:
+	$(call run_mobile_script,mobile/scripts/install-apk-windows.sh)
+
+mobile-open:
+	bash -lc 'source $$HOME/.nvm/nvm.sh && nvm use 20 && cd mobile && npx cap open android'
+
+mobile-doctor:
+	bash -lc 'source $$HOME/.nvm/nvm.sh && nvm use 20 && cd mobile && npx cap doctor'
+
+mobile-setup-android:
+	$(call run_mobile_script,mobile/scripts/setup-android.sh)
+
+# Ikona launchera: frontend/public/images/samfin_logo_ico.png → mipmap-*/ic_launcher*.png
+# Po zmianie logo: make mobile-icons && make mobile-build && make mobile-install-apk
+mobile-icons:
+	python3 mobile/scripts/generate-icons.py
 
 # ── Setup (pierwsze uruchomienie) ─────────────────────────────────────────────
 

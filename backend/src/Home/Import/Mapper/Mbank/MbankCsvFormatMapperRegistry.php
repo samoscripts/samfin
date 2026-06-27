@@ -11,11 +11,9 @@ final class MbankCsvFormatMapperRegistry
 
     public function __construct(
         MbankElectronicStatementMapper $electronicStatementMapper,
-        MbankOperationsListMapper $operationsListMapper,
     ) {
         $this->mappers = [
             $electronicStatementMapper,
-            $operationsListMapper,
         ];
     }
 

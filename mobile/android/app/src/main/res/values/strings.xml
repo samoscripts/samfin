@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SamFin</string>
+    <string name="title_activity_main">SamFin</string>
+    <string name="package_name">pl.samsoft.samfin</string>
+    <string name="custom_url_scheme">pl.samsoft.samfin</string>
+</resources>

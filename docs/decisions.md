@@ -459,6 +459,16 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-031: Wycofanie parsera legacy mBank (5 kolumn)
+
+**Kontekst:** Pierwszy eksport mBank („lista operacji”, 5 kolumn, nagłówek `#Data operacji`) zastąpiony przez elektroniczne zestawienie operacji (8 kolumn, `#Data księgowania`). Nowe pliki 5-kolumnowe nie są importowane.
+
+**Decyzja:** Usunięto `MbankOperationsListMapper` i `CounterpartyAccountExtractor`. Jedyny mapper: `MbankElectronicStatementMapper`. Kolumny audytu `bank_category_raw` / `own_account_label_raw` w `csv_import_row` pozostają w schemacie (nullable, niewypełniane).
+
+**Pliki:** `Mapper/Mbank/`, `MbankCsvImportProvider.php`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -473,3 +483,4 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-24 | ADR-028: kopie zapasowe bazy (ZIP+manifest, CLI, pre-restore) |
 | 2026-06-25 | ADR-029: synchroniczna ingestia CSV — batchowanie, cache reguł, bulk duplikaty |
 | 2026-06-25 | ADR-030: usuwanie transakcji — kosz `transactions_trash` + hard DELETE |
+| 2026-06-26 | ADR-031: wycofanie parsera legacy mBank CSV (5 kolumn) |
