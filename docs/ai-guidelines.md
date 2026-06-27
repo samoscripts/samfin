@@ -129,6 +129,8 @@ make up              # Docker
 make migrate         # Migracje DB (w kontenerze, użytkownik www-data)
 make shell           # Bash w kontenerze PHP
 make sf CMD="debug:router"   # Lista tras
+make test            # PHPUnit (APP_ENV=test)
+make test-db-setup   # Jednorazowo: baza samfin_test + migracje
 make npm CMD="run build"     # Build frontendu
 ```
 
@@ -141,6 +143,18 @@ docker compose exec -u www-data -T app php bin/console doctrine:migrations:migra
 **Nie** uruchamiaj migracji na hoście WSL bez kontenera — brak `pdo_mysql`. Szczegóły: [database.md](database.md), reguła `.cursor/rules/docker-migrations.mdc`.
 
 Health check: `GET http://localhost:3001/api/health` — zwraca m.in. `version`, `build`, `commit` (z `backend/config/build_info.json`, generowany przez `frontend/scripts/generate-build-info.mjs` przy `npm run build`).
+
+### Testy (PHPUnit)
+
+Jednorazowo: `make test-db-setup` (baza `samfin_test` + migracje). Potem: `make test`.
+
+| Katalog | Zakres |
+|---------|--------|
+| `backend/tests/Smoke/` | health, security (publiczne vs chronione endpointy) |
+| `backend/tests/Api/` | testy HTTP kontrolerów (`ApiTestCase` — Bearer token, `requestJson`) |
+| `backend/tests/Unit/`, `backend/tests/Home/` | testy jednostkowe serwisów / parserów |
+
+Nowe testy API: dziedzicz z `App\Tests\Support\ApiTestCase`, używaj `createUser()` + `requestJson()`. Izolacja DB: `dama/doctrine-test-bundle` (rollback po każdym teście).
 
 ---
 

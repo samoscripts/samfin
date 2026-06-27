@@ -119,11 +119,11 @@ Folder prototypów HTML/JS został usunięty z repozytorium. W dokumentacji nie 
 
 **Pytanie:** Usunąć czy planowane do użycia?
 
-### 17. Brak testów automatycznych
+### 17. Testy automatyczne — stan początkowy
 
-W repozytorium nie znaleziono testów PHPUnit ani Vitest/Jest dla logiki biznesowej.
+**Stan (2026-06-27):** PHPUnit w `backend/` — smoke (`tests/Smoke/`), API (`tests/Api/`), jednostkowe (`tests/Home/`, `tests/Unit/`). Baza testowa: MariaDB `samfin_test`. Uruchomienie: `make test-db-setup` (jednorazowo), potem `make test`.
 
-**Pytanie:** Jaki jest docelowy poziom pokrycia testami?
+**Otwarte:** docelowy poziom pokrycia, CI (GitHub Actions), testy E2E frontendu.
 
 ### 18. Symfony Validator
 

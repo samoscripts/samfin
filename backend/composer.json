@@ -31,8 +31,10 @@
     }
     ,
     "require-dev": {
+        "dama/doctrine-test-bundle": "^8.6",
         "symfony/debug-bundle": "^7.4",
         "symfony/maker-bundle": "^1.60",
+        "symfony/test-pack": "^1.2",
         "symfony/web-profiler-bundle": "^7.4"
     },
     "config": {

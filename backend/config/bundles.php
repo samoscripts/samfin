@@ -10,4 +10,5 @@ return [
     Symfony\Bundle\DebugBundle\DebugBundle::class                     => ['dev' => true],
     Symfony\Bundle\TwigBundle\TwigBundle::class                       => ['dev' => true],
     Symfony\Bundle\WebProfilerBundle\WebProfilerBundle::class         => ['dev' => true],
+    DAMA\DoctrineTestBundle\DAMADoctrineTestBundle::class             => ['test' => true],
 ];

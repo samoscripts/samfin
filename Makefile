@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-full-rsync mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-copy-apk mobile-install-apk mobile-icons
+.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-full-rsync mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-copy-apk mobile-install-apk mobile-icons test test-db-setup test-db-migrate
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
@@ -23,6 +23,9 @@ help:
 	@echo "  make composer-install  composer install w kontenerze"
 	@echo "  make cc              cache:clear"
 	@echo "  make routes          debug:router"
+	@echo "  make test            PHPUnit (APP_ENV=test, w kontenerze)"
+	@echo "  make test-db-migrate migracje na bazie samfin_test"
+	@echo "  make test-db-setup   utwórz samfin_test + migracje (jednorazowo)"
 	@echo ""
 	@echo "Frontend:"
 	@echo "  make npm CMD=...     npm w kontenerze frontend"
@@ -89,6 +92,16 @@ migrate:
 
 routes:
 	docker compose exec app php bin/console debug:router
+
+test-db-setup:
+	docker compose exec -T db mariadb -uroot -proot -e "CREATE DATABASE IF NOT EXISTS samfin_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL ON samfin_test.* TO 'samfin'@'%'; FLUSH PRIVILEGES;"
+	$(MAKE) test-db-migrate
+
+test-db-migrate:
+	docker compose exec -e APP_ENV=test -u www-data -T app php bin/console doctrine:migrations:migrate --no-interaction
+
+test:
+	docker compose exec -e APP_ENV=test -u www-data -T app vendor/bin/phpunit
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 
