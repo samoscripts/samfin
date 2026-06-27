@@ -47,9 +47,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private bool $active = true;
 
-    #[ORM\Column(length: 64, unique: true, nullable: true)]
-    private ?string $apiToken = null;
-
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -134,9 +131,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function isActive(): bool { return $this->active; }
     public function setActive(bool $active): static { $this->active = $active; return $this; }
-
-    public function getApiToken(): ?string { return $this->apiToken; }
-    public function setApiToken(?string $apiToken): static { $this->apiToken = $apiToken; return $this; }
 
     public function getCreatedAt(): ?\DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): ?\DateTimeImmutable { return $this->updatedAt; }

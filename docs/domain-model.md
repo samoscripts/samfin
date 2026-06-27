@@ -181,7 +181,17 @@ Historia zmian klasyfikacji transakcji. Każdy wpis to snapshot JSON (podmioty +
 
 ## User (użytkownik)
 
-Konta aplikacji z rolami `ADMIN` / `USER`. Token sesji (`api_token`, 64 znaki hex) wydawany przy logowaniu.
+Konta aplikacji z rolami `ADMIN` / `USER`. Tokeny sesji w `user_api_token` (64 znaki hex, wiele aktywnych na użytkownika — np. web + mobile).
+
+### UserApiToken
+
+| Pole | Opis |
+|------|------|
+| `user_id` | FK → `app_user` (CASCADE) |
+| `token` | Unikalny Bearer (64 hex) |
+| `name` | Etykieta klienta z logowania (`web`, `mobile`, …) |
+| `created_at` | Czas wydania |
+| `last_used_at` | Ostatnie użycie (opcjonalne, na przyszłość) |
 
 ## Terminologia w kodzie vs UI
 

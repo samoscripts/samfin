@@ -4,6 +4,7 @@ namespace App\Settings\Controller;
 
 use App\Identity\Entity\User;
 use App\Identity\Repository\UserRepository;
+use App\Identity\Service\ApiTokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,6 +21,7 @@ class UserController extends AbstractController
         private EntityManagerInterface      $em,
         private UserRepository              $userRepository,
         private UserPasswordHasherInterface $passwordHasher,
+        private ApiTokenService             $apiTokenService,
     ) {}
 
     #[Route('', name: 'api_users_index', methods: ['GET'])]
@@ -117,7 +119,7 @@ class UserController extends AbstractController
 
         if (!empty($data['newPassword'])) {
             $user->setPasswordHash($this->passwordHasher->hashPassword($user, $data['newPassword']));
-            $user->setApiToken(null);
+            $this->apiTokenService->revokeAllForUser($user);
         }
 
         $this->em->flush();
@@ -134,7 +136,7 @@ class UserController extends AbstractController
         }
 
         $user->setActive(false);
-        $user->setApiToken(null);
+        $this->apiTokenService->revokeAllForUser($user);
         $this->em->flush();
 
         return $this->json(['message' => 'Użytkownik dezaktywowany.']);

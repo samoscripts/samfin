@@ -1,5 +1,6 @@
 import api from './client'
 import { AuthUser, LoginOption } from '@/shared/types/auth'
+import { isNativeApp } from '@/mobile/platform'
 
 export async function fetchLoginOptions(): Promise<LoginOption[]> {
   const res = await api.get<LoginOption[]>('/auth/login-options')
@@ -30,7 +31,11 @@ export async function apiLogin(
 ): Promise<{ token: string; user: AuthUser }> {
   const res = await api.post<{ success: boolean; token: string; user: AuthUser; message?: string }>(
     '/auth/login',
-    { email, password },
+    {
+      email,
+      password,
+      clientName: isNativeApp() ? 'mobile' : 'web',
+    },
   )
   if (!res.data.success) {
     throw new Error(res.data.message ?? 'Logowanie nieudane.')

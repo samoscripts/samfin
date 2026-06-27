@@ -151,7 +151,7 @@ Jednorazowo: `make test-db-setup` (baza `samfin_test` + migracje). Potem: `make 
 | Katalog | Zakres |
 |---------|--------|
 | `backend/tests/Smoke/` | health, security (publiczne vs chronione endpointy) |
-| `backend/tests/Api/` | testy HTTP kontrolerów (`ApiTestCase` — Bearer token, `requestJson`) |
+| `backend/tests/Api/` | testy HTTP kontrolerów (`ApiTestCase`): auth, categories, transactions, parties, wallets, concerns, party-bank-accounts, csv-imports, analytics, settlements, classification-rules, transaction-templates, system/backups |
 | `backend/tests/Unit/`, `backend/tests/Home/` | testy jednostkowe serwisów / parserów |
 
 Nowe testy API: dziedzicz z `App\Tests\Support\ApiTestCase`, używaj `createUser()` + `requestJson()`. Izolacja DB: `dama/doctrine-test-bundle` (rollback po każdym teście).

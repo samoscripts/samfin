@@ -60,4 +60,57 @@ final class AuthApiTest extends ApiTestCase
 
         $this->assertJsonResponse(401);
     }
+
+    public function testLoginTwiceCreatesIndependentTokens(): void
+    {
+        $this->createUser();
+
+        $this->requestJson('POST', '/api/auth/login', [
+            'email'       => self::TEST_USER_EMAIL,
+            'password'    => self::TEST_USER_PASSWORD,
+            'clientName'  => 'web',
+        ]);
+        $web = $this->assertJsonResponse(200);
+
+        $this->requestJson('POST', '/api/auth/login', [
+            'email'       => self::TEST_USER_EMAIL,
+            'password'    => self::TEST_USER_PASSWORD,
+            'clientName'  => 'mobile',
+        ]);
+        $mobile = $this->assertJsonResponse(200);
+
+        self::assertNotSame($web['token'], $mobile['token']);
+
+        $this->requestJson('GET', '/api/auth/me', token: $web['token']);
+        $this->assertJsonResponse(200);
+
+        $this->requestJson('GET', '/api/auth/me', token: $mobile['token']);
+        $this->assertJsonResponse(200);
+    }
+
+    public function testLogoutRevokesOnlyCurrentToken(): void
+    {
+        $this->createUser();
+
+        $this->requestJson('POST', '/api/auth/login', [
+            'email'    => self::TEST_USER_EMAIL,
+            'password' => self::TEST_USER_PASSWORD,
+        ]);
+        $first = $this->assertJsonResponse(200);
+
+        $this->requestJson('POST', '/api/auth/login', [
+            'email'    => self::TEST_USER_EMAIL,
+            'password' => self::TEST_USER_PASSWORD,
+        ]);
+        $second = $this->assertJsonResponse(200);
+
+        $this->requestJson('POST', '/api/auth/logout', token: $first['token']);
+        $this->assertJsonResponse(200);
+
+        $this->requestJson('GET', '/api/auth/me', token: $first['token']);
+        $this->assertJsonResponse(401);
+
+        $this->requestJson('GET', '/api/auth/me', token: $second['token']);
+        $this->assertJsonResponse(200);
+    }
 }

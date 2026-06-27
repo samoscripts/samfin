@@ -4,6 +4,7 @@ namespace App\Identity\Controller;
 
 use App\Identity\Entity\User;
 use App\Identity\Repository\UserRepository;
+use App\Identity\Service\ApiTokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,6 +20,7 @@ class AuthController extends AbstractController
         private EntityManagerInterface       $em,
         private UserPasswordHasherInterface  $passwordHasher,
         private UserRepository               $userRepository,
+        private ApiTokenService              $apiTokenService,
     ) {}
 
     #[Route('/login-options', name: 'api_auth_login_options', methods: ['GET'])]
@@ -43,6 +45,7 @@ class AuthController extends AbstractController
         $data     = json_decode($request->getContent(), true) ?? [];
         $email    = trim((string) ($data['email'] ?? ''));
         $password = (string) ($data['password'] ?? '');
+        $clientName = isset($data['clientName']) ? (string) $data['clientName'] : null;
 
         if (!$email || !$password) {
             return $this->json(['success' => false, 'message' => 'Podaj email i hasło.'], 400);
@@ -54,9 +57,7 @@ class AuthController extends AbstractController
             return $this->json(['success' => false, 'message' => 'Nieprawidłowy email lub hasło.'], 401);
         }
 
-        $token = bin2hex(random_bytes(32));
-        $user->setApiToken($token);
-        $this->em->flush();
+        $token = $this->apiTokenService->issueToken($user, $clientName);
 
         return $this->json([
             'success' => true,
@@ -108,6 +109,7 @@ class AuthController extends AbstractController
                 return $this->json(['message' => 'Aktualne hasło jest nieprawidłowe.'], 422);
             }
             $user->setPasswordHash($this->passwordHasher->hashPassword($user, $newPassword));
+            $this->apiTokenService->revokeAllForUser($user);
         }
 
         $this->em->flush();
@@ -116,10 +118,12 @@ class AuthController extends AbstractController
     }
 
     #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
-    public function logout(#[CurrentUser] User $user): JsonResponse
+    public function logout(Request $request): JsonResponse
     {
-        $user->setApiToken(null);
-        $this->em->flush();
+        $auth = $request->headers->get('Authorization', '');
+        if (str_starts_with($auth, 'Bearer ')) {
+            $this->apiTokenService->revokeToken(substr($auth, 7));
+        }
 
         return $this->json(['success' => true, 'message' => 'Wylogowano.']);
     }

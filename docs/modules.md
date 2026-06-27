@@ -14,8 +14,10 @@ Konwencje warstw i reguły kodu: [`architecture-rules.md`](architecture-rules.md
 
 | Plik | Route | Opis |
 |------|-------|------|
-| `Identity/Controller/AuthController.php` | `/api/auth/*` | Login, logout, profil, lista użytkowników do logowania |
-| `Identity/Security/ApiTokenAuthenticator.php` | — | Bearer token z `User.api_token` |
+| `Identity/Controller/AuthController.php` | `/api/auth/*` | Login (nowy token + opcj. `clientName`), logout (tylko bieżący token), profil |
+| `Identity/Service/ApiTokenService.php` | — | Wydawanie / unieważnianie tokenów `user_api_token` |
+| `Identity/Entity/UserApiToken.php` | — | Token API powiązany z użytkownikiem |
+| `Identity/Security/ApiTokenAuthenticator.php` | — | Bearer token z `user_api_token` |
 | `Identity/Command/CreateAdminCommand.php` | CLI `app:create-admin` | Tworzenie admina z konsoli |
 
 ### Settings

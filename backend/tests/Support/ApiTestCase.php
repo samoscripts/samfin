@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Support;
 
 use App\Identity\Entity\User;
+use App\Identity\Entity\UserApiToken;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -48,7 +49,7 @@ abstract class ApiTestCase extends WebTestCase
         $user->setPasswordHash($hasher->hashPassword($user, $password));
 
         if ($apiToken !== null) {
-            $user->setApiToken($apiToken);
+            $em->persist(new UserApiToken($user, $apiToken, 'test'));
         }
 
         $em->persist($user);

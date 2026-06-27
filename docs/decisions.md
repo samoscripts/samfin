@@ -24,9 +24,11 @@ Format: status `PRZYJĘTE` = widać w kodzie; `DO POTWIERDZENIA` = sugerowane, n
 
 **Kontekst:** API bez sesji PHP.
 
-**Decyzja:** Po logowaniu `User.api_token` (64 hex) w nagłówku `Authorization: Bearer`. Firewall `stateless: true`.
+**Decyzja:** Po logowaniu nowy wiersz w `user_api_token` (64 hex) w nagłówku `Authorization: Bearer`. Firewall `stateless: true`. Każde logowanie tworzy osobny token (`clientName`, np. `web` / `mobile`); wylogowanie unieważnia tylko bieżący token.
 
-**Pliki:** `ApiTokenAuthenticator.php`, `security.yaml`.
+**Pliki:** `ApiTokenAuthenticator.php`, `ApiTokenService.php`, `UserApiToken.php`, `security.yaml`.
+
+**Historia:** do 2026-06 token był w `app_user.api_token` (jeden na użytkownika) — migracja `Version20260627120000`.
 
 ---
 

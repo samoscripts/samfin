@@ -1,2 +1,6 @@
 framework:
     test: true
+    exceptions:
+        # Oczekiwane 403 w testach API (np. user bez ROLE_ADMIN) — nie zaśmiecaj outputu PHPUnit.
+        Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException:
+            log_level: debug

@@ -333,8 +333,9 @@ Włącz **„Instalacja z nieznanych źródeł”** dla menedżera plików (Andr
 | Nawigacja | Menu / import / transakcje jak w przeglądarce |
 | Wylogowanie | Powrót do ekranu logowania |
 | **CSV z mBanku (Faza 2)** | Eksport CSV → Udostępnij / Otwórz za pomocą → SamFin → po zalogowaniu ekran Import z wybranym plikiem i bankiem mBank → **Importuj** |
+| **Równoległa sesja (Faza 3)** | Zalogowany na telefonie i w przeglądarce jednocześnie; wylogowanie na jednym urządzeniu nie wylogowuje drugiego |
 
-**Nie działa jeszcze (kolejne fazy):** PIN / odcisk palca, multi-token (równoległa sesja web + mobile).
+**Nie działa jeszcze (kolejne fazy):** PIN / odcisk palca (Faza 4).
 
 ### Test importu CSV z mBanku
 
@@ -442,8 +443,8 @@ server: {
 | Faza | Opis |
 |------|------|
 | **1** | Szkielet Capacitor, remote URL, pierwszy APK |
-| **2** (teraz) | Intent CSV z mBanku → ekran importu (`CsvIntentPlugin` + `frontend/src/mobile/`) |
-| **3** | Multi-token w backendzie (telefon + web równolegle) |
+| **2** | Intent CSV z mBanku → ekran importu |
+| **3** (teraz) | Multi-token backend — równoległa sesja web + mobile |
 | **4** | App lock — PIN / odcisk, token w secure storage |
 | **5** | Dopracowanie UX importu na mobile |
 | **6** | Dokumentacja w `docs/` (ADR, modules.md) |

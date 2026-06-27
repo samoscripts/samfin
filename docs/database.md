@@ -9,6 +9,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od 
 | Tabela | Encja PHP | Opis |
 |--------|-----------|------|
 | `app_user` | `User` | Użytkownicy |
+| `user_api_token` | `UserApiToken` | Tokeny API (wiele sesji na użytkownika) |
 | `party` | `Party` | Podmioty |
 | `party_bank_account` | `PartyBankAccount` | Rachunki bankowe podmiotów |
 | `wallet` | `Wallet` | Portfele |
@@ -33,7 +34,12 @@ erDiagram
     app_user {
         int id PK
         string email UK
-        string api_token UK
+    }
+    user_api_token {
+        int id PK
+        int user_id FK
+        string token UK
+        string name
     }
     party {
         int id PK
