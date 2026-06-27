@@ -22,7 +22,8 @@ Przy **większych zmianach** w tym samym zadaniu co kod **zaktualizuj dokumentac
 |--------|------|
 | Decyzja architektoniczna | `docs/decisions.md` (ADR + data w historii) |
 | Słownik / konfiguracja | `docs/configuration-dictionaries.md` |
-| Encja / relacje | `docs/domain-model.md` |
+| Encja / relacje domenowe | `docs/domain-model.md` |
+| Migracja / schemat DB | `docs/database.md` (chronologia, [reguły nazewnictwa migracji](docs/database.md#reguły-nazewnictwa-migracji)) |
 | Endpointy / pliki modułu | `docs/modules.md` |
 | Niespójność / otwarte pytanie | `docs/open-questions.md` |
 | Wytyczne dla AI i checklisty | `docs/ai-guidelines.md` |

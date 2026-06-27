@@ -5,8 +5,7 @@ declare(strict_types=1);
 /**
  * Guard for readable foreign key names in Doctrine migrations.
  *
- * Rule:
- *   ADD CONSTRAINT fk_{table}_{column} FOREIGN KEY (...)
+ * Pełna konwencja (plik migracji + FK): docs/database.md#reguły-nazewnictwa-migracji
  *
  * To avoid breaking historical migrations, validation is enforced only for
  * migration versions >= ENFORCE_FROM_VERSION.

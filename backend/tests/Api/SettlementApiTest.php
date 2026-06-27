@@ -24,6 +24,17 @@ final class SettlementApiTest extends ApiTestCase
         $this->assertJsonResponse(422);
     }
 
+    public function testIndexWithoutConfigReturns422(): void
+    {
+        $this->createUser(apiToken: self::TEST_USER_TOKEN);
+
+        $this->requestJson('GET', '/api/reports/settlements', token: self::TEST_USER_TOKEN);
+
+        $data = $this->assertJsonResponse(422);
+        self::assertArrayHasKey('message', $data);
+        self::assertArrayHasKey('config', $data);
+    }
+
     public function testIndexWithConflictingPeriodParamsReturns422(): void
     {
         $this->createUser(apiToken: self::TEST_USER_TOKEN);

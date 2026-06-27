@@ -164,7 +164,7 @@ backend/src/Home/Report/Settlement/
     ├── SettlementIndexerService.php, SettlementIndexStateService.php
 ```
 
-Migracje: `Version20260625120000` (config), `Version20260627120000` (rename → `settlement_config`), `Version20260628120000` (`settlement_ledger_entry` + kolumny indeksu).
+Migracje: `Version20260625120000` (config), `Version20260706120000` (repair rename → `settlement_config`), `Version20260628120000` (`settlement_ledger_entry` + kolumny indeksu).
 
 ---
 

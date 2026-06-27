@@ -146,7 +146,7 @@ erDiagram
 | Pozostałe FK do `party`, `wallet`, `concern`, `category`, `csv_import*` | SET NULL |
 | `created_by` / `updated_by` → `app_user` | RESTRICT lub SET NULL (zależnie od tabeli) |
 
-Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
+Nazwy constraintów FK w migracjach: sekcja [Reguły nazewnictwa migracji](#reguły-nazewnictwa-migracji).
 
 ## Indeksy istotne dla zapytań
 
@@ -183,14 +183,15 @@ Konwencja nazw FK (migracja `Version20260607204500`): `fk_{tabela}_{kolumna}`.
 | `20260624120000` | Backfill `classification_rule.name` i `description` dla reguł z `created_from_transaction_id` |
 | `20260625120000` | `common_account_settlement_config` — konfiguracja rozliczenia (historyczna nazwa) |
 | `20260626120000` | Repair: utworzenie `common_account_settlement_config` jeśli brak (gdy `20260625120000` zapisana bez tabeli) |
-| `20260627120000` | Rename: `settlement_config`, kolumna `settlement_party_id` |
+| `20260627120000` | Rename: `settlement_config`, kolumna `settlement_party_id` (plik usunięty z repo — repair w `20260706120000`) |
 | `20260628120000` | `settlement_ledger_entry`; kolumny indeksu na `settlement_config` (`reindex_from_date`, salda początkowe, `needs_refresh`, …) |
 | `20260629120000` | `transactions_trash` — kosz snapshotów przed usunięciem transakcji |
-| `20260627120000` | CSV mBank v2: `csv_format`, pola booking/title/kontrahent; reset `classification_rule` |
-| `20260630120000` | Repair: DDL z `20260627120000` jeśli kolumny nie powstały przy pierwszym uruchomieniu |
+| `20260630120000` | Repair: DDL CSV z `20260627120000` jeśli kolumny nie powstały przy pierwszym uruchomieniu |
 | `20260701143022` | `transactions`: rename `title`→`operation_title`, `description`→`operation_desc`, `balance_after_minor`; reset `classification_rule` |
 | `20260702120000` | `transactions`: rename `operation_*`→`trans_*`, `trans_localization`, drop `operation_type`, pełna kolejność kolumn; `csv_import_row.title_localization_raw`; reset `classification_rule` |
 | `20260704143000` | Drop `trans_localization`, `csv_import_row.title_localization_raw`; reorder kolumn `transactions` po dropie |
+| `20260705120000` | Multi-token auth: `user_api_token`, migracja z `app_user.api_token` |
+| `20260706120000` | Repair: rename `common_account_settlement_config` → `settlement_config`; ledger + kolumny indeksu jeśli brak |
 
 ## Zapytania diagnostyczne (tylko SELECT)
 
@@ -283,6 +284,28 @@ Brak kolumny `deleted_at` na encjach operacyjnych. Dezaktywacja przez `active = 
 
 Jedyna migracja seedująca dane biznesowe: konto `admin@samfin.local`. Słowniki konfiguracyjne (kategorie, portfele itd.) **nie są seedowane** — użytkownik tworzy je przez UI/API.
 
+## Reguły nazewnictwa migracji
+
+**Jedna konwencja** dla plików w `backend/migrations/` i dla `ADD CONSTRAINT … FOREIGN KEY` w metodzie `up()`. Szczegóły operacyjne (Docker, diff): [`.cursor/rules/docker-migrations.mdc`](../.cursor/rules/docker-migrations.mdc).
+
+### Plik migracji
+
+| Reguła | Opis |
+|--------|------|
+| Format nazwy | `VersionYYYYMMDDHHMMSS.php` — timestamp z generatora Doctrine |
+| Tworzenie | `doctrine:migrations:diff` (po zmianie encji) lub `doctrine:migrations:generate` — **nie** wymyślać wersji ręcznie |
+| Timestamp | Rzeczywista data i czas (np. `Version20260701143022.php`). Bez sztucznych sufiksów (`120000`, „+1 dzień”, stała godzina dla wielu plików tego samego dnia) |
+| Wykonane migracje | **Nie edytować** pliku już zapisanego w `doctrine_migration_versions`. Poprawka schematu → **nowy** plik (repair, idempotentny). Edycja starego pliku nie uruchomi się ponownie i myli historię |
+| Historia | Starsze pliki z sufiksem `120000` zostają; nowe migracje — wyłącznie timestamp z CLI |
+
+### Klucze obce w DDL
+
+| Reguła | Opis |
+|--------|------|
+| Nazwa constraintu | `fk_{tabela}_{kolumna}` (np. `fk_settlement_config_settlement_party_id`) |
+| Zakres | Obowiązkowe dla migracji od `Version20260607204500` w górę |
+| Walidacja | `docker compose exec -T app composer check:migration-fk-names` — skrypt `backend/bin/check-migration-fk-names.php` |
+
 ## Uruchamianie migracji
 
 Aplikacja działa w Dockerze — **nie uruchamiaj** `doctrine:migrations:migrate` na hoście (brak drivera PDO do MariaDB).
@@ -300,8 +323,6 @@ docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff
 ```
 
 **Produkcja** (`scripts/deploy.sh`): migracje na serwerze, bez Dockera — `php bin/console doctrine:migrations:migrate --no-interaction --env=prod` (użytkownik deployu na hoście).
-
-Skrypt pomocniczy: `backend/bin/check-migration-fk-names.php`.
 
 ## Kopie zapasowe bazy (aplikacyjne)
 

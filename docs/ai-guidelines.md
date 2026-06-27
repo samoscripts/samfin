@@ -58,8 +58,7 @@ App\System\               — health
 
 1. Klasa w `Entity/` z atrybutami Doctrine.
 2. `Repository/` extends `ServiceEntityRepository`.
-3. Migracja: `make migrate` lub `docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff` (w kontenerze — patrz `.cursor/rules/docker-migrations.mdc`). **Nie** dokładaj kolejnej migracji z ręcznym `Version…120000` dla tego samego refaktoru — rozszerz ostatnią niewdrożoną migrację lub wygeneruj timestamp przez CLI.
-4. Konwencja FK: `fk_{table}_{column}` (patrz istniejące migracje).
+3. Migracja: `doctrine:migrations:diff` w kontenerze → `make migrate`. Konwencja nazw: [database.md — Reguły nazewnictwa migracji](database.md#reguły-nazewnictwa-migracji) (plik `Version…` + `fk_{tabela}_{kolumna}`).
 
 ### Import nowego banku
 

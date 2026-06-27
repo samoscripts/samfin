@@ -31,12 +31,7 @@ docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff
 
 Sprawdź wygenerowany plik w `backend/migrations/`, potem `make migrate`.
 
-### Nazewnictwo plików migracji
-
-- Format: `VersionYYYYMMDDHHMMSS.php` — **rzeczywista data i czas** (np. `Version20260625143022.php`).
-- Generuj przez `doctrine:migrations:diff` lub `doctrine:migrations:generate` — nie wymyślaj nazwy ręcznie.
-- **Nie** używaj sztucznych sufiksów (`120000`, `+1 dzień`) ani stałej godziny dla wielu plików tego samego dnia.
-- **Nigdy nie edytuj** pliku migracji już wykonanej w jakiejkolwiek bazie (`doctrine_migration_versions`). Zmiana DDL → **nowa** migracja (np. repair). Edycja „starego” pliku nie uruchomi się ponownie i myli historię.
+Nazewnictwo plików i FK: jedna konwencja w [`docs/database.md`](../docs/database.md#reguły-nazewnictwa-migracji).
 
 ## Inne komendy Symfony
 
