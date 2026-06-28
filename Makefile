@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-full-rsync mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-copy-apk mobile-install-apk mobile-icons test test-db-setup test-db-migrate
+.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-all deploy-full-rsync git-deploy-alias mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-copy-apk mobile-install-apk mobile-icons test test-db-setup test-db-migrate
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,9 @@ help:
 	@echo "  make build-info      generuj build_info.json"
 	@echo ""
 	@echo "Deploy:"
-	@echo "  make deploy          deploy frontendu na produkcję"
+	@echo "  make deploy              deploy frontendu na produkcję"
+	@echo "  make deploy-all          git add/commit/push (poprawki) + deploy"
+	@echo "  git deploy -all          to samo (jednorazowo: make git-deploy-alias)"
 	@echo "  make deploy-full-rsync   pełny rsync backendu"
 	@echo ""
 	@echo "Mobile (Capacitor / Android):"
@@ -130,6 +132,13 @@ fix-frontend-node-modules:
 
 deploy:
 	bash scripts/deploy.sh
+
+deploy-all:
+	bash scripts/deploy.sh --all
+
+git-deploy-alias:
+	git config alias.deploy '!f() { root="$$(git rev-parse --show-toplevel)"; bash "$$root/scripts/deploy.sh" "$$@"; }; f'
+	@echo "✓ git deploy — uruchom: git deploy   lub   git deploy -all"
 
 deploy-full-rsync:
 	bash scripts/deploy.sh --full-rsync

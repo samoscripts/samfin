@@ -3,6 +3,7 @@
 #
 # Run from WSL/Linux in repo root (not from PowerShell, not inside a container):
 #   cd /home/msamotyj/www/fin && make deploy
+#   git deploy -all   (after: make git-deploy-alias)
 #
 # Default (hybrid): local npm build + upload frontend artifacts, git pull + composer on server.
 # PHP webroot files (.htaccess, index.php) come from git pull — commit and push before deploy.
@@ -46,12 +47,14 @@ RSYNC_FLAGS=(-avz)
 REMOTE_HAS_RSYNC=false
 FULL_RSYNC=false
 DRY_RUN=false
+GIT_COMMIT_ALL=false
 
 usage() {
     cat <<'EOF'
 Usage: ./scripts/deploy.sh [OPTIONS]
 
 Options:
+  --all, -all    git add -A, commit ("poprawki" if unstaged changes), push — then deploy
   --full-rsync   Build vendor locally and upload entire backend/ (no git pull / composer on server)
   --dry-run      Build locally but skip upload and post-deploy
   -h, --help     Show this help
@@ -60,6 +63,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --all|-all)   GIT_COMMIT_ALL=true; shift ;;
         --full-rsync) FULL_RSYNC=true; shift ;;
         --dry-run)    DRY_RUN=true; shift ;;
         -h|--help)    usage; exit 0 ;;
@@ -104,6 +108,17 @@ preflight() {
     detect_remote_rsync
 
     log "Preflight OK"
+}
+
+git_commit_and_push() {
+    log "Git: add, commit, push..."
+    git add -A
+    if git diff --staged --quiet; then
+        log "Nothing to commit — pushing current branch"
+    else
+        git commit -m "poprawki"
+    fi
+    git push
 }
 
 NPM_EXEC_ENV=(-e HOME=/app -e NPM_CONFIG_CACHE=/app/.npm-cache)
@@ -236,6 +251,9 @@ REMOTE
 
 main() {
     cd "$REPO_ROOT"
+    if [[ "$GIT_COMMIT_ALL" == true ]]; then
+        git_commit_and_push
+    fi
     preflight
 
     if [[ "$FULL_RSYNC" == true ]]; then
