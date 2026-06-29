@@ -111,9 +111,6 @@ class TransactionClassificationService
                 if (!$category) {
                     throw new \InvalidArgumentException("Nie znaleziono kategorii id={$payload['categoryId']}.");
                 }
-                if (!$category->supportsDirection($tx->getDirection())) {
-                    throw new \InvalidArgumentException('Kategoria nie pasuje do kierunku transakcji.');
-                }
                 $item->setCategory($category);
             }
 

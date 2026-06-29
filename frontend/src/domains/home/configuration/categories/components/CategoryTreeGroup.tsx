@@ -1,8 +1,7 @@
 import { useDroppable } from '@dnd-kit/core'
-import { ChevronDown, Loader2, Pencil, X } from 'lucide-react'
+import { ChevronDown, Loader2, Pencil, Trash2, X } from 'lucide-react'
 import type { Category } from '@/shared/api/categories'
 import type { CategoryTreeNode } from '../utils/categoryTree'
-import CategoryDirectionsPills from './CategoryDirectionsPills'
 import CategoryTreeRow from './CategoryTreeRow'
 
 export interface CategoryTreeGroupProps {
@@ -10,11 +9,13 @@ export interface CategoryTreeGroupProps {
   expanded: boolean
   dimmed?: boolean
   deactivating: number | null
+  deleting: number | null
   activeDropParentId: number | null
   invalidDropParentId: number | null
   onToggle: (parentId: number) => void
   onEdit: (id: number) => void
   onDeactivate: (item: Category) => void
+  onPermanentDelete?: (item: Category) => void
   onMerge: (item: Category) => void
   onMove: (item: Category) => void
 }
@@ -24,11 +25,13 @@ export default function CategoryTreeGroup({
   expanded,
   dimmed = false,
   deactivating,
+  deleting,
   activeDropParentId,
   invalidDropParentId,
   onToggle,
   onEdit,
   onDeactivate,
+  onPermanentDelete,
   onMerge,
   onMove,
 }: CategoryTreeGroupProps) {
@@ -91,8 +94,6 @@ export default function CategoryTreeGroup({
           )}
         </div>
 
-        <CategoryDirectionsPills directions={parent.directions} />
-
         <div className="flex items-center gap-0.5 shrink-0">
           <button
             type="button"
@@ -113,6 +114,17 @@ export default function CategoryTreeGroup({
               {deactivating === parent.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
             </button>
           )}
+          {!parent.active && onPermanentDelete && (
+            <button
+              type="button"
+              onClick={() => onPermanentDelete(parent)}
+              disabled={deleting === parent.id}
+              title="Usuń z bazy"
+              className="p-1.5 rounded-md text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors disabled:opacity-40"
+            >
+              {deleting === parent.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -123,8 +135,10 @@ export default function CategoryTreeGroup({
             child={child}
             dimmed={dimmed}
             deactivating={deactivating}
+            deleting={deleting}
             onEdit={onEdit}
             onDeactivate={onDeactivate}
+            onPermanentDelete={onPermanentDelete}
             onMerge={onMerge}
             onMove={onMove}
           />

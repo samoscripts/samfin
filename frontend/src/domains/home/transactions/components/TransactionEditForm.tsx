@@ -31,7 +31,7 @@ import {
   isOwnSideLocked,
   resolvePartyName,
 } from '../utils/partyAssignment'
-import { filterCategoriesForDirection } from '../utils/categoryOptions'
+import { filterActiveCategories } from '../utils/categoryOptions'
 import {
   TransactionTemplateFormFooter,
   TransactionTemplateList,
@@ -126,7 +126,7 @@ export default function TransactionEditForm({
   const paidToLocked = isOwnSideLocked(tx, 'paidTo')
   const paidFromParties = filterPartiesForField(parties, tx, 'paidFrom', draft.paidToPartyId)
   const paidToParties = filterPartiesForField(parties, tx, 'paidTo', draft.paidFromPartyId)
-  const relevantCategories = filterCategoriesForDirection(categories, tx.direction)
+  const relevantCategories = filterActiveCategories(categories)
 
   const manualOwnFrom = tx.source === 'MANUAL' && tx.direction === 'EXPENSE'
   const manualOwnTo = tx.source === 'MANUAL' && tx.direction === 'INCOME'

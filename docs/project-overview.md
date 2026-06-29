@@ -90,11 +90,12 @@ flowchart LR
 5. **Dashboard** — agregaty przychodów, wydatków, salda i liczby niesklasyfikowanych transakcji.
 6. **Transakcje ręczne** — formularz `/transactions/new` ze `source: MANUAL`; klasyfikacja opcjonalna; reguły Skąd/Dokąd jak przy edycji (ADR-017, ADR-019).
 7. **Raporty** — sidebar z podmenu: Analizy (`/raporty/analytics`, `GET /api/reports/analytics`) oraz Rozliczenia (`/raporty/settlements`, `GET /api/reports/settlements`).
+8. **Aplikacja mobilna Android** — Capacitor WebView (remote URL); pobieranie APK z `/downloads/`; przewodnik w UI: `/o-aplikacji` (ADR-033, ADR-034).
 
 ## Konwencje globalne
 
 - **Kwoty**: przechowywane w groszach (`amount_minor`, typ `INT`); API zwraca wartości dziesiętne PLN (`round(minor / 100, 2)`).
-- **Soft delete**: encje konfiguracyjne i użytkownicy dezaktywowani przez `active = false` (endpoint `DELETE` nie usuwa rekordu fizycznie). **Kategorie:** dezaktywacja zablokowana przy potwierdzonych użyciach — ADR-027; merge przepina powiązania.
+- **Soft delete**: encje konfiguracyjne i użytkownicy dezaktywowani przez `active = false` (endpoint `DELETE` nie usuwa rekordu fizycznie). **Kategorie:** dezaktywacja zablokowana przy potwierdzonych użyciach — ADR-027; merge przepina powiązania; hard delete tylko nieaktywnych — ADR-035.
 - **Audyt**: większość encji ma `created_by`, `updated_by`, `created_at`, `updated_at`.
 - **Język UI**: głównie polski; część etykiet nawigacji po angielsku (np. „Dashboard”, „Transactions”).
 

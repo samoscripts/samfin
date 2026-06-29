@@ -1,5 +1,6 @@
 import { Navigate, Routes, Route } from 'react-router-dom'
 import Layout       from '@/layout/Layout'
+import AboutApp     from '@/domains/about/pages/AboutApp'
 import Dashboard    from '@/domains/home/dashboard/pages/Dashboard'
 import Transactions from '@/domains/home/transactions/pages/Transactions'
 import TransactionEditRedirect from '@/domains/home/transactions/pages/TransactionEditRedirect'
@@ -97,6 +98,7 @@ export default function AppRoutes() {
         </Route>
 
         <Route path="moje-konto" element={<MyAccount />} />
+        <Route path="o-aplikacji" element={<AboutApp />} />
         <Route path="ustawienia" element={<Settings />}>
           <Route index element={<Navigate to="uzytkownicy" replace />} />
           <Route path="uzytkownicy">

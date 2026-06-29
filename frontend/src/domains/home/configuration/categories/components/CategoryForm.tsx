@@ -1,20 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
-import { DIRECTION_OPTIONS } from '@/domains/home/transactions/constants/labels'
+import { useMemo, useState } from 'react'
 import {
   createCategory,
   updateCategory,
   formatCategoryDeactivateError,
   type Category,
-  type CategoryDirection,
 } from '@/shared/api/categories'
-import FilterToggleGroup from '@/shared/components/form/FilterToggleGroup'
 import FormActions from '@/shared/components/form/FormActions'
 import FormError from '@/shared/components/form/FormError'
 import FormField from '@/shared/components/form/FormField'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import { configInputCls, configSelectCls, textareaCls } from '@/shared/components/form/formClasses'
-import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
-import { parentSupportsChildDirections } from '@/shared/utils/categoryOptions'
 
 export interface CategoryFormProps {
   item: Category | null
@@ -23,15 +18,9 @@ export interface CategoryFormProps {
   onCancel: () => void
 }
 
-function defaultDirections(item: Category | null): CategoryDirection[] {
-  if (item?.directions?.length) return item.directions
-  return ['EXPENSE']
-}
-
 export default function CategoryForm({ item, allCategories, onSaved, onCancel }: CategoryFormProps) {
   const isEdit = item !== null
   const [name, setName] = useState(item?.name ?? '')
-  const [directions, setDirections] = useState<CategoryDirection[]>(() => defaultDirections(item))
   const [parentId, setParentId] = useState<string>(item?.parentId ? String(item.parentId) : '')
   const [description, setDescription] = useState(item?.description ?? '')
   const [active, setActive] = useState(item?.active ?? true)
@@ -39,41 +28,18 @@ export default function CategoryForm({ item, allCategories, onSaved, onCancel }:
   const [error, setError] = useState<string | null>(null)
 
   const parentOptions = useMemo(
-    () =>
-      allCategories.filter((c) => {
-        if (isEdit && c.id === item.id) return false
-        return parentSupportsChildDirections(c, directions)
-      }),
-    [allCategories, directions, isEdit, item],
+    () => allCategories.filter((c) => !isEdit || c.id !== item.id),
+    [allCategories, isEdit, item],
   )
-
-  useEffect(() => {
-    if (parentId === '') return
-    const selected = allCategories.find((c) => c.id === Number(parentId))
-    if (!selected || !parentSupportsChildDirections(selected, directions)) {
-      setParentId('')
-    }
-  }, [directions, parentId, allCategories])
-
-  function handleDirectionsChange(next: string[]) {
-    if (next.length === 0) return
-    setDirections(next as CategoryDirection[])
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
-    if (directions.length === 0) {
-      setError('Wybierz co najmniej jeden kierunek (wydatek lub wpływ).')
-      return
-    }
-
     setSaving(true)
     try {
       const payload = {
         name: name.trim(),
-        directions,
         parentId: parentId ? Number(parentId) : null,
         description: description.trim() || null,
         active,
@@ -96,41 +62,27 @@ export default function CategoryForm({ item, allCategories, onSaved, onCancel }:
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && <FormError message={error} />}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Nazwa" required>
-          <input
-            type="text"
-            className={configInputCls}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nazwa kategorii…"
-            required
-          />
-        </FormField>
+      <FormField label="Nazwa" required>
+        <input
+          type="text"
+          className={configInputCls}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nazwa kategorii…"
+          required
+        />
+      </FormField>
 
-        <FormField label="Kierunki" required>
-          <FilterToggleGroup
-            options={DIRECTION_OPTIONS}
-            value={directions}
-            onChange={handleDirectionsChange}
-            variantForValue={(v) => DIRECTION_PILL[v as CategoryDirection]}
-            ariaLabel="Kierunki kategorii"
-          />
-        </FormField>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Kategoria nadrzędna">
-          <DictionarySelect
-            items={parentOptions}
-            value={parentId ? Number(parentId) : null}
-            onChange={(v) => setParentId(v === null ? '' : String(v))}
-            emptyLabel="Brak"
-            valueType="number"
-            className={configSelectCls}
-          />
-        </FormField>
-      </div>
+      <FormField label="Kategoria nadrzędna">
+        <DictionarySelect
+          items={parentOptions}
+          value={parentId ? Number(parentId) : null}
+          onChange={(v) => setParentId(v === null ? '' : String(v))}
+          emptyLabel="Brak"
+          valueType="number"
+          className={configSelectCls}
+        />
+      </FormField>
 
       <FormField label="Opis">
         <textarea

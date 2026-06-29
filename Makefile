@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-all deploy-full-rsync git-deploy-alias mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-copy-apk mobile-install-apk mobile-icons test test-db-setup test-db-migrate
+.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-all deploy-full-rsync git-deploy-alias mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-build-i mobile-copy-apk mobile-install-apk mobile-icons test test-db-setup test-db-migrate
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
@@ -43,7 +43,8 @@ help:
 	@echo "  make mobile-install      npm install w mobile/ (Node 20)"
 	@echo "  make mobile-sync         cap sync android (po zmianach capacitor.config / pluginów)"
 	@echo "  make mobile-build-apk    zbuduj debug APK w WSL (Gradle, JDK 21)"
-	@echo "  make mobile-build        mobile-sync + mobile-build-apk"
+	@echo "  make mobile-build        mobile-sync + mobile-build-apk (pyta o kopiowanie do downloads/)"
+	@echo "  make mobile-build-i      jak mobile-build, ale kopiuje APK do downloads/ bez pytania"
 	@echo "  make mobile-copy-apk     skopiuj APK do Pobranych Windows"
 	@echo "  make mobile-install-apk  adb install -r na telefon (adb.exe z Windows)"
 	@echo "  make mobile-icons        ikona apki: podmień PNG → generuj mipmap → make mobile-build"
@@ -162,6 +163,9 @@ mobile-build-apk:
 	$(call run_mobile_script,mobile/scripts/build-apk.sh)
 
 mobile-build: mobile-sync mobile-build-apk
+
+mobile-build-i: mobile-sync
+	$(call run_mobile_script,mobile/scripts/build-apk.sh -i)
 
 mobile-copy-apk:
 	$(call run_mobile_script,mobile/scripts/copy-apk-windows.sh)

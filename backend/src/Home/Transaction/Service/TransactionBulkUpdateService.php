@@ -85,7 +85,7 @@ class TransactionBulkUpdateService
             $concern = $this->resolveConcern($values['concernId'] ?? null);
         }
         if (in_array('categoryId', $fields, true)) {
-            $category = $this->resolveCategory($values['categoryId'] ?? null, $directions[0]);
+            $category = $this->resolveCategory($values['categoryId'] ?? null);
         }
 
         $itemFields = array_intersect($fields, ['walletId', 'concernId', 'categoryId']);
@@ -189,7 +189,7 @@ class TransactionBulkUpdateService
         return $concern;
     }
 
-    private function resolveCategory(mixed $id, string $direction): ?Category
+    private function resolveCategory(mixed $id): ?Category
     {
         if ($id === null || $id === '') {
             return null;
@@ -197,9 +197,6 @@ class TransactionBulkUpdateService
         $category = $this->em->find(Category::class, (int) $id);
         if (!$category) {
             throw new \InvalidArgumentException("Nie znaleziono kategorii id={$id}.");
-        }
-        if (!$category->supportsDirection($direction)) {
-            throw new \InvalidArgumentException('Kategoria nie pasuje do kierunku transakcji.');
         }
 
         return $category;

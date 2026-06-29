@@ -11,10 +11,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\HasLifecycleCallbacks]
 class Category
 {
-    public const DIRECTION_INCOME  = 'INCOME';
-    public const DIRECTION_EXPENSE = 'EXPENSE';
-    public const DIRECTIONS = [self::DIRECTION_INCOME, self::DIRECTION_EXPENSE];
-
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -22,12 +18,6 @@ class Category
 
     #[ORM\Column(length: 200)]
     private ?string $name = null;
-
-    #[ORM\Column(name: 'direction_expense', options: ['default' => true])]
-    private bool $directionExpense = true;
-
-    #[ORM\Column(name: 'direction_income', options: ['default' => false])]
-    private bool $directionIncome = false;
 
     #[ORM\ManyToOne(targetEntity: self::class)]
     #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
@@ -74,7 +64,6 @@ class Category
             'parentId'    => $this->parent?->getId(),
             'parentName'  => $this->parent?->getName(),
             'name'        => $this->name,
-            'directions'  => $this->getDirections(),
             'description' => $this->description,
             'active'      => $this->active,
             'createdById' => $this->createdBy?->getId(),
@@ -84,70 +73,10 @@ class Category
         ];
     }
 
-    /** @return list<string> */
-    public function getDirections(): array
-    {
-        $directions = [];
-        if ($this->directionExpense) {
-            $directions[] = self::DIRECTION_EXPENSE;
-        }
-        if ($this->directionIncome) {
-            $directions[] = self::DIRECTION_INCOME;
-        }
-
-        return $directions;
-    }
-
-    public function supportsDirection(string $direction): bool
-    {
-        return match ($direction) {
-            self::DIRECTION_EXPENSE => $this->directionExpense,
-            self::DIRECTION_INCOME  => $this->directionIncome,
-            default                 => false,
-        };
-    }
-
-    /** @param list<string> $directions */
-    public function setDirections(array $directions): static
-    {
-        $normalized = array_values(array_unique(array_filter(
-            $directions,
-            fn (string $direction) => in_array($direction, self::DIRECTIONS, true),
-        )));
-
-        $this->directionExpense = in_array(self::DIRECTION_EXPENSE, $normalized, true);
-        $this->directionIncome  = in_array(self::DIRECTION_INCOME, $normalized, true);
-
-        return $this;
-    }
-
-    /** @param list<string> $childDirections */
-    public function supportsAllDirections(array $childDirections): bool
-    {
-        foreach ($childDirections as $direction) {
-            if (!$this->supportsDirection($direction)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    public function hasAnyDirection(): bool
-    {
-        return $this->directionExpense || $this->directionIncome;
-    }
-
     public function getId(): ?int { return $this->id; }
 
     public function getName(): ?string { return $this->name; }
     public function setName(string $name): static { $this->name = $name; return $this; }
-
-    public function isDirectionExpense(): bool { return $this->directionExpense; }
-    public function setDirectionExpense(bool $directionExpense): static { $this->directionExpense = $directionExpense; return $this; }
-
-    public function isDirectionIncome(): bool { return $this->directionIncome; }
-    public function setDirectionIncome(bool $directionIncome): static { $this->directionIncome = $directionIncome; return $this; }
 
     public function getParent(): ?self { return $this->parent; }
     public function setParent(?self $parent): static { $this->parent = $parent; return $this; }

@@ -7,9 +7,11 @@ class CategoryInUseException extends \InvalidArgumentException
     /**
      * @param array{items: int, templates: int, rules: int, total: int} $usage
      */
-    public function __construct(private readonly array $usage)
-    {
-        parent::__construct('Nie można dezaktywować kategorii, ponieważ jest używana.');
+    public function __construct(
+        private readonly array $usage,
+        string $message = 'Nie można dezaktywować kategorii, ponieważ jest używana.',
+    ) {
+        parent::__construct($message);
     }
 
     /**

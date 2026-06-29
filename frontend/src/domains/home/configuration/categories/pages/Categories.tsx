@@ -3,11 +3,13 @@ import { createPortal } from 'react-dom'
 import { Loader2, Plus } from 'lucide-react'
 import {
   deactivateCategory,
+  deleteCategory,
   fetchCategories,
   fetchCategory,
-  formatCategoryDeactivateError,
+  formatCategoryUsageError,
   type Category,
 } from '@/shared/api/categories'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { useRightPanelPortal } from '@/layout/RightPanelContext'
 import CategoriesSidebar from '../components/CategoriesSidebar'
 import CategoryTreeList from '../components/CategoryTreeList'
@@ -18,6 +20,10 @@ import {
 } from '../constants/panelLayout'
 import { useCategoriesPanelUrl } from '../hooks/useCategoriesPanelUrl'
 
+type ConfirmAction =
+  | { type: 'deactivate'; item: Category }
+  | { type: 'delete'; item: Category }
+
 export default function Categories() {
   const portalRoot = useRightPanelPortal()
   const { panel, categoryId, panelOpen, openPanel, closePanel } = useCategoriesPanelUrl()
@@ -27,7 +33,10 @@ export default function Categories() {
   const [editingItem, setEditingItem] = useState<Category | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const [deactivating, setDeactivating] = useState<number | null>(null)
-  const [deactivateError, setDeactivateError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<number | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
 
   const [panelWidth, setPanelWidth] = useState(loadStoredCategoriesPanelWidth)
   const [panelExpanded, setPanelExpanded] = useState(false)
@@ -79,17 +88,46 @@ export default function Categories() {
     storeCategoriesPanelWidth(w)
   }, [])
 
-  async function handleDeactivate(item: Category) {
-    if (!confirm(`Dezaktywować kategorię „${item.name}"?`)) return
-    setDeactivateError(null)
-    setDeactivating(item.id)
+  function requestDeactivate(item: Category) {
+    setConfirmAction({ type: 'deactivate', item })
+  }
+
+  function requestPermanentDelete(item: Category) {
+    setConfirmAction({ type: 'delete', item })
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmAction) return
+    setActionError(null)
+    setConfirmLoading(true)
+
+    const { type, item } = confirmAction
+
+    if (type === 'deactivate') {
+      setDeactivating(item.id)
+      try {
+        await deactivateCategory(item.id)
+        setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: false } : i)))
+        setConfirmAction(null)
+      } catch (err: unknown) {
+        setActionError(formatCategoryUsageError(err, 'Nie udało się dezaktywować kategorii.'))
+      } finally {
+        setDeactivating(null)
+        setConfirmLoading(false)
+      }
+      return
+    }
+
+    setDeleting(item.id)
     try {
-      await deactivateCategory(item.id)
-      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: false } : i)))
+      await deleteCategory(item.id)
+      setItems((prev) => prev.filter((i) => i.id !== item.id))
+      setConfirmAction(null)
     } catch (err: unknown) {
-      setDeactivateError(formatCategoryDeactivateError(err, 'Nie udało się dezaktywować kategorii.'))
+      setActionError(formatCategoryUsageError(err, 'Nie udało się usunąć kategorii.'))
     } finally {
-      setDeactivating(null)
+      setDeleting(null)
+      setConfirmLoading(false)
     }
   }
 
@@ -113,6 +151,17 @@ export default function Categories() {
   const active = items.filter((i) => i.active)
   const inactive = items.filter((i) => !i.active)
 
+  const confirmTitle =
+    confirmAction?.type === 'delete' ? 'Usuń kategorię' : 'Dezaktywuj kategorię'
+
+  const confirmMessage = confirmAction
+    ? confirmAction.type === 'delete'
+      ? `Czy na pewno trwale usunąć kategorię „${confirmAction.item.name}" z bazy? Tej operacji nie można cofnąć.`
+      : `Czy na pewno dezaktywować kategorię „${confirmAction.item.name}"?`
+    : ''
+
+  const confirmLabel = confirmAction?.type === 'delete' ? 'Usuń' : 'Dezaktywuj'
+
   return (
     <>
       <div>
@@ -133,8 +182,8 @@ export default function Categories() {
           </button>
         </div>
 
-        {deactivateError && (
-          <p className="text-sm text-red-600 dark:text-red-400 mb-4">{deactivateError}</p>
+        {actionError && (
+          <p className="text-sm text-red-600 dark:text-red-400 mb-4">{actionError}</p>
         )}
 
         {isLoading ? (
@@ -154,7 +203,7 @@ export default function Categories() {
               items={active}
               deactivating={deactivating}
               onEdit={(id) => openPanel('edit', id)}
-              onDeactivate={handleDeactivate}
+              onDeactivate={requestDeactivate}
               onMerge={(item) => openPanel('merge', item.id)}
               onMove={(item) => openPanel('move', item.id)}
               onItemsChange={setItems}
@@ -165,8 +214,10 @@ export default function Categories() {
                 items={inactive}
                 dimmed
                 deactivating={deactivating}
+                deleting={deleting}
                 onEdit={(id) => openPanel('edit', id)}
-                onDeactivate={handleDeactivate}
+                onDeactivate={requestDeactivate}
+                onPermanentDelete={requestPermanentDelete}
                 onMerge={(item) => openPanel('merge', item.id)}
                 onMove={(item) => openPanel('move', item.id)}
                 onItemsChange={setItems}
@@ -175,6 +226,16 @@ export default function Categories() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={confirmTitle}
+        message={confirmMessage}
+        confirmLabel={confirmLabel}
+        loading={confirmLoading}
+        onConfirm={() => void handleConfirmAction()}
+        onCancel={() => !confirmLoading && setConfirmAction(null)}
+      />
 
       {portalRoot &&
         createPortal(

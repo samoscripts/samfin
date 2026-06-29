@@ -48,8 +48,10 @@ export interface CategoryTreeListProps {
   items: Category[]
   dimmed?: boolean
   deactivating: number | null
+  deleting?: number | null
   onEdit: (id: number) => void
   onDeactivate: (item: Category) => void
+  onPermanentDelete?: (item: Category) => void
   onMerge: (item: Category) => void
   onMove: (item: Category) => void
   onItemsChange: (updater: (prev: Category[]) => Category[]) => void
@@ -60,8 +62,10 @@ export default function CategoryTreeList({
   items,
   dimmed = false,
   deactivating,
+  deleting = null,
   onEdit,
   onDeactivate,
+  onPermanentDelete,
   onMerge,
   onMove,
   onItemsChange,
@@ -153,7 +157,7 @@ export default function CategoryTreeList({
 
     const parent = overData.category as Category
     if (!canMoveChildToParent(child, parent)) {
-      setMoveError('Nie można przenieść do tej grupy (niezgodne kierunki lub ta sama grupa).')
+      setMoveError('Nie można przenieść do tej grupy (ta sama grupa lub nieprawidłowy cel).')
       return
     }
 
@@ -218,11 +222,13 @@ export default function CategoryTreeList({
                 expanded={expandedIds.has(node.parent.id)}
                 dimmed={dimmed}
                 deactivating={deactivating}
+                deleting={deleting}
                 activeDropParentId={activeDropParentId}
                 invalidDropParentId={invalidDropParentId}
                 onToggle={toggleExpanded}
                 onEdit={onEdit}
                 onDeactivate={onDeactivate}
+                onPermanentDelete={onPermanentDelete}
                 onMerge={onMerge}
                 onMove={onMove}
               />
@@ -239,8 +245,10 @@ export default function CategoryTreeList({
                     child={child}
                     dimmed={dimmed}
                     deactivating={deactivating}
+                    deleting={deleting}
                     onEdit={onEdit}
                     onDeactivate={onDeactivate}
+                    onPermanentDelete={onPermanentDelete}
                     onMerge={onMerge}
                     onMove={onMove}
                   />

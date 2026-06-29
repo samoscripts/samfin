@@ -5,6 +5,8 @@ import Topbar from './Topbar'
 import Breadcrumbs from './Breadcrumbs'
 import AppFooter from './AppFooter'
 import { RightPanelContext } from './RightPanelContext'
+import MobileUpdateBanner from '@/mobile/MobileUpdateBanner'
+import MobileInstallBanner from '@/mobile/MobileInstallBanner'
 
 export default function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -27,6 +29,8 @@ export default function Layout() {
           />
 
           <div className="flex flex-col flex-1 min-w-0 min-h-0 md:overflow-hidden">
+            <MobileInstallBanner />
+            <MobileUpdateBanner />
             <Topbar onMobileMenuOpen={handleMobileOpen} />
             <Breadcrumbs />
             <main className="flex-1 overflow-y-auto min-h-0">

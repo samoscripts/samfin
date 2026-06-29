@@ -1,15 +1,16 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowRightLeft, GripVertical, Loader2, Pencil, X } from 'lucide-react'
+import { ArrowRightLeft, GripVertical, Loader2, Pencil, Trash2, X } from 'lucide-react'
 import type { Category } from '@/shared/api/categories'
-import CategoryDirectionsPills from './CategoryDirectionsPills'
 
 export interface CategoryTreeRowProps {
   child: Category
   dimmed?: boolean
   deactivating: number | null
+  deleting: number | null
   onEdit: (id: number) => void
   onDeactivate: (item: Category) => void
+  onPermanentDelete?: (item: Category) => void
   onMerge: (item: Category) => void
   onMove: (item: Category) => void
 }
@@ -18,8 +19,10 @@ export default function CategoryTreeRow({
   child,
   dimmed = false,
   deactivating,
+  deleting,
   onEdit,
   onDeactivate,
+  onPermanentDelete,
   onMerge,
   onMove,
 }: CategoryTreeRowProps) {
@@ -63,8 +66,6 @@ export default function CategoryTreeRow({
         )}
       </div>
 
-      <CategoryDirectionsPills directions={child.directions} />
-
       <div className="flex items-center gap-0.5 shrink-0">
         <button
           type="button"
@@ -99,6 +100,17 @@ export default function CategoryTreeRow({
             className="p-1.5 rounded-md text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors disabled:opacity-40"
           >
             {deactivating === child.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+          </button>
+        )}
+        {!child.active && onPermanentDelete && (
+          <button
+            type="button"
+            onClick={() => onPermanentDelete(child)}
+            disabled={deleting === child.id}
+            title="Usuń z bazy"
+            className="p-1.5 rounded-md text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors disabled:opacity-40"
+          >
+            {deleting === child.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
           </button>
         )}
       </div>

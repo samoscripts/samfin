@@ -6,6 +6,7 @@
 #   git deploy -all   (after: make git-deploy-alias)
 #
 # Default (hybrid): local npm build + upload frontend artifacts, git pull + composer on server.
+# -all / deploy-all: git add, commit, push lokalnie — potem ten sam deploy (git pull na serwerze).
 # PHP webroot files (.htaccess, index.php) come from git pull — commit and push before deploy.
 # Fallback:         ./scripts/deploy.sh --full-rsync  (when composer fails on hosting)
 #
@@ -54,9 +55,9 @@ usage() {
 Usage: ./scripts/deploy.sh [OPTIONS]
 
 Options:
-  --all, -all    git add -A, commit ("poprawki" if unstaged changes), push — then deploy
+  --all, -all    git add -A, commit ("poprawki" if unstaged changes), push — then deploy (git pull on server)
   --full-rsync   Build vendor locally and upload entire backend/ (no git pull / composer on server)
-  --dry-run      Build locally but skip upload and post-deploy
+  --dry-run      Build locally; skip git add/commit/push (-all), upload and post-deploy
   -h, --help     Show this help
 EOF
 }
@@ -135,6 +136,34 @@ build_backend_vendor() {
         composer install --no-dev --optimize-autoloader --no-interaction
 }
 
+has_download_artifacts() {
+    local downloads_dir="$REPO_ROOT/backend/public/downloads"
+    [[ -f "$downloads_dir/mobile.json" ]] && return 0
+    compgen -G "$downloads_dir/*.apk" >/dev/null && return 0
+    return 1
+}
+
+upload_downloads_artifacts() {
+    local downloads_dir="$REPO_ROOT/backend/public/downloads"
+    if ! has_download_artifacts; then
+        log "Brak APK/manifestu w backend/public/downloads/ — pomijam upload mobile"
+        return 0
+    fi
+
+    if [[ "$REMOTE_HAS_RSYNC" == true ]]; then
+        log "Rsync mobile downloads to $DEPLOY_HOST:$DEPLOY_BACKEND_PATH/public/downloads/"
+        rsync "${RSYNC_FLAGS[@]}" \
+            -e "$RSYNC_SSH" \
+            "$downloads_dir/" \
+            "$DEPLOY_HOST:$DEPLOY_BACKEND_PATH/public/downloads/"
+    else
+        log "Upload mobile downloads (tar+ssh) to $DEPLOY_HOST:$DEPLOY_BACKEND_PATH/public/downloads/"
+        ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" "mkdir -p '$DEPLOY_BACKEND_PATH/public/downloads'"
+        tar -C "$downloads_dir" -czf - . \
+            | ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" "tar -C '$DEPLOY_BACKEND_PATH/public/downloads' -xzf -"
+    fi
+}
+
 upload_frontend_artifacts() {
     if [[ "$REMOTE_HAS_RSYNC" == true ]]; then
         log "Rsync frontend to $DEPLOY_HOST:$DEPLOY_BACKEND_PATH/public/app/"
@@ -150,6 +179,8 @@ upload_frontend_artifacts() {
                 "$REPO_ROOT/backend/config/build_info.json" \
                 "$DEPLOY_HOST:$DEPLOY_BACKEND_PATH/config/build_info.json"
         fi
+
+        upload_downloads_artifacts
     else
         local remote_app="$DEPLOY_BACKEND_PATH/public/app"
         log "Upload frontend (tar+ssh) to $DEPLOY_HOST:$remote_app/"
@@ -164,6 +195,8 @@ upload_frontend_artifacts() {
                 "$REPO_ROOT/backend/config/build_info.json" \
                 "$DEPLOY_HOST:$DEPLOY_BACKEND_PATH/config/build_info.json"
         fi
+
+        upload_downloads_artifacts
     fi
 }
 
@@ -252,7 +285,11 @@ REMOTE
 main() {
     cd "$REPO_ROOT"
     if [[ "$GIT_COMMIT_ALL" == true ]]; then
-        git_commit_and_push
+        if [[ "$DRY_RUN" == true ]]; then
+            log "Dry run: skipping git add/commit/push"
+        else
+            git_commit_and_push
+        fi
     fi
     preflight
 

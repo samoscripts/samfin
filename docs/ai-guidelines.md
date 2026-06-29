@@ -10,7 +10,7 @@ Dokument opisuje, jak bezpiecznie pracować z kodem SamFin — dla asystentów A
 2. **Słowniki to dane w tabelach** — nazwy kategorii, portfeli, podmiotów, obszarów są konfigurowalne przez użytkownika. Nie traktuj przykładów z `mock/` jako danych produkcyjnych.
 3. **Enumy w kodzie ≠ słowniki użytkownika** — `INCOME`/`EXPENSE`, statusy klasyfikacji, typy podmiotów to stałe systemowe; konkretne rekordy `party`, `category` itd. to dane użytkownika.
 4. **Kwoty w groszach** — w PHP/DB zawsze `amount_minor` (int). API i frontend używają decimal PLN; konwersja `round(amount * 100)` przy zapisie.
-5. **Soft delete** — `DELETE` w API ustawia zwykle `active = false`. Nie zakładaj fizycznego usuwania rekordów konfiguracyjnych. **Wyjątek:** kategorie z potwierdzonymi użyciami — dezaktywacja zablokowana (`ADR-027`); merge przepina referencje.
+5. **Soft delete** — `DELETE` w API ustawia zwykle `active = false`. Nie zakładaj fizycznego usuwania rekordów konfiguracyjnych. **Wyjątki (kategorie):** dezaktywacja zablokowana przy użyciu (`ADR-027`); merge przepina referencje; **hard delete** tylko nieaktywnych bez użyć i bez subkategorii (`ADR-035`).
 6. **Minimalny diff** — przy zmianach zachowuj istniejące konwencje (inline JSON validation, `toApiArray()` na encjach, camelCase w API).
 7. **Umiejscowienie UI** — formularze create/edit w **page content** lub **sidebar**; **modale** tylko na confirmy i krótkie prompty. Przy nowej funkcji — zapytaj użytkownika (page / sidebar / modal). Szczegóły: [`architecture-rules.md`](architecture-rules.md) (sekcja Frontend).
 8. **Pole kategorii** — w formularzach klasyfikacji używaj `CategorySelect` (`frontend/src/shared/components/form/CategorySelect.tsx`), nie `DictionarySelect`. Szczegóły: `.cursor/rules/frontend-form-fields.mdc`.
@@ -101,9 +101,8 @@ Przy modyfikacji klasyfikacji lub importu sprawdź:
 - [ ] Status przez `TransactionStatusCalculator` (klasyfikacja, bulk update, import CSV)
 - [ ] Skąd/Dokąd: reguły kontekstowe (`TransactionPartyAssignmentValidator`, `partyAssignment.ts`); Skąd ≠ Dokąd
 - [ ] Bulk update: jeden `direction` dla wszystkich ID
-- [ ] Bulk update: kategoria `directions` zawiera `transaction.direction`
-- [ ] Kategoria CRUD: `directions` min. 1 element; parent obsługuje wszystkie kierunki dziecka
 - [ ] Dezaktywacja kategorii: blokada przy użyciu w pozycjach transakcji, szablonach lub regułach (`CategoryUsageService`, ADR-027); merge przepina referencje
+- [ ] Hard delete kategorii: tylko `active=false`, bez użyć, bez subkategorii (`ADR-035`)
 - [ ] Import: duplikat po party + date + amount + trans_title/description (canonical_text)
 - [ ] Import: EXPENSE → `paid_from`, INCOME → `paid_to` z `csv_import.party`
 - [ ] Historia: czy zmiana powinna wołać `TransactionSnapshotLogService`?

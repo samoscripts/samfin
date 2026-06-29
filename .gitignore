@@ -13,6 +13,8 @@
 /frontend/tsconfig.tsbuildinfo
 /backend/public/app/*
 !/backend/public/app/.gitkeep
+/backend/public/downloads/*
+!/backend/public/downloads/.gitkeep
 
 # Deploy
 /deploy.env

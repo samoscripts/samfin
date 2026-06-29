@@ -3,6 +3,7 @@
 namespace App\Home\Configuration\Service;
 
 use App\Home\Configuration\Entity\Category;
+use App\Home\Configuration\Repository\UserCategoryPickEventRepository;
 use App\Home\Configuration\Support\CategoryRuleReferenceSupport;
 use App\Home\Transaction\ClassificationRule\Entity\ClassificationRule;
 use App\Identity\Entity\User;
@@ -12,6 +13,7 @@ class CategoryMergeService
 {
     public function __construct(
         private EntityManagerInterface $em,
+        private UserCategoryPickEventRepository $pickEventRepository,
     ) {}
 
     /**
@@ -39,10 +41,6 @@ class CategoryMergeService
             throw new \InvalidArgumentException('Obie kategorie muszą być aktywne.');
         }
 
-        if (!$target->supportsAllDirections($source->getDirections())) {
-            throw new \InvalidArgumentException('Kategoria docelowa musi obsługiwać wszystkie kierunki kategorii źródłowej.');
-        }
-
         $sourceId = $source->getId();
         $targetId = $target->getId();
 
@@ -60,6 +58,8 @@ class CategoryMergeService
             );
 
             $rulesUpdated = $this->replaceCategoryInRules($sourceId, $targetId);
+
+            $this->pickEventRepository->reassignCategory($sourceId, $targetId);
 
             $source->setActive(false);
             $source->setUpdatedBy($user);

@@ -14,11 +14,17 @@ Do wyboru kategorii klasyfikacji (transakcje, reguły, filtry) **zawsze** używa
 - Etykieta zamknięta: **`Rodzic / Dziecko`** (`formatCategoryLabel` z `@/shared/utils/categoryOptions`).
 - Wybieralne są tylko kategorie-dzieci (`parentId != null`, aktywne) — domyślny tryb `selectable="child"`.
 - Dla wyboru **grupy głównej** (np. przenoszenie subkategorii) użyj `selectable="group"` — lista pokazuje tylko rooty (`parentId = null`).
-- Gdy kontekst ma kierunek (INCOME/EXPENSE), przekaż `direction` — lista filtruje się automatycznie.
+- Gdy kontekst ma kierunek transakcji (INCOME/EXPENSE), przekaż `direction` do `CategorySelect` — służy sekcji „Najczęściej wybierane” (frequent picks), nie filtruje listy kategorii.
+- `CategorySelect` otwiera **picker w overlay** (`PickerOverlay`: modal na desktopie, bottom sheet na mobile) — nie inline dropdown.
+- Sekcja **„Najczęściej wybierane”** (tylko `selectable="child"` + znany `direction`): chipy z API (`GET /api/category-pick-events/frequent`, limit 20), domyślnie 5 widocznych + „Pokaż więcej”; wybór rejestruje `POST /api/category-pick-events`.
 
-Wyjątek: formularz CRUD kategorii (`CategoryForm`) — tam wybór **kategorii nadrzędnej** ma inne semantyki i pozostaje na `DictionarySelect`. Kierunki kategorii (`directions`: EXPENSE / INCOME, min. 1) ustawia się `FilterToggleGroup` (jak filtr „Typ operacji” w sidebarze transakcji), nie checkboxami ani selectem.
+Wyjątek: formularz CRUD kategorii (`CategoryForm`) — tam wybór **kategorii nadrzędnej** ma inne semantyki i pozostaje na `DictionarySelect`. Kategorie nie mają pola kierunku (ADR-036).
 
-Lista kategorii (`Categories.tsx`) używa `CategoryTreeList` — drzewo accordion, nie tabeli płaskiej. Akcje CRUD / przenieś / scal otwierają `CategoriesSidebar` w portalu prawego panelu (`?panel=…`). Dezaktywacja zablokowana przy użyciu kategorii — API zwraca `422` z `usage` (ADR-027).
+Lista kategorii (`Categories.tsx`) używa `CategoryTreeList` — drzewo accordion, nie tabeli płaskiej. Akcje CRUD / przenieś / scal otwierają `CategoriesSidebar` w portalu prawego panelu (`?panel=…`). Dezaktywacja zablokowana przy użyciu kategorii — API zwraca `422` z `usage` (ADR-027). Dezaktywacja i trwałe usunięcie nieaktywnych — `ConfirmDialog`.
+
+## Strona (PartySelect)
+
+Do wyboru podmiotu (Skąd/Dokąd, reguły) używaj `PartySelect` z `@/shared/components/form/PartySelect` — ten sam **picker overlay** co kategorie, **bez** sekcji najczęściej wybieranych.
 
 ## Pomocnicze utils
 

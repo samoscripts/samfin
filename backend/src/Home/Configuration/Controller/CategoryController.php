@@ -86,11 +86,6 @@ class CategoryController extends AbstractController
             return $this->json(['message' => 'Pole nazwa jest wymagane.'], 422);
         }
 
-        $directions = $this->parseDirections($data, [Category::DIRECTION_EXPENSE]);
-        if ($directions instanceof JsonResponse) {
-            return $directions;
-        }
-
         $parent = null;
         if (array_key_exists('parentId', $data) && $data['parentId'] !== null && $data['parentId'] !== '') {
             $parentId = (int)$data['parentId'];
@@ -98,7 +93,7 @@ class CategoryController extends AbstractController
             if (!$parent) {
                 return $this->json(['message' => 'Nie znaleziono kategorii nadrzędnej.'], 422);
             }
-            $parentError = $this->validateParentAssignment($parent, $directions);
+            $parentError = $this->validateParentAssignment($parent);
             if ($parentError !== null) {
                 return $this->json(['message' => $parentError], 422);
             }
@@ -109,7 +104,6 @@ class CategoryController extends AbstractController
 
         $category = new Category();
         $category->setName($name);
-        $category->setDirections($directions);
         $category->setParent($parent);
         $category->setDescription(($data['description'] ?? '') !== '' ? $data['description'] : null);
         $category->setActive((bool)($data['active'] ?? true));
@@ -130,9 +124,8 @@ class CategoryController extends AbstractController
             return $this->json(['message' => 'Nie znaleziono kategorii.'], 404);
         }
 
-        $data       = json_decode($request->getContent(), true) ?? [];
-        $directions = $category->getDirections();
-        $parent     = $category->getParent();
+        $data   = json_decode($request->getContent(), true) ?? [];
+        $parent = $category->getParent();
 
         if (array_key_exists('name', $data)) {
             $name = trim((string)$data['name']);
@@ -140,13 +133,6 @@ class CategoryController extends AbstractController
                 return $this->json(['message' => 'Pole nazwa jest wymagane.'], 422);
             }
             $category->setName($name);
-        }
-        if (array_key_exists('directions', $data)) {
-            $parsed = $this->parseDirections($data);
-            if ($parsed instanceof JsonResponse) {
-                return $parsed;
-            }
-            $directions = $parsed;
         }
         if (array_key_exists('parentId', $data)) {
             if ($data['parentId'] === null || $data['parentId'] === '') {
@@ -164,7 +150,7 @@ class CategoryController extends AbstractController
         }
 
         if ($parent !== null) {
-            $parentError = $this->validateParentAssignment($parent, $directions);
+            $parentError = $this->validateParentAssignment($parent);
             if ($parentError !== null) {
                 return $this->json(['message' => $parentError], 422);
             }
@@ -191,7 +177,6 @@ class CategoryController extends AbstractController
             $category->setActive($nextActive);
         }
 
-        $category->setDirections($directions);
         $category->setParent($parent);
 
         /** @var User $user */
@@ -211,7 +196,7 @@ class CategoryController extends AbstractController
         }
 
         if (!$category->isActive()) {
-            return $this->json(['message' => 'Kategoria dezaktywowana.']);
+            return $this->permanentDelete($category);
         }
 
         $blocked = $this->deactivationBlockedResponse($category);
@@ -228,6 +213,31 @@ class CategoryController extends AbstractController
         return $this->json(['message' => 'Kategoria dezaktywowana.']);
     }
 
+    private function permanentDelete(Category $category): JsonResponse
+    {
+        $categoryId = $category->getId();
+        if ($categoryId === null) {
+            return $this->json(['message' => 'Nie znaleziono kategorii.'], 404);
+        }
+
+        if ($this->repository->countChildren($categoryId) > 0) {
+            return $this->json(['message' => 'Usuń najpierw subkategorie tej grupy.'], 422);
+        }
+
+        $blocked = $this->usageBlockedResponse(
+            $categoryId,
+            'Nie można usunąć kategorii z bazy, ponieważ jest używana.',
+        );
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
+        $this->em->remove($category);
+        $this->em->flush();
+
+        return $this->json(['message' => 'Kategoria usunięta.']);
+    }
+
     private function deactivationBlockedResponse(Category $category): ?JsonResponse
     {
         $categoryId = $category->getId();
@@ -235,8 +245,13 @@ class CategoryController extends AbstractController
             return null;
         }
 
+        return $this->usageBlockedResponse($categoryId);
+    }
+
+    private function usageBlockedResponse(int $categoryId, ?string $message = null): ?JsonResponse
+    {
         try {
-            $this->assertCategoryCanBeDeactivated($categoryId);
+            $this->assertCategoryHasNoUsages($categoryId, $message);
         } catch (CategoryInUseException $e) {
             return $this->json([
                 'message' => $e->getMessage(),
@@ -247,23 +262,18 @@ class CategoryController extends AbstractController
         return null;
     }
 
-    private function assertCategoryCanBeDeactivated(int $categoryId): void
+    private function assertCategoryHasNoUsages(int $categoryId, ?string $message = null): void
     {
         $usage = $this->usageService->countUsages($categoryId);
         if ($usage['total'] > 0) {
-            throw new CategoryInUseException($usage);
+            throw new CategoryInUseException($usage, $message ?? 'Nie można dezaktywować kategorii, ponieważ jest używana.');
         }
     }
 
-    /** @param list<string> $childDirections */
-    private function validateParentAssignment(Category $parent, array $childDirections): ?string
+    private function validateParentAssignment(Category $parent): ?string
     {
         if ($parent->getParent() !== null) {
             return 'Kategoria nadrzędna musi być grupą główną.';
-        }
-
-        if (!$parent->supportsAllDirections($childDirections)) {
-            return 'Kategoria nadrzędna musi obsługiwać wszystkie kierunki podkategorii.';
         }
 
         return null;
@@ -278,30 +288,4 @@ class CategoryController extends AbstractController
         return null;
     }
 
-    /**
-     * @param array<string,mixed> $data
-     * @param list<string>        $default
-     * @return list<string>|JsonResponse
-     */
-    private function parseDirections(array $data, array $default = []): array|JsonResponse
-    {
-        if (!array_key_exists('directions', $data)) {
-            return $default;
-        }
-
-        if (!is_array($data['directions'])) {
-            return $this->json(['message' => 'Pole directions musi być tablicą.'], 422);
-        }
-
-        $directions = array_values(array_unique(array_filter(
-            $data['directions'],
-            fn (mixed $direction) => is_string($direction) && in_array($direction, Category::DIRECTIONS, true),
-        )));
-
-        if ($directions === []) {
-            return $this->json(['message' => 'Wymagany co najmniej jeden kierunek (EXPENSE lub INCOME).'], 422);
-        }
-
-        return $directions;
-    }
 }

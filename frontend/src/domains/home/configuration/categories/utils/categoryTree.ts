@@ -1,5 +1,5 @@
-import type { Category, CategoryDirection } from '@/shared/api/categories'
-import { categoryMatchesQuery, parentSupportsChildDirections } from '@/shared/utils/categoryOptions'
+import type { Category } from '@/shared/api/categories'
+import { categoryMatchesQuery } from '@/shared/utils/categoryOptions'
 
 export interface CategoryTreeNode {
   parent: Category
@@ -45,21 +45,10 @@ export function buildCategoryTree(categories: Category[]): CategoryTreeData {
   return { groups, orphans }
 }
 
-export function filterCategoryTree(
-  tree: CategoryTreeData,
-  query: string,
-  direction?: CategoryDirection | '',
-): CategoryTreeData {
+export function filterCategoryTree(tree: CategoryTreeData, query: string): CategoryTreeData {
   const q = query.trim()
-  const hasDirection = direction === 'EXPENSE' || direction === 'INCOME'
 
-  const matchesDirection = (c: Category) =>
-    !hasDirection || c.directions.includes(direction)
-
-  const filterChild = (c: Category) =>
-    matchesDirection(c) && (!q || categoryMatchesQuery(c, q))
-
-  const filterParent = (c: Category) => matchesDirection(c)
+  const filterChild = (c: Category) => !q || categoryMatchesQuery(c, q)
 
   const groups = tree.groups
     .map((node) => ({
@@ -68,7 +57,6 @@ export function filterCategoryTree(
     }))
     .filter((node) => {
       if (node.children.length > 0) return true
-      if (!filterParent(node.parent)) return false
       if (!q) return true
       return categoryMatchesQuery(node.parent, q)
     })
@@ -80,12 +68,10 @@ export function filterCategoryTree(
 
 export function canMoveChildToParent(child: Category, parent: Category): boolean {
   if (child.parentId === parent.id) return false
-  if (parent.parentId != null) return false
-  return parentSupportsChildDirections(parent, child.directions)
+  return parent.parentId == null
 }
 
 export function isMergeTarget(source: Category, target: Category): boolean {
   if (source.id === target.id) return false
-  if (source.parentId == null || target.parentId == null) return false
-  return parentSupportsChildDirections(target, source.directions)
+  return source.parentId != null && target.parentId != null
 }

@@ -24,6 +24,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od 
 | `transactions_trash` | `TransactionTrash` | Snapshot usuniętych transakcji (przed hard DELETE) |
 | `classification_rule` | `ClassificationRule` | Reguły auto-klasyfikacji per podmiot |
 | `transaction_template` | `TransactionTemplate` | Szablony klasyfikacji per użytkownik (wpływ/wydatek) |
+| `user_category_pick_event` | `UserCategoryPickEvent` | Log wyborów subkategorii per użytkownik i kierunek (`created_at`; purge po 90 dniach) |
 | `settlement_config` | `SettlementConfig` | Konfiguracja rozliczenia wpłat (per `user_id`) |
 | `settlement_ledger_entry` | `SettlementLedgerEntry` | Indeks ledger rozliczeń (1 wiersz = 1 `transaction_item`, running state) |
 
@@ -61,8 +62,6 @@ erDiagram
     category {
         int id PK
         int parent_id FK
-        bool direction_expense
-        bool direction_income
     }
     csv_import {
         int id PK
@@ -196,7 +195,9 @@ Historia: do 2026-06 jeden token w `app_user.api_token` (usunięty w migracji `V
 | `20260614150000` | `classification_rule`; `transactions.counterparty_account_number` |
 | `20260615120000` | Reguły klasyfikacji: warunek `direction` na początku `conditions_json` |
 | `20260622120000` | `transaction_template` — szablony klasyfikacji per użytkownik |
-| `20260623120000` | `category`: `direction_expense`, `direction_income` (zastępuje `type`) |
+| `20260623120000` | `category`: `direction_expense`, `direction_income` (zastępuje `type`; usunięte w `20260630120000`) |
+| `20260630120000` | (historyczna — wersja w DB; treść zastąpiona przez `20260708120000`) |
+| `20260708120000` | `category`: usunięcie `direction_expense`, `direction_income` (ADR-036) |
 | `20260624120000` | Backfill `classification_rule.name` i `description` dla reguł z `created_from_transaction_id` |
 | `20260625120000` | `common_account_settlement_config` — konfiguracja rozliczenia (historyczna nazwa) |
 | `20260626120000` | Repair: utworzenie `common_account_settlement_config` jeśli brak (gdy `20260625120000` zapisana bez tabeli) |
@@ -209,6 +210,7 @@ Historia: do 2026-06 jeden token w `app_user.api_token` (usunięty w migracji `V
 | `20260704143000` | Drop `trans_localization`, `csv_import_row.title_localization_raw`; reorder kolumn `transactions` po dropie |
 | `20260705120000` | Multi-token auth: `user_api_token`, migracja z `app_user.api_token` |
 | `20260706120000` | Repair: rename `common_account_settlement_config` → `settlement_config`; ledger + kolumny indeksu jeśli brak |
+| `20260707120000` | `user_category_pick_event` — log wyborów kategorii (najczęściej wybierane, okno 90 dni) |
 
 ## Zapytania diagnostyczne (tylko SELECT)
 

@@ -129,16 +129,13 @@ Słownik konfigurowalny — kogo/czego dotyczy wydatek lub wpływ (np. Basia, ws
 
 ## Category (kategoria)
 
-Słownik konfigurowalny z hierarchią (`parent_id`).
+Słownik konfigurowalny z hierarchią (`parent_id`). Kategorie są **neutralne** względem kierunku transakcji (ADR-036) — dowolna subkategoria może być przypisana do wpływu lub wydatku.
 
-- **DB:** `direction_expense`, `direction_income` (co najmniej jedno `true`; CHECK w migracji `20260623120000`).
-- **API:** `directions: ['EXPENSE']`, `['INCOME']` lub `['EXPENSE','INCOME']`.
-- **Drzewo:** kierunki dziecka ⊆ kierunki parenta.
-- **Transakcja:** kategoria na pozycji musi obsługiwać `transaction.direction` (`Category::supportsDirection()`).
 - **Dezaktywacja:** blokowana przy użyciu w `transaction_items`, `transaction_template` lub `classification_rule.actions_json.items` (ADR-027). Scalanie subkategorii (`POST /api/categories/merge`) przepina te referencje przed dezaktywacją źródła.
+- **Hard delete:** tylko nieaktywne kategorie bez użyć i bez subkategorii — `DELETE` (ADR-035).
 - **UI:** lista drzewiasta + panel boczny (`?panel=create|edit|move|merge&id=`); merge i przenoszenie w panelu, nie w modalu (ADR-026).
 
-Pole `type` (pojedynczy INCOME/EXPENSE) — **usunięte** w migracji `20260623120000`.
+Historycznie: pole `type` (pojedynczy INCOME/EXPENSE) usunięte w `20260623120000`; flagi `direction_expense` / `direction_income` usunięte w `20260708120000`.
 
 ## CsvImport / CsvImportRow / CsvImportError
 

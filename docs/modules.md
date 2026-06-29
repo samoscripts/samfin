@@ -42,8 +42,9 @@ Konwencje warstw i reguły kodu: [`architecture-rules.md`](architecture-rules.md
 | `WalletController` | `/api/wallets` | Wallet |
 | `ConcernController` | `/api/concerns` | Concern |
 | `CategoryController` | `/api/categories` | Category |
+| `CategoryPickEventController` | `GET /api/category-pick-events/frequent`, `POST /api/category-pick-events` | Log wyborów kategorii — najczęściej wybierane (okno 90 dni, sync per user) |
 
-Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false`.
+Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false` (wyjątek: **kategorie** — `DELETE` na nieaktywnej kategorii usuwa rekord z bazy, ADR-035).
 
 ### Home — Import
 
@@ -105,7 +106,7 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 - `main.tsx` — root, providery
 - `App.tsx` — bramka auth
 - `routes.tsx` — definicja tras
-- `providers/AuthProvider.tsx`, `ThemeProvider.tsx`
+- `providers/AuthProvider.tsx`, `ThemeProvider.tsx`, `MobileUpdateProvider.tsx`
 
 ### `layout/` — szkielet UI
 
@@ -136,6 +137,12 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 
 `MyAccount`, `Settings` (zakładki użytkownicy/system), `Users`, `UserForm`.
 
+### `domains/about/` — przewodnik użytkownika
+
+| Plik | Route | Opis |
+|------|-------|------|
+| `about/pages/AboutApp.tsx` | `/o-aplikacji` | Opis modułów, konfiguracji, sekcja aplikacji mobilnej (pobieranie APK z `/downloads/mobile.json`) |
+
 ### `frontend/src/mobile/` — aplikacja Android (Capacitor)
 
 Logika uruchamiana tylko gdy `isNativeApp()` (`Capacitor.isNativePlatform()`).
@@ -150,8 +157,14 @@ Logika uruchamiana tylko gdy `isNativeApp()` (`Capacitor.isNativePlatform()`).
 | `consumeIncomingCsv.ts` | Odczyt pliku z intentu → `File` + `source: MBANK` |
 | `IncomingCsvHandler.tsx` | Po loginie / unlock: nawigacja na `/import/nowy` |
 | `AppLockScreen.tsx` | Ekran PIN / biometria |
+| `updateCheck.ts` | Porównanie `App.getInfo()` z `/downloads/mobile.json`; detekcja Android WWW |
+| `MobileUpdateRequiredScreen.tsx` | Blokada startu — wymagana aktualizacja APK (`minVersionCode`) |
+| `MobileUpdateBanner.tsx` | Opcjonalny baner „dostępna nowa wersja” w apce |
+| `MobileInstallBanner.tsx` | Baner instalacji na Androidzie w przeglądarce |
 
-**Bramka w `App.tsx`:** native + token bez unlock → `AppLockScreen`; po unlock → trasy + `IncomingCsvHandler`.
+**Manifest mobile (statyczny):** `GET /downloads/mobile.json` — `versionCode`, `versionName`, `minVersionCode`, `latestApkUrl`. Generowany przez `mobile/scripts/build-apk.sh` przy kopiowaniu APK.
+
+**Bramka w `App.tsx`:** wymuszona aktualizacja APK → `MobileUpdateRequiredScreen`; native + token bez unlock → `AppLockScreen`; po unlock → trasy + `IncomingCsvHandler`.
 
 **Plugin natywny:** `mobile/android/.../CsvIntentPlugin.java` — `ACTION_VIEW` na CSV (`text/csv`, `text/plain`, …); plik w cache apki do odczytu przez JS.
 
@@ -173,6 +186,7 @@ Szczegóły buildu APK i testów: [`mobile/README.md`](../mobile/README.md).
 | Portfele | `shared/api/wallets.ts` | `WalletController` |
 | Dotyczy | `shared/api/concerns.ts` | `ConcernController` |
 | Kategorie | `shared/api/categories.ts` | `CategoryController` |
+| Najczęściej wybierane kategorie | `shared/api/categoryPickEvents.ts` | `CategoryPickEventController` |
 | Reguły klasyfikacji | `shared/api/classificationRules.ts` | `ClassificationRuleController`, `ClassificationRulesController` |
 | System (admin) | `shared/api/system.ts` | `SystemController` |
 | Użytkownicy | `shared/api/users.ts` | `UserController` |
@@ -257,10 +271,11 @@ Typowy kształt (camelCase w JSON):
 - **Party:** `name`, `type`, `ownershipType`, `usageType`, `description`, `active`
 - **PartyBankAccount:** `partyId`, `accountNumber`, `bankName`, `displayName`, `ownerNameFromBank`, `currency`, `active`
 - **Wallet / Concern:** `name`, `description`, `active`
-- **Category:** `name`, `directions` (`EXPENSE` / `INCOME`, min. 1), `parentId`, `description`, `active`
+- **Category:** `name`, `parentId`, `description`, `active`
 - **Category merge:** `POST /api/categories/merge` — `{ sourceId, targetId }` (tylko subkategorie; przepina pozycje transakcji, szablony, reguły; dezaktywuje źródło)
-- **Category deactivation guard:** `DELETE /api/categories/{id}` i `PUT active=false` zwracają `422` z `usage`, gdy kategoria jest używana w tych samych miejscach co merge (`CategoryUsageService`, `CategoryRuleReferenceSupport`)
-- **Category UI:** `Categories.tsx` + `CategoriesSidebar` (portal prawego panelu, `?panel=create|edit|move|merge&id=`); `formatCategoryDeactivateError()` w `categories.ts`
+- **Category deactivation guard:** `DELETE /api/categories/{id}` (aktywna) i `PUT active=false` zwracają `422` z `usage`, gdy kategoria jest używana w tych samych miejscach co merge (`CategoryUsageService`, `CategoryRuleReferenceSupport`)
+- **Category hard delete:** `DELETE /api/categories/{id}` na **nieaktywnej** kategorii usuwa rekord z bazy (ADR-035); `422` przy użyciu lub gdy grupa ma subkategorie
+- **Category UI:** `Categories.tsx` + `CategoriesSidebar` (portal prawego panelu, `?panel=create|edit|move|merge&id=`); `formatCategoryUsageError()` w `categories.ts`; `ConfirmDialog` dla dezaktywacji i usuwania
 
 ### Upload CSV — `POST /api/csv-imports`
 

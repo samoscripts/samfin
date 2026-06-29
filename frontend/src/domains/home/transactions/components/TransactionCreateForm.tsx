@@ -22,7 +22,7 @@ import {
   applyPartyFieldChange,
   filterPartiesForField,
 } from '../utils/partyAssignment'
-import { filterCategoriesForDirection } from '../utils/categoryOptions'
+import { filterActiveCategories } from '../utils/categoryOptions'
 import type { TransactionNewUrlPrefill } from '../utils/transactionNewUrlParams'
 import { defaultNewTransactionDate, parseAmountFromUrl, parseIdFromUrl } from '../utils/transactionNewUrlParams'
 import {
@@ -126,7 +126,7 @@ export default function TransactionCreateForm({
 
   const paidFromParties = filterPartiesForField(parties, txContext, 'paidFrom', draft.paidToPartyId)
   const paidToParties = filterPartiesForField(parties, txContext, 'paidTo', draft.paidFromPartyId)
-  const relevantCategories = filterCategoriesForDirection(categories, draft.direction)
+  const relevantCategories = filterActiveCategories(categories)
 
   const manualOwnFrom = draft.direction === 'EXPENSE'
   const manualOwnTo = draft.direction === 'INCOME'

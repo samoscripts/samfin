@@ -2,7 +2,6 @@ export {
   buildCategoryGroups,
   categoryMatchesQuery,
   filterActiveCategories,
-  filterCategoriesForDirection,
   filterCategoryGroups,
   findCategoryById,
   formatCategoryLabel,

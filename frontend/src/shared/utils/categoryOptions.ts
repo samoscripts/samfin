@@ -1,4 +1,4 @@
-import type { Category, CategoryDirection } from '@/shared/api/categories'
+import type { Category } from '@/shared/api/categories'
 
 export function formatCategoryLabel(c: Pick<Category, 'name' | 'parentName'>): string {
   return c.parentName ? `${c.parentName} / ${c.name}` : c.name
@@ -8,29 +8,6 @@ export function filterActiveCategories(categories: Category[]): Category[] {
   return categories.filter((c) => c.active)
 }
 
-export function categorySupportsDirection(
-  category: Pick<Category, 'directions'>,
-  direction: CategoryDirection,
-): boolean {
-  return category.directions.includes(direction)
-}
-
-export function parentSupportsChildDirections(
-  parent: Pick<Category, 'directions'>,
-  childDirections: CategoryDirection[],
-): boolean {
-  return childDirections.every((direction) => parent.directions.includes(direction))
-}
-
-export function filterCategoriesForDirection(
-  categories: Category[],
-  direction: CategoryDirection | string,
-): Category[] {
-  return categories.filter(
-    (c) => c.active && categorySupportsDirection(c, direction as CategoryDirection),
-  )
-}
-
 export function isSelectableCategory(c: Category): boolean {
   return c.active && c.parentId != null
 }
@@ -38,7 +15,6 @@ export function isSelectableCategory(c: Category): boolean {
 export interface CategoryGroup {
   parentId: number
   parentName: string
-  directions: CategoryDirection[]
   children: Category[]
 }
 
@@ -64,7 +40,6 @@ export function buildCategoryGroups(categories: Category[]): CategoryGroup[] {
     groups.push({
       parentId: parent.id,
       parentName: parent.name,
-      directions: parent.directions,
       children,
     })
   }
@@ -101,13 +76,6 @@ export function findCategoryById(categories: Category[], id: number | null | und
   return categories.find((c) => c.id === id)
 }
 
-export function prepareCategoriesForSelect(
-  categories: Category[],
-  direction?: CategoryDirection | '',
-): Category[] {
-  const active = filterActiveCategories(categories)
-  if (direction === 'EXPENSE' || direction === 'INCOME') {
-    return filterCategoriesForDirection(active, direction)
-  }
-  return active
+export function prepareCategoriesForSelect(categories: Category[]): Category[] {
+  return filterActiveCategories(categories)
 }

@@ -7,6 +7,7 @@ import {
   BarChart2,
   Settings,
   SlidersHorizontal,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -68,6 +69,7 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 const NAV_AFTER: NavItem[] = [
+  { to: '/o-aplikacji', label: 'O aplikacji', icon: <BookOpen size={18} /> },
   { to: '/konfiguracja', label: 'Konfiguracja', icon: <SlidersHorizontal size={18} /> },
 ]
 

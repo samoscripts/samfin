@@ -358,9 +358,11 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ### ADR-025: Kategoria — wiele kierunków (`direction_expense` / `direction_income`)
 
+**Status:** **Superseded** przez ADR-036 (2026-06-30).
+
 **Kontekst:** Kategoria miała pojedyncze pole `type` (INCOME lub EXPENSE). Użytkownik potrzebuje kategorii wspólnych dla obu kierunków lub wyboru wielu kierunków.
 
-**Decyzja:**
+**Decyzja (historyczna):**
 
 - Zastąpienie `category.type` kolumnami boolean `direction_expense`, `direction_income` (CHECK: co najmniej jedna aktywna).
 - API: `directions: string[]` zamiast `type`.
@@ -369,7 +371,20 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 **Pliki:** `Category.php`, `CategoryController.php`, migracja `20260623120000`, `categoryOptions.ts`, `CategoryForm.tsx`.
 
-**Uwaga:** To **nie** przywraca flag `direction_usage_*` na `party` (ADR-017) — tam reguły wynikają z kontekstu transakcji, nie ze słownika.
+---
+
+### ADR-036: Kategoria bez kierunku (neutralna względem wpływu/wydatku)
+
+**Kontekst:** Parametryzacja kierunku na kategorii (`direction_expense` / `direction_income`, API `directions[]`) komplikowała CRUD, drzewo, merge i pickery. Kierunek transakcji pozostaje na `transaction.direction`.
+
+**Decyzja:**
+
+- Usunięcie kolumn `direction_expense`, `direction_income` i constraintu `chk_category_direction` (migracja `20260708120000`).
+- API kategorii bez pola `directions` — dowolna aktywna subkategoria przypisywalna do wpływu i wydatku.
+- Usunięcie walidacji `supportsDirection` przy klasyfikacji, bulk update, szablonach i merge.
+- **Zachowane:** `user_category_pick_event.direction` — kontekst frequent picks per kierunek transakcji, nie atrybut kategorii.
+
+**Pliki:** `Category.php`, `CategoryController.php`, serwisy transakcji i merge, `categoryOptions.ts`, `CategoryForm.tsx`.
 
 ---
 
@@ -503,6 +518,40 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-034: Publikacja APK i sprawdzanie aktualizacji (sideload)
+
+**Kontekst:** Użytkownicy pobierają APK spoza sklepu; apka musi wiedzieć, czy jest nowsza wersja natywna, i czasem wymusić aktualizację.
+
+**Decyzja:**
+- Źródło wersji mobile: `mobile/version.json` (`versionName`, `versionCode`, opcjonalnie `minVersionCode`) → Gradle przez `-PappVersionCode` / `-PappVersionName`.
+- Po `make mobile-build` skrypt pyta o kopiowanie do `backend/public/downloads/`; `make mobile-build-i` / flaga `-i` — bez pytania.
+- Pliki: `samfin-{versionName}.apk`, `samfin.apk`, manifest `mobile.json` (publiczny, bez auth).
+- `make deploy` wgrywa `backend/public/downloads/` razem z frontendem (bez osobnego skryptu).
+- Frontend: strona `/o-aplikacji` (sekcja mobilna + pobieranie); baner instalacji na Androidzie w WWW; w apce natywnej — opcjonalny baner aktualizacji lub pełna blokada UI gdy `localVersionCode < minVersionCode`.
+- Brak auto-instalacji (sideload) — użytkownik pobiera APK ręcznie. Zmiany React **nie** wymagają nowego APK (remote WebView, ADR-033).
+
+**Pliki:** `mobile/version.json`, `mobile/scripts/build-apk.sh`, `scripts/deploy.sh`, `frontend/src/mobile/updateCheck.ts`, `MobileUpdateProvider.tsx`, `domains/about/pages/AboutApp.tsx`.
+
+---
+
+### ADR-035: Hard delete nieaktywnych kategorii
+
+**Kontekst:** Nieaktywne kategorie (`active = false`) pozostawały w bazie bez możliwości usunięcia z UI. `DELETE /api/categories/{id}` na nieaktywnej kategorii zwracał idempotentny komunikat bez fizycznego usunięcia.
+
+**Decyzja:**
+
+- `DELETE /api/categories/{id}` dla **aktywnej** kategorii — bez zmian (dezaktywacja, ADR-027).
+- `DELETE /api/categories/{id}` dla **nieaktywnej** kategorii — **hard DELETE** z tabeli `category`.
+- Warunki hard delete:
+  - brak użyć w `transaction_items`, `transaction_template`, regułach (`CategoryUsageService`, ten sam zakres co ADR-027) → `422` + `usage`;
+  - brak subkategorii (`countChildren = 0`) → `422` z komunikatem o konieczności usunięcia dzieci.
+- Brak snapshotu / kosza (w przeciwieństwie do ADR-030 dla transakcji).
+- UI: sekcja „Nieaktywne” w `Categories.tsx` — przycisk kosza; potwierdzenie przez `ConfirmDialog` (dezaktywacja też przez `ConfirmDialog`).
+
+**Pliki:** `CategoryController.php`, `CategoryInUseException.php`, `categories.ts`, `Categories.tsx`, `CategoryTreeRow.tsx`, `CategoryTreeGroup.tsx`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -511,7 +560,8 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-13 | ADR-017: usunięcie direction_usage_*; reguły kontekstowe Skąd/Dokąd |
 | 2026-06-13 | ADR-018 (portfel), ADR-019 (transakcje ręczne MVP — plan) |
 | 2026-06-14 | ADR-021..023: reguły klasyfikacji per party, fill_empty, classify service |
-| 2026-06-23 | ADR-025: kategoria — `direction_expense` / `direction_income`, API `directions[]` |
+| 2026-06-23 | ADR-025: kategoria — `direction_expense` / `direction_income`, API `directions[]` (superseded ADR-036) |
+| 2026-06-30 | ADR-036: usunięcie kierunku z kategorii — migracja `20260708120000` |
 | 2026-06-24 | ADR-026: lista kategorii — drzewo, DnD przenoszenie, merge subkategorii |
 | 2026-06-24 | ADR-027: blokada dezaktywacji kategorii przy użyciu w transakcjach, szablonach i regułach |
 | 2026-06-24 | ADR-028: kopie zapasowe bazy (ZIP+manifest, CLI, pre-restore) |
@@ -520,3 +570,5 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-26 | ADR-031: wycofanie parsera legacy mBank CSV (5 kolumn) |
 | 2026-06-27 | ADR-032: app lock mobile — PIN, biometria, token w Preferences |
 | 2026-06-27 | ADR-033: aplikacja Android — Capacitor remote URL, intent CSV, workflow WSL+Windows |
+| 2026-06-27 | ADR-034: publikacja APK (downloads/, mobile.json), aktualizacje i strona O aplikacji |
+| 2026-06-30 | ADR-035: hard delete nieaktywnych kategorii z UI zarządzania |

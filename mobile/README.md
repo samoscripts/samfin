@@ -187,7 +187,8 @@ Z katalogu `fin/`:
 | Komenda | Opis |
 |---------|------|
 | `make mobile-build-apk` | Gradle `assembleDebug` (JDK 21 + SDK) |
-| `make mobile-build` | `mobile-sync` + build APK |
+| `make mobile-build` | `mobile-sync` + build APK; **pyta** o kopiowanie do `backend/public/downloads/` |
+| `make mobile-build-i` | jak `mobile-build`, ale kopiuje APK do `downloads/` **bez pytania** (`-i`) |
 | `make mobile-copy-apk` | Kopiuje APK do `Pobrane` na Windows |
 | `make mobile-install-apk` | `adb install -r` przez `adb.exe` z Windows |
 
@@ -222,6 +223,39 @@ MOBILE_WIN_DOWNLOADS=/mnt/c/Users/48607/Downloads
 | `SDK location not found` | `local.properties` lub `ANDROID_HOME` |
 | `Permission denied` na `gradlew` | `chmod +x mobile/android/gradlew` (skrypt robi to sam) |
 | `adb: unauthorized` | Na telefonie zaakceptuj debugowanie USB |
+
+### Wersjonowanie i publikacja APK (WWW)
+
+Plik [`mobile/version.json`](version.json) (commitowany):
+
+```json
+{
+  "versionName": "0.9.12",
+  "versionCode": 12,
+  "minVersionCode": null
+}
+```
+
+- **`versionName`** — etykieta wersji (zsynchronizuj z `frontend/package.json` przy release).
+- **`versionCode`** — liczba całkowita rosnąca; podbij przy każdym publikowanym APK.
+- **`minVersionCode`** — opcjonalnie: apki poniżej tej wartości **nie wystartują** (ekran wymuszonej aktualizacji).
+
+Po buildzie (`make mobile-build` lub `make mobile-build-i`) skrypt może skopiować APK do `backend/public/downloads/`:
+
+- `samfin-{versionName}.apk` — wersjonowany plik
+- `samfin.apk` — zawsze najnowszy
+- `mobile.json` — manifest dla apki i strony „O aplikacji”
+
+Workflow publikacji:
+
+```bash
+make mobile-build-i   # build + kopiuj do downloads/
+make deploy           # wgrywa app/ + downloads/ na serwer
+```
+
+URL produkcyjny: `https://fin.samsoft.pl/downloads/mobile.json`
+
+Aktualizacja w apce: porównanie `App.getInfo().build` (versionCode) z manifestem; opcjonalny baner lub blokada UI gdy `minVersionCode` ustawione.
 
 ---
 
