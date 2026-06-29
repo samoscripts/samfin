@@ -3,6 +3,7 @@ import type { Direction } from '@/shared/types'
 import type { Category } from '@/shared/api/categories'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import CategorySelect from '@/shared/components/form/CategorySelect'
+import MoneyAmountInput from '@/shared/components/form/MoneyAmountInput'
 import {
   FieldRow,
   SectionLabel,
@@ -126,8 +127,10 @@ export default function ClassificationItemsEditor({
     ])
   }
 
-  function handleAmountChange(changedIndex: 0 | 1, raw: string) {
-    const parsed = roundMoney(parseFloat(raw) || 0)
+  function handleAmountChange(changedIndex: 0 | 1, signedAmount: number | null) {
+    if (signedAmount === null) return
+
+    const parsed = roundMoney(signedAmount)
     const otherIndex = changedIndex === 0 ? 1 : 0
     const otherAmount = roundMoney(totalAmount - parsed)
     const next = [...items] as [ClassificationItemDraft, ClassificationItemDraft]
@@ -174,12 +177,13 @@ export default function ClassificationItemsEditor({
               <div className="flex items-center gap-2">
                 {mode === 'transaction' && (
                   <div className="w-28">
-                    <input
-                      type="number"
-                      step={0.01}
-                      value={item.amount ?? ''}
-                      onChange={(e) => handleAmountChange(i as 0 | 1, e.target.value)}
-                      className={splitInputCls}
+                    <MoneyAmountInput
+                      value={item.amount}
+                      direction={direction}
+                      showSignPrefix={direction === 'EXPENSE'}
+                      onChange={(signed) => handleAmountChange(i as 0 | 1, signed)}
+                      inputClassName={splitInputCls}
+                      disabled={readOnly}
                     />
                   </div>
                 )}

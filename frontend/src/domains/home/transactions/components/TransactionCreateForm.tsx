@@ -10,12 +10,14 @@ import ClassificationItemsEditor, {
   type ClassificationItemDraft,
 } from '@/shared/components/classification/ClassificationItemsEditor'
 import FormError from '@/shared/components/form/FormError'
+import MoneyAmountInput from '@/shared/components/form/MoneyAmountInput'
 import { FieldRow, SectionLabel } from '@/shared/components/form/FormSection'
 import PartySelect from '@/shared/components/form/PartySelect'
 import FilterToggleGroup from '@/shared/components/form/FilterToggleGroup'
 import { inputCls, selectCls } from '@/shared/components/form/formClasses'
 import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
 import { getApiErrorMessage } from '@/shared/utils/errors'
+import { applySignToAmount, flipSignedAmount } from '@/shared/utils/moneyInput'
 import { roundMoney } from '@/shared/utils/splitAllocation'
 import { DIRECTION_OPTIONS, EDIT_EMPTY_LABEL } from '../constants/labels'
 import {
@@ -23,6 +25,7 @@ import {
   filterPartiesForField,
 } from '../utils/partyAssignment'
 import { filterActiveCategories } from '../utils/categoryOptions'
+import { validateEditItems } from '../utils/editValidation'
 import type { TransactionNewUrlPrefill } from '../utils/transactionNewUrlParams'
 import { defaultNewTransactionDate, parseAmountFromUrl, parseIdFromUrl } from '../utils/transactionNewUrlParams'
 import {
@@ -46,9 +49,10 @@ function prefillToDraft(prefill: TransactionNewUrlPrefill): CreateDraft {
   const walletId = parseIdFromUrl(prefill.walletId)
   const concernId = parseIdFromUrl(prefill.concernId)
   const categoryId = parseIdFromUrl(prefill.categoryId)
+  const direction = prefill.direction ?? 'EXPENSE'
 
   return {
-    direction: prefill.direction ?? 'EXPENSE',
+    direction,
     transDate: prefill.transDate ?? prefill.date ?? defaultNewTransactionDate(),
     amount,
     transDescription:
@@ -57,7 +61,8 @@ function prefillToDraft(prefill: TransactionNewUrlPrefill): CreateDraft {
     paidToPartyId: parseIdFromUrl(prefill.paidToPartyId),
     items: [
       {
-        amount: amount ?? undefined,
+        amount:
+          amount != null ? applySignToAmount(amount, direction) : undefined,
         walletId,
         concernId,
         categoryId,
@@ -135,9 +140,11 @@ export default function TransactionCreateForm({
     setDraft((prev) => ({
       ...prev,
       amount: next,
-      items: prev.items.map((item, idx) =>
-        idx === 0 ? { ...item, amount: next ?? undefined } : item,
-      ),
+      items: prev.items.map((item, idx) => {
+        if (idx !== 0) return item
+        if (next == null) return { ...item, amount: undefined }
+        return { ...item, amount: applySignToAmount(next, prev.direction) }
+      }),
     }))
   }
 
@@ -158,12 +165,31 @@ export default function TransactionCreateForm({
       return
     }
 
+    const includeClassification = hasClassificationData(draft)
+
+    if (includeClassification) {
+      const normalizedForValidation = draft.items.map((item) => ({
+        amount: roundMoney(
+          applySignToAmount(Math.abs(item.amount ?? draft.amount!), draft.direction),
+        ),
+      }))
+      const clientError = validateEditItems(
+        normalizedForValidation,
+        signedAmount,
+        draft.direction,
+      )
+      if (clientError) {
+        setError(clientError)
+        return
+      }
+    }
+
     const normalizedItems = draft.items.map((item) => ({
       ...item,
-      amount: roundMoney(item.amount ?? draft.amount ?? 0),
+      amount: roundMoney(
+        applySignToAmount(Math.abs(item.amount ?? draft.amount!), draft.direction),
+      ),
     }))
-
-    const includeClassification = hasClassificationData(draft)
 
     setSaving(true)
     try {
@@ -217,6 +243,11 @@ export default function TransactionCreateForm({
                   direction: next,
                   paidFromPartyId: null,
                   paidToPartyId: null,
+                  items: prev.items.map((item) => ({
+                    ...item,
+                    amount:
+                      item.amount != null ? flipSignedAmount(item.amount, next) : item.amount,
+                  })),
                 }))
               }}
               variantForValue={(v) => DIRECTION_PILL[v as Direction]}
@@ -241,16 +272,11 @@ export default function TransactionCreateForm({
               />
             </FieldRow>
             <FieldRow label="Kwota (PLN)">
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                className={inputCls}
-                value={draft.amount ?? ''}
-                onChange={(e) => {
-                  const raw = e.target.value
-                  updateAmount(raw === '' ? null : Number.parseFloat(raw))
-                }}
+              <MoneyAmountInput
+                value={draft.amount}
+                direction={draft.direction}
+                onChange={updateAmount}
+                inputClassName={inputCls}
                 required
               />
             </FieldRow>

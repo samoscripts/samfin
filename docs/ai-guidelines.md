@@ -9,7 +9,7 @@ Dokument opisuje, jak bezpiecznie pracować z kodem SamFin — dla asystentów A
 1. **Nie wymyślaj funkcji** — jeśli nie ma endpointu, encji lub strony w kodzie, oznacz to jako brak lub „DO POTWIERDZENIA”.
 2. **Słowniki to dane w tabelach** — nazwy kategorii, portfeli, podmiotów, obszarów są konfigurowalne przez użytkownika. Nie traktuj przykładów z `mock/` jako danych produkcyjnych.
 3. **Enumy w kodzie ≠ słowniki użytkownika** — `INCOME`/`EXPENSE`, statusy klasyfikacji, typy podmiotów to stałe systemowe; konkretne rekordy `party`, `category` itd. to dane użytkownika.
-4. **Kwoty w groszach** — w PHP/DB zawsze `amount_minor` (int). API i frontend używają decimal PLN; konwersja `round(amount * 100)` przy zapisie.
+4. **Kwoty w groszach** — w PHP/DB zawsze `amount_minor` (int). API i frontend używają decimal PLN; konwersja `round(amount * 100)` przy zapisie. **Wyjątki UX:** filtry transakcji i warunki reguł (`amount_minor`) — wpis PLN dodatni, porównanie po `abs()`; ręczne tworzenie transakcji — PLN dodatni, znak z pola `direction`. Util FE: `shared/utils/moneyInput.ts`.
 5. **Soft delete** — `DELETE` w API ustawia zwykle `active = false`. Nie zakładaj fizycznego usuwania rekordów konfiguracyjnych. **Wyjątki (kategorie):** dezaktywacja zablokowana przy użyciu (`ADR-027`); merge przepina referencje; **hard delete** tylko nieaktywnych bez użyć i bez subkategorii (`ADR-035`).
 6. **Minimalny diff** — przy zmianach zachowuj istniejące konwencje (inline JSON validation, `toApiArray()` na encjach, camelCase w API).
 7. **Umiejscowienie UI** — formularze create/edit w **page content** lub **sidebar**; **modale** tylko na confirmy i krótkie prompty. Przy nowej funkcji — zapytaj użytkownika (page / sidebar / modal). Szczegóły: [`architecture-rules.md`](architecture-rules.md) (sekcja Frontend).
@@ -104,6 +104,7 @@ Przy modyfikacji klasyfikacji lub importu sprawdź:
 - [ ] Dezaktywacja kategorii: blokada przy użyciu w pozycjach transakcji, szablonach lub regułach (`CategoryUsageService`, ADR-027); merge przepina referencje
 - [ ] Hard delete kategorii: tylko `active=false`, bez użyć, bez subkategorii (`ADR-035`)
 - [ ] Import: duplikat po party + date + amount + trans_title/description (canonical_text)
+- [ ] Warunek reguły `amount_minor`: UI PLN bezwzględne, zapis dodatnich groszy, matcher `abs(tx.amount_minor)`
 - [ ] Import: EXPENSE → `paid_from`, INCOME → `paid_to` z `csv_import.party`
 - [ ] Historia: czy zmiana powinna wołać `TransactionSnapshotLogService`?
 

@@ -349,12 +349,12 @@ class TransactionRepository extends ServiceEntityRepository
                ->setParameter('categoryId', (int) $f['categoryId']);
         }
         if (isset($f['amountMin']) && $f['amountMin'] !== '') {
-            $minMinor = (int) round((float) $f['amountMin'] * 100);
+            $minMinor = (int) round((float) str_replace(',', '.', (string) $f['amountMin']) * 100);
             $qb->andWhere('ABS(t.amountMinor) >= :amountMin')
                ->setParameter('amountMin', $minMinor);
         }
         if (isset($f['amountMax']) && $f['amountMax'] !== '') {
-            $maxMinor = (int) round((float) $f['amountMax'] * 100);
+            $maxMinor = (int) round((float) str_replace(',', '.', (string) $f['amountMax']) * 100);
             $qb->andWhere('ABS(t.amountMinor) <= :amountMax')
                ->setParameter('amountMax', $maxMinor);
         }

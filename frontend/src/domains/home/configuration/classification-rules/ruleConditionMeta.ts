@@ -3,6 +3,7 @@ import type {
   RuleConditionField,
   RuleOperator,
 } from '@/shared/api/classificationRules'
+import { minorToMoneyInput, parseMoneyInputToMinor } from '@/shared/utils/moneyInput'
 import type { RuleDirection } from './constants'
 import { OPERATORS } from './constants'
 
@@ -114,10 +115,10 @@ export function defaultValueForOperator(
 ): RuleCondition['value'] {
   if (!operatorNeedsValue(operator)) return undefined
   if (operator === 'between') {
-    return field === 'amount_minor' ? [0, 0] : ['', '']
+    return field === 'amount_minor' ? ['', ''] : ['', '']
   }
   if (operator === 'in' || operator === 'not_in') return []
-  if (field === 'amount_minor') return 0
+  if (field === 'amount_minor') return ''
   return ''
 }
 
@@ -148,20 +149,45 @@ export function normalizeConditionOperator(
   }
 }
 
-function formatListValue(value: unknown): string {
-  if (Array.isArray(value)) return value.map(String).join(', ')
+function formatListValue(value: unknown, field?: RuleConditionField): string {
+  if (Array.isArray(value)) {
+    if (field === 'amount_minor') {
+      return value
+        .map((item) => (typeof item === 'number' ? minorToMoneyInput(item) : String(item ?? '')))
+        .join('; ')
+    }
+    return value.map(String).join(', ')
+  }
   return String(value ?? '')
 }
 
 function parseListValue(raw: string, field: RuleConditionField): unknown[] {
-  const parts = raw
+  if (field === 'amount_minor') {
+    return raw
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((part) => parseMoneyInputToMinor(part))
+      .filter((minor): minor is number => minor !== null)
+  }
+
+  return raw
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-  if (field === 'amount_minor') {
-    return parts.map((p) => Number(p))
+}
+
+function isValidAmountMinorValue(value: unknown): boolean {
+  if (typeof value === 'number' && Number.isFinite(value)) return true
+  if (typeof value === 'string' && value !== '') {
+    return parseMoneyInputToMinor(value) !== null
   }
-  return parts
+  return false
+}
+
+function amountMinorBetweenBoundsValid(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length !== 2) return false
+  return isValidAmountMinorValue(value[0]) && isValidAmountMinorValue(value[1])
 }
 
 export function validateConditions(conditions: RuleCondition[]): string | null {
@@ -193,8 +219,8 @@ export function validateConditions(conditions: RuleCondition[]): string | null {
       if (!Array.isArray(v) || v.length !== 2 || v[0] === '' || v[1] === '') {
         return `${label}: podaj obie granice zakresu (od–do).`
       }
-      if (c.field === 'amount_minor' && (Number.isNaN(Number(v[0])) || Number.isNaN(Number(v[1])))) {
-        return `${label}: granice zakresu muszą być liczbami.`
+      if (c.field === 'amount_minor' && !amountMinorBetweenBoundsValid(v)) {
+        return `${label}: granice zakresu muszą być kwotami w PLN (np. 21,56).`
       }
       continue
     }
@@ -203,11 +229,18 @@ export function validateConditions(conditions: RuleCondition[]): string | null {
       if (!Array.isArray(v) || v.length === 0) {
         return `${label}: podaj co najmniej jedną wartość na liście.`
       }
+      if (c.field === 'amount_minor' && v.some((item) => !isValidAmountMinorValue(item))) {
+        return `${label}: wartości listy muszą być kwotami w PLN (np. 21,56; 45,15).`
+      }
       continue
     }
 
     if (v === undefined || v === null || v === '') {
       return `${label}: podaj wartość.`
+    }
+
+    if (c.field === 'amount_minor' && !isValidAmountMinorValue(v)) {
+      return `${label}: podaj kwotę w PLN (np. 21,56).`
     }
   }
 
@@ -216,6 +249,45 @@ export function validateConditions(conditions: RuleCondition[]): string | null {
 
 export function isBetweenValue(value: unknown): value is [unknown, unknown] {
   return Array.isArray(value) && value.length === 2
+}
+
+function coerceAmountMinorValue(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.abs(Math.round(value))
+  }
+  if (typeof value === 'string') {
+    const minor = parseMoneyInputToMinor(value)
+    if (minor !== null) return minor
+  }
+  return 0
+}
+
+/** Ensure amount_minor condition values are positive minor units before API save. */
+export function normalizeAmountConditionsForApi(conditions: RuleCondition[]): RuleCondition[] {
+  return conditions.map((c) => {
+    if (
+      c.field !== 'amount_minor' ||
+      c.operator === 'is_empty' ||
+      c.operator === 'is_not_empty'
+    ) {
+      return c
+    }
+
+    const v = c.value
+
+    if (c.operator === 'between' && Array.isArray(v) && v.length === 2) {
+      return {
+        ...c,
+        value: [coerceAmountMinorValue(v[0]), coerceAmountMinorValue(v[1])],
+      }
+    }
+
+    if ((c.operator === 'in' || c.operator === 'not_in') && Array.isArray(v)) {
+      return { ...c, value: v.map((item) => coerceAmountMinorValue(item)) }
+    }
+
+    return { ...c, value: coerceAmountMinorValue(v) }
+  })
 }
 
 export { formatListValue, parseListValue }

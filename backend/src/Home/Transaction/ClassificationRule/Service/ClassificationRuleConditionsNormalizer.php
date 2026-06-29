@@ -8,6 +8,8 @@ class ClassificationRuleConditionsNormalizer
 {
     public const FIELD_DIRECTION = 'direction';
 
+    private const FIELD_AMOUNT_MINOR = 'amount_minor';
+
     /**
      * @param array<string, mixed> $conditionsJson
      * @return array<string, mixed>
@@ -31,7 +33,7 @@ class ClassificationRuleConditionsNormalizer
         return [
             'conditions' => [
                 $this->directionCondition($direction),
-                ...$rest,
+                ...array_map(fn (array $item) => $this->normalizeAmountCondition($item), $rest),
             ],
         ];
     }
@@ -135,5 +137,41 @@ class ClassificationRuleConditionsNormalizer
     private function isValidDirection(string $direction): bool
     {
         return in_array($direction, [Transaction::DIRECTION_EXPENSE, Transaction::DIRECTION_INCOME], true);
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @return array<string, mixed>
+     */
+    private function normalizeAmountCondition(array $item): array
+    {
+        if (($item['field'] ?? '') !== self::FIELD_AMOUNT_MINOR) {
+            return $item;
+        }
+
+        $operator = $item['operator'] ?? '';
+        $value    = $item['value'] ?? null;
+
+        if (in_array($operator, ['is_empty', 'is_not_empty'], true)) {
+            return $item;
+        }
+
+        if ($operator === 'between' && is_array($value) && count($value) === 2) {
+            $item['value'] = [abs((int) $value[0]), abs((int) $value[1])];
+
+            return $item;
+        }
+
+        if (in_array($operator, ['in', 'not_in'], true) && is_array($value)) {
+            $item['value'] = array_map(static fn (mixed $v) => abs((int) $v), $value);
+
+            return $item;
+        }
+
+        if ($value !== null && $value !== '') {
+            $item['value'] = abs((int) $value);
+        }
+
+        return $item;
     }
 }

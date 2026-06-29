@@ -10,7 +10,7 @@ export const CONDITION_FIELDS: { value: RuleConditionField; label: string }[] = 
   { value: 'trans_description', label: 'Opis transakcji' },
   { value: 'trans_title', label: 'Tytuł transakcji' },
   { value: 'counterparty_name', label: 'Kontrahent' },
-  { value: 'amount_minor', label: 'Kwota (grosze)' },
+  { value: 'amount_minor', label: 'Kwota (zł)' },
   { value: 'trans_date', label: 'Data transakcji' },
   { value: 'classification_status', label: 'Status klasyfikacji' },
   { value: 'counterparty_account_number', label: 'NRB kontrahenta' },
@@ -76,7 +76,7 @@ export const DEFAULT_MANUAL_CONDITION: RuleCondition = {
 
   operator: 'equals',
 
-  value: 0,
+  value: '',
 
 }
 

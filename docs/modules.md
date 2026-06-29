@@ -347,7 +347,7 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 
 **Świadomie odroczone (P5+):** `EntityListPage` scaffold; migracja `TransactionFiltersForm` na `FormField`; react-hook-form / Zod.
 
-**P5 (zrobione):** warunki reguł — operatory zależne od pola, dedykowane kontrolki wartości (`between`, `in`, kierunek, status), walidacja przed zapisem (`ruleConditionMeta.ts`).
+**P5 (zrobione):** warunki reguł — operatory zależne od pola, dedykowane kontrolki wartości (`between`, `in`, kierunek, status), walidacja przed zapisem (`ruleConditionMeta.ts`). Kwota warunku: UI w PLN (bezwzględna), JSON `amount_minor` w groszach; matcher `ClassificationRuleMatcher` przez `abs()`.
 
 **Kolejne kroki refaktoryzacji frontendu:**
 

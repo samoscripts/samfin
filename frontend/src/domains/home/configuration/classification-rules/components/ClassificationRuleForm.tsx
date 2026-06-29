@@ -29,6 +29,7 @@ import {
 import {
   ensureDirectionCondition,
   extractDirectionFromConditions,
+  normalizeAmountConditionsForApi,
   validateConditions,
 } from '../ruleConditionMeta'
 import RuleActionsEditor from './RuleActionsEditor'
@@ -185,6 +186,8 @@ export default function ClassificationRuleForm({
       return
     }
 
+    const apiConditions = normalizeAmountConditionsForApi(normalizedConditions)
+
     const percents = form.actions.items.map((item) => item.percent)
     const percentsError = validatePercents(percents)
     if (percentsError) {
@@ -196,7 +199,7 @@ export default function ClassificationRuleForm({
     try {
       const payload: FormState = {
         ...form,
-        conditions: { conditions: normalizedConditions },
+        conditions: { conditions: apiConditions },
         actions: applyOwnSideToActions(form.actions, saveDirection, contextPartyId),
       }
 

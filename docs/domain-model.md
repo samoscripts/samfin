@@ -164,6 +164,8 @@ Automatyczne dopasowanie i klasyfikacja transakcji — zestaw per **`party_id`**
 
 Wykonanie: wyłącznie przez `TransactionClassificationService` (ADR-023). Przy imporcie: `fill_empty` (ADR-022).
 
+**Warunek `amount_minor`:** w UI wpisuje się kwotę w PLN (wartość bezwzględna, np. `800` lub `21,56`); w `conditions_json` zapisywane są dodatnie grosze (`80000`, `2156`). Matcher porównuje `abs(kwota transakcji)` z wartością warunku (kierunek jest już w pierwszym warunku `direction`). Lista wartości (`in` / `not_in`): separator `;` (np. `21,56; 45,15`).
+
 **Tworzenie reguły z transakcji (UI):** W szczegółach transakcji przycisk „Utwórz regułę” (aktywny, gdy podmiot OWN jest po właściwej stronie i spełnia kryteria `ruleEligible`). Nawigacja do `/konfiguracja/reguly` z wstępnie wypełnionym formularzem: zablokowane podmiot, kierunek, strony transakcji i klasyfikacja; warunek opisu (`contains`, wartość ręczna) oraz opcjonalnie NRB kontrahenta (`equals`, tylko odczyt). Przy zapisie ustawiane jest `created_from_transaction_id`.
 
 ## TransactionChangeLog
