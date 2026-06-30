@@ -39,6 +39,7 @@ interface CreateDraft {
   transDate: string
   amount: number | null
   transDescription: string
+  transCustomDescription: string
   paidFromPartyId: number | null
   paidToPartyId: number | null
   items: ClassificationItemDraft[]
@@ -57,6 +58,7 @@ function prefillToDraft(prefill: TransactionNewUrlPrefill): CreateDraft {
     amount,
     transDescription:
       prefill.transDescription ?? prefill.operationDesc ?? prefill.description ?? '',
+    transCustomDescription: '',
     paidFromPartyId: parseIdFromUrl(prefill.paidFromPartyId),
     paidToPartyId: parseIdFromUrl(prefill.paidToPartyId),
     items: [
@@ -198,6 +200,7 @@ export default function TransactionCreateForm({
         transDate: draft.transDate,
         amount: draft.amount,
         transDescription: draft.transDescription.trim(),
+        transCustomDescription: draft.transCustomDescription.trim() || null,
         paidFromPartyId: draft.paidFromPartyId,
         paidToPartyId: draft.paidToPartyId,
         ...(includeClassification
@@ -289,6 +292,17 @@ export default function TransactionCreateForm({
               onChange={(e) => setDraft((prev) => ({ ...prev, transDescription: e.target.value }))}
               placeholder="Opis transakcji…"
               required
+            />
+          </FieldRow>
+          <FieldRow label="Własny opis">
+            <input
+              type="text"
+              className={inputCls}
+              value={draft.transCustomDescription}
+              onChange={(e) =>
+                setDraft((prev) => ({ ...prev, transCustomDescription: e.target.value }))
+              }
+              placeholder="Twój opis, notatka…"
             />
           </FieldRow>
         </div>

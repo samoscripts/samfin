@@ -34,6 +34,8 @@ class TransactionClassificationService
         ?int        $paidFromPartyId,
         ?int        $paidToPartyId,
         User        $user,
+        ?string     $transCustomDescription = null,
+        bool        $updateTransCustomDescription = false,
     ): void {
         $itemCount = count($itemsPayload);
         if ($itemCount < 1) {
@@ -78,6 +80,11 @@ class TransactionClassificationService
 
         $tx->setPaidFromParty($paidFromParty);
         $tx->setPaidToParty($paidToParty);
+
+        if ($updateTransCustomDescription) {
+            $trimmed = $transCustomDescription !== null ? trim($transCustomDescription) : '';
+            $tx->setTransCustomDescription($trimmed === '' ? null : $trimmed);
+        }
 
         foreach ($tx->getItems()->toArray() as $old) {
             $tx->removeItem($old);

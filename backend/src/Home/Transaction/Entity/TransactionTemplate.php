@@ -52,6 +52,9 @@ class TransactionTemplate
     #[ORM\JoinColumn(name: 'category_id', nullable: true, onDelete: 'SET NULL')]
     private ?Category $category = null;
 
+    #[ORM\Column(name: 'trans_custom_description', type: 'text', nullable: true)]
+    private ?string $transCustomDescription = null;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -82,7 +85,8 @@ class TransactionTemplate
             'paidToPartyId'    => $this->paidToParty?->getId(),
             'walletId'         => $this->wallet?->getId(),
             'concernId'        => $this->concern?->getId(),
-            'categoryId'       => $this->category?->getId(),
+            'categoryId'             => $this->category?->getId(),
+            'transCustomDescription' => $this->transCustomDescription,
             'createdAt'        => $this->createdAt?->format('Y-m-d\TH:i:s\Z'),
             'updatedAt'        => $this->updatedAt?->format('Y-m-d\TH:i:s\Z'),
         ];
@@ -113,6 +117,9 @@ class TransactionTemplate
 
     public function getCategory(): ?Category { return $this->category; }
     public function setCategory(?Category $category): static { $this->category = $category; return $this; }
+
+    public function getTransCustomDescription(): ?string { return $this->transCustomDescription; }
+    public function setTransCustomDescription(?string $v): static { $this->transCustomDescription = $v; return $this; }
 
     public function getCreatedAt(): ?\DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): ?\DateTimeImmutable { return $this->updatedAt; }

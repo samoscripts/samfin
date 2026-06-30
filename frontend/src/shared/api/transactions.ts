@@ -35,6 +35,7 @@ export interface CreateTransactionPayload {
   transDate: string
   amount: number
   transDescription: string
+  transCustomDescription?: string | null
   transTitle?: string | null
   paidFromPartyId?: number | null
   paidToPartyId?: number | null
@@ -53,6 +54,7 @@ export interface ClassifyPayload {
   items: ItemPayload[]
   paidFromPartyId?: number | null
   paidToPartyId?: number | null
+  transCustomDescription?: string | null
 }
 
 export const fetchTransactions = async (

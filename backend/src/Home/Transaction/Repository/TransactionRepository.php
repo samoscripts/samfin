@@ -363,6 +363,7 @@ class TransactionRepository extends ServiceEntityRepository
             $qb->andWhere(
                 'LOWER(t.transDescription) LIKE LOWER(:description)
                 OR LOWER(t.transTitle) LIKE LOWER(:description)
+                OR LOWER(t.transCustomDescription) LIKE LOWER(:description)
                 OR LOWER(t.counterpartyName) LIKE LOWER(:description)',
             )->setParameter('description', $needle);
         }

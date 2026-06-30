@@ -42,6 +42,8 @@ export interface Transaction {
 
   transDescription?: string | null
 
+  transCustomDescription?: string | null
+
   balanceAfterMinor?: number | null
 
   counterpartyName?: string | null

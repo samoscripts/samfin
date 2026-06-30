@@ -13,7 +13,7 @@ import ClassificationItemsEditor, {
 import FormError from '@/shared/components/form/FormError'
 import { FieldRow, ReadOnlyField, SectionLabel } from '@/shared/components/form/FormSection'
 import PartySelect from '@/shared/components/form/PartySelect'
-import { selectCls } from '@/shared/components/form/formClasses'
+import { inputCls, selectCls } from '@/shared/components/form/formClasses'
 import Pill from '@/shared/components/Pill'
 import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
 import { formatAmount } from '@/shared/utils/format'
@@ -39,6 +39,7 @@ import {
 import { applyTemplateToDraft, templatePayloadFromDraft } from '../utils/transactionTemplates'
 
 interface EditDraft {
+  transCustomDescription: string
   paidFromPartyId: number | null
   paidToPartyId: number | null
   items: ClassificationItemDraft[]
@@ -68,6 +69,7 @@ function txToEditDraft(tx: Transaction): EditDraft {
   }
 
   return {
+    transCustomDescription: tx.transCustomDescription ?? '',
     paidFromPartyId: tx.paidFromPartyId ?? null,
     paidToPartyId: tx.paidToPartyId ?? null,
     items,
@@ -157,6 +159,7 @@ export default function TransactionEditForm({
       const updated = await classifyTransactionItems(tx.transactionId, {
         paidFromPartyId: draft.paidFromPartyId,
         paidToPartyId: draft.paidToPartyId,
+        transCustomDescription: draft.transCustomDescription.trim() || null,
         items: normalizedItems.map(
           (item) =>
             ({
@@ -198,6 +201,20 @@ export default function TransactionEditForm({
       {error && <FormError message={error} />}
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 md:p-5 space-y-5">
+        <FieldRow label="Własny opis">
+          <input
+            type="text"
+            className={inputCls}
+            value={draft.transCustomDescription}
+            onChange={(e) =>
+              setDraft((prev) => ({ ...prev, transCustomDescription: e.target.value }))
+            }
+            placeholder="Twój opis, notatka…"
+          />
+        </FieldRow>
+
+        <div className="border-t border-gray-100 dark:border-gray-800" />
+
         <div className="space-y-3">
           <SectionLabel>Strony transakcji</SectionLabel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

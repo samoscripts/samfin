@@ -10,6 +10,7 @@ export interface TransactionTemplate {
   walletId: number | null
   concernId: number | null
   categoryId: number | null
+  transCustomDescription?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -22,6 +23,7 @@ export type TransactionTemplatePayload = {
   walletId: number | null
   concernId: number | null
   categoryId: number | null
+  transCustomDescription?: string | null
 }
 
 export const fetchTransactionTemplates = async (direction: Direction): Promise<TransactionTemplate[]> =>

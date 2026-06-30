@@ -78,6 +78,14 @@ class TransactionTemplateController extends AbstractController
         $walletId        = $this->nullableInt($data['walletId'] ?? null);
         $concernId       = $this->nullableInt($data['concernId'] ?? null);
         $categoryId      = $this->nullableInt($data['categoryId'] ?? null);
+        $transCustomDescription = null;
+        if (array_key_exists('transCustomDescription', $data)) {
+            $raw = $data['transCustomDescription'];
+            if (is_string($raw)) {
+                $trimmed = trim($raw);
+                $transCustomDescription = $trimmed === '' ? null : $trimmed;
+            }
+        }
 
         if ($err = $this->resolveParty($paidFromPartyId)) {
             return $this->json(['message' => $err], 422);
@@ -104,6 +112,7 @@ class TransactionTemplateController extends AbstractController
         $template->setWallet($walletId !== null ? $this->walletRepository->find($walletId) : null);
         $template->setConcern($concernId !== null ? $this->concernRepository->find($concernId) : null);
         $template->setCategory($categoryId !== null ? $this->categoryRepository->find($categoryId) : null);
+        $template->setTransCustomDescription($transCustomDescription);
 
         $this->em->persist($template);
         $this->em->flush();

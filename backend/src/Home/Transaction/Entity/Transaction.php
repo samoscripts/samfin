@@ -126,6 +126,12 @@ class Transaction
 
 
 
+    #[ORM\Column(name: 'trans_custom_description', type: 'text', nullable: true)]
+
+    private ?string $transCustomDescription = null;
+
+
+
     #[ORM\Column(name: 'amount_minor')]
 
     private int $amountMinor = 0;
@@ -282,7 +288,9 @@ class Transaction
 
             'transTitle'          => $this->transTitle,
 
-            'transDescription'    => $this->transDescription,
+            'transDescription'        => $this->transDescription,
+
+            'transCustomDescription'  => $this->transCustomDescription,
 
             'balanceAfterMinor'   => $this->balanceAfterMinor,
 
@@ -357,6 +365,12 @@ class Transaction
     public function getTransDescription(): ?string { return $this->transDescription; }
 
     public function setTransDescription(?string $v): static { $this->transDescription = $v; return $this; }
+
+
+
+    public function getTransCustomDescription(): ?string { return $this->transCustomDescription; }
+
+    public function setTransCustomDescription(?string $v): static { $this->transCustomDescription = $v; return $this; }
 
 
 

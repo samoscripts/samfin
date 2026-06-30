@@ -25,6 +25,7 @@ class TransactionCreateService
         float $amount,
         string $transDescription,
         ?string $transTitle,
+        ?string $transCustomDescription,
         ?int $paidFromPartyId,
         ?int $paidToPartyId,
         ?array $itemsPayload,
@@ -62,6 +63,7 @@ class TransactionCreateService
         if ($transTitle !== null && trim($transTitle) !== '') {
             $tx->setTransTitle(trim($transTitle));
         }
+        $tx->setTransCustomDescription(self::normalizeCustomDescription($transCustomDescription));
         $tx->setAmountMinor($amountMinor);
         $tx->setDirection($direction);
         $tx->setSource(Transaction::SOURCE_MANUAL);
@@ -113,5 +115,15 @@ class TransactionCreateService
         }
 
         return $tx;
+    }
+
+    private static function normalizeCustomDescription(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 }

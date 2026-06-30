@@ -94,6 +94,12 @@ export default function TransactionSummaryCard({
 
         )}
 
+        {tx.transCustomDescription && (
+
+          <DetailRow label="Własny opis" value={tx.transCustomDescription} />
+
+        )}
+
         {tx.counterpartyName && (
 
           <DetailRow label="Kontrahent" value={tx.counterpartyName} />

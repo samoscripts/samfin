@@ -73,7 +73,9 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 | `Transaction/ClassificationRule/*` | Reguły auto-klasyfikacji per party |
 | `Transaction/Repository/TransactionRepository.php` | `findPaged`, `getPeriodStats`, `findDuplicate` |
 
-**Tworzenie ręczne (ADR-019):** `POST /api/transactions` — `TransactionCreateService`; UI w sidebarze listy (`?tab=create`, prefill z query); legacy `/transactions/new` → redirect.
+**Tworzenie ręczne (ADR-019):** `POST /api/transactions` — `TransactionCreateService`; wymagane: `direction`, `transDate`, `amount`, `transDescription`; opcjonalne: `transCustomDescription`, `transTitle`, `paidFromPartyId`, `paidToPartyId`, `items[]`. UI w sidebarze listy (`?tab=create`, prefill z query); legacy `/transactions/new` → redirect.
+
+**Szablony klasyfikacji:** `POST /api/transaction-templates` — opcjonalne `transCustomDescription` (własny opis zapisywany w szablonie; aplikowany w edycji transakcji).
 
 ### Home — Report
 
@@ -211,6 +213,7 @@ Szczegóły buildu APK i testów: [`mobile/README.md`](../mobile/README.md).
 {
   "paidFromPartyId": 1,
   "paidToPartyId": 2,
+  "transCustomDescription": "opcjonalny własny opis użytkownika",
   "items": [
     {
       "amount": 100.50,

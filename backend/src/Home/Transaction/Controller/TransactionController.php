@@ -117,6 +117,12 @@ class TransactionController extends AbstractController
             return $this->json(['message' => 'Pole items musi być tablicą.'], 422);
         }
 
+        $transCustomDescription = null;
+        if (array_key_exists('transCustomDescription', $body)) {
+            $raw = $body['transCustomDescription'];
+            $transCustomDescription = is_string($raw) ? $raw : null;
+        }
+
         /** @var User $user */
         $user = $this->security->getUser();
 
@@ -127,6 +133,7 @@ class TransactionController extends AbstractController
                 (float) $amount,
                 $transDescription,
                 is_string($transTitle) ? $transTitle : null,
+                $transCustomDescription,
                 $paidFromPartyId,
                 $paidToPartyId,
                 $items,
@@ -311,6 +318,13 @@ class TransactionController extends AbstractController
             return $this->json(['message' => 'Pole items jest wymagane i nie może być puste.'], 422);
         }
 
+        $updateTransCustomDescription = array_key_exists('transCustomDescription', $body);
+        $transCustomDescription = null;
+        if ($updateTransCustomDescription) {
+            $raw = $body['transCustomDescription'];
+            $transCustomDescription = is_string($raw) ? $raw : null;
+        }
+
         /** @var User $user */
         $user = $this->security->getUser();
 
@@ -321,6 +335,8 @@ class TransactionController extends AbstractController
                 $paidFromPartyId,
                 $paidToPartyId,
                 $user,
+                $transCustomDescription,
+                $updateTransCustomDescription,
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['message' => $e->getMessage()], 422);

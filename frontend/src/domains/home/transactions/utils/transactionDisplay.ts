@@ -18,13 +18,18 @@ export function transactionPrimaryLabel(tx: Transaction): string | null {
 
 /** Podtytuły pod główną linią (tytuł). */
 export function transactionSubtitleLines(tx: Transaction): string[] {
+  const lines: string[] = []
+
   const title = tx.transTitle?.trim()
-  if (!title) return []
+  if (title) {
+    const desc = tx.transDescription?.trim()
+    if (desc) lines.push(desc)
+  }
 
-  const desc = tx.transDescription?.trim()
-  if (!desc) return []
+  const custom = tx.transCustomDescription?.trim()
+  if (custom) lines.push(custom)
 
-  return [desc]
+  return lines
 }
 
 

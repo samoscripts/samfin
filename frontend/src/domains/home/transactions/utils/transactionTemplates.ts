@@ -11,6 +11,7 @@ export interface ClassificationDraftFields {
   paidFromPartyId: number | null
   paidToPartyId: number | null
   items: ClassificationItemDraft[]
+  transCustomDescription?: string
 }
 
 function firstItemFields(items: ClassificationItemDraft[]): {
@@ -38,6 +39,7 @@ export function templatePayloadFromDraft(
     walletId,
     concernId,
     categoryId,
+    transCustomDescription: draft.transCustomDescription?.trim() || null,
   }
 }
 
@@ -133,5 +135,8 @@ export function applyTemplateToDraft<T extends ClassificationDraftFields>(
     paidToPartyId:
       paidToLocked || template.paidToPartyId == null ? draft.paidToPartyId : template.paidToPartyId,
     items: applyClassificationToItems(draft.items, template),
+    ...(template.transCustomDescription != null
+      ? { transCustomDescription: template.transCustomDescription }
+      : {}),
   }
 }
