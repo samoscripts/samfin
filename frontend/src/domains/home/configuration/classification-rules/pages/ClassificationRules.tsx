@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronRight, Loader2, PanelRight, Plus, Save } from 'lucide-react'
 import { fetchParties, fetchPartiesForClassificationRules } from '@/shared/api/parties'
 import { fetchWallets, type Wallet } from '@/shared/api/wallets'
@@ -76,6 +76,8 @@ export default function ClassificationRules() {
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriesLoaded, setCategoriesLoaded] = useState(false)
   const [createFromTx, setCreateFromTx] = useState<Transaction | null>(null)
+  const [editSourceTx, setEditSourceTx] = useState<Transaction | null>(null)
+  const [editSourceTxMissing, setEditSourceTxMissing] = useState(false)
   const [ruleDraft, setRuleDraft] = useState<RuleFromTransactionDraft | null>(null)
   const [returnAfterCreate, setReturnAfterCreate] = useState<string | null>(null)
 
@@ -177,6 +179,30 @@ export default function ClassificationRules() {
       cancelled = true
     }
   }, [isEdit, entityId, partyRules, loadPartyRules, urlPartyId, applyUrl])
+
+  useEffect(() => {
+    const sourceTxId = editingRule?.createdFromTransactionId ?? null
+    if (!isEdit || sourceTxId === null) {
+      setEditSourceTx(null)
+      setEditSourceTxMissing(false)
+      return
+    }
+
+    let cancelled = false
+    setEditSourceTx(null)
+    setEditSourceTxMissing(false)
+    fetchTransaction(sourceTxId)
+      .then((tx) => {
+        if (!cancelled) setEditSourceTx(tx)
+      })
+      .catch(() => {
+        if (!cancelled) setEditSourceTxMissing(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, editingRule?.createdFromTransactionId])
 
   useEffect(() => {
     if (!isCreate) {
@@ -363,6 +389,12 @@ export default function ClassificationRules() {
       )
     }
 
+    const sourceTx = createFromTx ?? editSourceTx
+    const sourceTxId =
+      createFromTx?.transactionId ?? editingRule?.createdFromTransactionId ?? null
+    const sourceTxLoading =
+      isEdit && sourceTxId !== null && editSourceTx === null && !editSourceTxMissing
+
     return (
       <div>
         {breadcrumb}
@@ -375,12 +407,32 @@ export default function ClassificationRules() {
               : `Edycja: ${editingRule?.name ?? ''}`}
           </h2>
 
-          {createFromTx && (
+          {sourceTxId !== null && (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Transakcja źródłowa
-              </h3>
-              <TransactionSummaryCard tx={createFromTx} layout="grid" />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Transakcja źródłowa
+                </h3>
+                {sourceTx && (
+                  <Link
+                    to={`/transactions?tx=${sourceTx.transactionId}`}
+                    className="text-xs text-[#c9a96e] hover:underline"
+                  >
+                    Otwórz transakcję
+                  </Link>
+                )}
+              </div>
+              {sourceTxLoading ? (
+                <div className="py-8 flex justify-center text-gray-400">
+                  <Loader2 size={20} className="animate-spin" />
+                </div>
+              ) : editSourceTxMissing && !createFromTx ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+                  Transakcja źródłowa (#{sourceTxId}) nie jest już dostępna.
+                </p>
+              ) : sourceTx ? (
+                <TransactionSummaryCard tx={sourceTx} layout="grid" />
+              ) : null}
             </div>
           )}
 

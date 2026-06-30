@@ -21,6 +21,7 @@ class TransactionBulkUpdateService
         'walletId',
         'concernId',
         'categoryId',
+        'transCustomDescription',
     ];
 
     public function __construct(
@@ -90,6 +91,15 @@ class TransactionBulkUpdateService
 
         $itemFields = array_intersect($fields, ['walletId', 'concernId', 'categoryId']);
         $partyFields = array_intersect($fields, ['paidFromPartyId', 'paidToPartyId']);
+        $updateCustomDescription = in_array('transCustomDescription', $fields, true);
+        $customDescription = null;
+        if ($updateCustomDescription) {
+            $raw = $values['transCustomDescription'] ?? null;
+            if (is_string($raw)) {
+                $trimmed = trim($raw);
+                $customDescription = $trimmed === '' ? null : $trimmed;
+            }
+        }
 
         foreach ($transactions as $tx) {
             $newPaidFrom = in_array('paidFromPartyId', $fields, true)
@@ -135,6 +145,10 @@ class TransactionBulkUpdateService
                     }
                     $item->setUpdatedBy($user);
                 }
+            }
+
+            if ($updateCustomDescription) {
+                $tx->setTransCustomDescription($customDescription);
             }
 
             $tx->setStatus($this->statusCalculator->calculate($tx));

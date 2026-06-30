@@ -4,8 +4,14 @@ import type { BulkUpdateField } from '@/shared/api/transactions'
 import type { Direction, Transaction } from '@/shared/types'
 import { isOwnSideLocked, isPartyFieldBulkBlocked } from './partyAssignment'
 
-export type BulkFieldState = { enabled: boolean; value: number | null }
-export type BulkClassificationDraft = Record<BulkUpdateField, BulkFieldState>
+export type BulkIdFieldState = { enabled: boolean; value: number | null }
+export type BulkTextFieldState = { enabled: boolean; value: string }
+/** @deprecated use BulkIdFieldState */
+export type BulkFieldState = BulkIdFieldState
+
+export type BulkClassificationDraft = Record<BulkUpdateIdField, BulkIdFieldState> & {
+  transCustomDescription: BulkTextFieldState
+}
 
 export interface ClassificationDraftFields {
   paidFromPartyId: number | null
@@ -66,6 +72,9 @@ export function bulkTemplatePayloadFromDraft(
     walletId: draft.walletId.enabled ? draft.walletId.value : null,
     concernId: draft.concernId.enabled ? draft.concernId.value : null,
     categoryId: draft.categoryId.enabled ? draft.categoryId.value : null,
+    transCustomDescription: draft.transCustomDescription.enabled
+      ? draft.transCustomDescription.value.trim() || null
+      : null,
   }
 }
 
@@ -83,6 +92,7 @@ export function applyTemplateToBulkDraft(
     walletId: { ...draft.walletId },
     concernId: { ...draft.concernId },
     categoryId: { ...draft.categoryId },
+    transCustomDescription: { ...draft.transCustomDescription },
   }
 
   if (!paidFromBlocked && template.paidFromPartyId != null) {
@@ -113,6 +123,12 @@ export function applyTemplateToBulkDraft(
   }
   if (template.categoryId != null) {
     next.categoryId = { enabled: true, value: template.categoryId }
+  }
+  if (template.transCustomDescription != null) {
+    next.transCustomDescription = {
+      enabled: true,
+      value: template.transCustomDescription,
+    }
   }
 
   return next

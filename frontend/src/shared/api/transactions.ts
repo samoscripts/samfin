@@ -141,11 +141,14 @@ export type BulkUpdateField =
   | 'walletId'
   | 'concernId'
   | 'categoryId'
+  | 'transCustomDescription'
+
+export type BulkUpdateIdField = Exclude<BulkUpdateField, 'transCustomDescription'>
 
 export interface BulkUpdatePayload {
   transactionIds: number[]
   fields: BulkUpdateField[]
-  values: Partial<Record<BulkUpdateField, number | null>>
+  values: Partial<Record<BulkUpdateField, number | string | null>>
 }
 
 export interface BulkUpdateResponse {

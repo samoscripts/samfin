@@ -109,4 +109,38 @@ final class TransactionApiTest extends ApiTestCase
         $data = $this->assertJsonResponse(201);
         self::assertSame('Notatka szablonu', $data['transCustomDescription']);
     }
+
+    public function testBulkUpdateTransCustomDescription(): void
+    {
+        $this->createUser(apiToken: self::TEST_USER_TOKEN);
+
+        $this->requestJson('POST', '/api/transactions', [
+            'direction' => 'EXPENSE',
+            'transDate' => '2026-06-04',
+            'amount' => 15.00,
+            'transDescription' => 'Bulk test 1',
+        ], self::TEST_USER_TOKEN);
+        $tx1 = $this->assertJsonResponse(201);
+
+        $this->requestJson('POST', '/api/transactions', [
+            'direction' => 'EXPENSE',
+            'transDate' => '2026-06-05',
+            'amount' => 20.00,
+            'transDescription' => 'Bulk test 2',
+        ], self::TEST_USER_TOKEN);
+        $tx2 = $this->assertJsonResponse(201);
+
+        $this->requestJson('PUT', '/api/transactions/bulk-update', [
+            'transactionIds' => [$tx1['transactionId'], $tx2['transactionId']],
+            'fields' => ['transCustomDescription'],
+            'values' => ['transCustomDescription' => 'Wspólna notatka'],
+        ], self::TEST_USER_TOKEN);
+
+        $result = $this->assertJsonResponse(200);
+        self::assertSame(2, $result['updated']);
+
+        $this->requestJson('GET', '/api/transactions/' . $tx1['transactionId'], token: self::TEST_USER_TOKEN);
+        $show1 = $this->assertJsonResponse(200);
+        self::assertSame('Wspólna notatka', $show1['transCustomDescription']);
+    }
 }

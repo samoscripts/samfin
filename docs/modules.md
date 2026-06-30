@@ -239,7 +239,7 @@ Szczegóły buildu APK i testów: [`mobile/README.md`](../mobile/README.md).
 }
 ```
 
-Dozwolone `fields`: `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`, `categoryId`. Wartość `null` czyści pole.
+Dozwolone `fields`: `paidFromPartyId`, `paidToPartyId`, `walletId`, `concernId`, `categoryId`, `transCustomDescription`. Wartość `null` czyści pole (dla `transCustomDescription` — usuwa własny opis).
 
 ### Usuwanie transakcji — `DELETE /api/transactions/{id}`
 

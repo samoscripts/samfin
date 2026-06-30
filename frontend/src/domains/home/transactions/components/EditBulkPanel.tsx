@@ -7,6 +7,7 @@ import type { Party } from '@/domains/home/configuration/parties/types'
 import {
   bulkUpdateTransactions,
   type BulkUpdateField,
+  type BulkUpdateIdField,
 } from '@/shared/api/transactions'
 import {
   filterPartiesForField,
@@ -21,7 +22,7 @@ import CategorySelect from '@/shared/components/form/CategorySelect'
 import PartySelect from '@/shared/components/form/PartySelect'
 import FormError from '@/shared/components/form/FormError'
 import { SectionLabel } from '@/shared/components/form/FormSection'
-import { selectCls } from '@/shared/components/form/formClasses'
+import { inputCls, selectCls } from '@/shared/components/form/formClasses'
 import {
   TransactionTemplateFormFooter,
   TransactionTemplateList,
@@ -32,7 +33,7 @@ import {
   type BulkClassificationDraft,
 } from '../utils/transactionTemplates'
 
-const FIELD_DEFS: { key: BulkUpdateField; label: string }[] = [
+const ID_FIELD_DEFS: { key: BulkUpdateIdField; label: string }[] = [
   { key: 'paidFromPartyId', label: 'Skąd' },
   { key: 'paidToPartyId', label: 'Dokąd' },
   { key: 'walletId', label: 'Portfel' },
@@ -40,16 +41,21 @@ const FIELD_DEFS: { key: BulkUpdateField; label: string }[] = [
   { key: 'categoryId', label: 'Kategoria' },
 ]
 
+const TEXT_FIELD = { key: 'transCustomDescription' as const, label: 'Własny opis' }
+
 const EMPTY_DRAFT = (): BulkClassificationDraft => ({
   paidFromPartyId: { enabled: false, value: null },
   paidToPartyId: { enabled: false, value: null },
   walletId: { enabled: false, value: null },
   concernId: { enabled: false, value: null },
   categoryId: { enabled: false, value: null },
+  transCustomDescription: { enabled: false, value: '' },
 })
 
 function isDraftDirty(draft: BulkClassificationDraft): boolean {
-  return FIELD_DEFS.some((f) => draft[f.key].enabled)
+  return (
+    ID_FIELD_DEFS.some((f) => draft[f.key].enabled) || draft.transCustomDescription.enabled
+  )
 }
 
 export interface EditBulkPanelProps {
@@ -90,12 +96,12 @@ export default function EditBulkPanel({
   const direction = transactions[0]?.direction ?? 'EXPENSE'
   const directionLabel = DIRECTION_LABEL_BY_VALUE[direction] ?? direction
 
-  const enabledFields = useMemo(
-    () => FIELD_DEFS.filter((f) => draft[f.key].enabled),
+  const enabledIdFields = useMemo(
+    () => ID_FIELD_DEFS.filter((f) => draft[f.key].enabled),
     [draft],
   )
 
-  const canSave = enabledFields.length > 0
+  const canSave = enabledIdFields.length > 0 || draft.transCustomDescription.enabled
 
   const getTemplatePayload = useCallback(
     () => bulkTemplatePayloadFromDraft(direction, draft),
@@ -112,7 +118,7 @@ export default function EditBulkPanel({
     onDirtyChange(isDraftDirty(draft))
   }, [draft, onDirtyChange])
 
-  const setFieldEnabled = useCallback((key: BulkUpdateField, enabled: boolean) => {
+  const setFieldEnabled = useCallback((key: BulkUpdateIdField, enabled: boolean) => {
     setDraft((prev) => ({
       ...prev,
       [key]: { ...prev[key], enabled },
@@ -120,7 +126,7 @@ export default function EditBulkPanel({
     setError(null)
   }, [])
 
-  const setFieldValue = useCallback((key: BulkUpdateField, value: number | null) => {
+  const setFieldValue = useCallback((key: BulkUpdateIdField, value: number | null) => {
     setDraft((prev) => ({
       ...prev,
       [key]: { ...prev[key], value },
@@ -129,16 +135,25 @@ export default function EditBulkPanel({
   }, [])
 
   const handleSave = useCallback(async () => {
-    const fields = FIELD_DEFS.filter((f) => draft[f.key].enabled).map((f) => f.key)
+    const fields: BulkUpdateField[] = [
+      ...ID_FIELD_DEFS.filter((f) => draft[f.key].enabled).map((f) => f.key),
+      ...(draft.transCustomDescription.enabled ? [TEXT_FIELD.key] : []),
+    ]
     if (fields.length === 0) {
       const msg = 'Wybierz co najmniej jedno pole do aktualizacji.'
       setError(msg)
       throw new Error(msg)
     }
 
-    const values = Object.fromEntries(
-      fields.map((key) => [key, draft[key].value]),
-    ) as Partial<Record<BulkUpdateField, number | null>>
+    const values: Partial<Record<BulkUpdateField, number | string | null>> = {}
+    for (const key of ID_FIELD_DEFS.map((f) => f.key)) {
+      if (draft[key].enabled) {
+        values[key] = draft[key].value
+      }
+    }
+    if (draft.transCustomDescription.enabled) {
+      values.transCustomDescription = draft.transCustomDescription.value.trim() || null
+    }
 
     setSaving(true)
     setError(null)
@@ -195,11 +210,21 @@ export default function EditBulkPanel({
   const manualOwnTo =
     bulkTxContext.source === 'MANUAL' && direction === 'INCOME'
 
-  const previewLines = enabledFields.map((f) => {
-    const val = draft[f.key].value
-    const display = resolveFieldDisplay(f.key, val, wallets, concerns, categories, parties)
-    return { label: f.label, display }
-  })
+  const previewLines = [
+    ...enabledIdFields.map((f) => {
+      const val = draft[f.key].value
+      const display = resolveIdFieldDisplay(f.key, val, wallets, concerns, categories, parties)
+      return { label: f.label, display }
+    }),
+    ...(draft.transCustomDescription.enabled
+      ? [
+          {
+            label: TEXT_FIELD.label,
+            display: draft.transCustomDescription.value.trim() || EDIT_EMPTY_LABEL,
+          },
+        ]
+      : []),
+  ]
 
   const countLabel =
     transactions.length === 1
@@ -250,7 +275,7 @@ export default function EditBulkPanel({
             Zaznacz pola, które chcesz ustawić dla wszystkich wybranych transakcji.
           </p>
 
-          {FIELD_DEFS.map((field) => {
+          {ID_FIELD_DEFS.map((field) => {
             const partyBlocked =
               (field.key === 'paidFromPartyId' && paidFromBlocked) ||
               (field.key === 'paidToPartyId' && paidToBlocked)
@@ -377,9 +402,52 @@ export default function EditBulkPanel({
               </div>
             )
           })}
+
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.transCustomDescription.enabled}
+                onChange={(e) => {
+                  setDraft((prev) => ({
+                    ...prev,
+                    transCustomDescription: {
+                      ...prev.transCustomDescription,
+                      enabled: e.target.checked,
+                    },
+                  }))
+                  setError(null)
+                }}
+                className="rounded border-gray-300 dark:border-gray-600 text-[#1c4230] focus:ring-[#c9a96e]/40"
+              />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                {TEXT_FIELD.label}
+              </span>
+            </label>
+            {draft.transCustomDescription.enabled && (
+              <div className="pl-6">
+                <input
+                  type="text"
+                  className={inputCls}
+                  value={draft.transCustomDescription.value}
+                  onChange={(e) => {
+                    setDraft((prev) => ({
+                      ...prev,
+                      transCustomDescription: {
+                        ...prev.transCustomDescription,
+                        value: e.target.value,
+                      },
+                    }))
+                    setError(null)
+                  }}
+                  placeholder="Twój opis, notatka…"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
-        {enabledFields.length > 0 && (
+        {(enabledIdFields.length > 0 || draft.transCustomDescription.enabled) && (
           <>
             <div className="border-t border-gray-100 dark:border-gray-800" />
             <div className="space-y-2">
@@ -415,8 +483,8 @@ export default function EditBulkPanel({
   )
 }
 
-function resolveFieldDisplay(
-  key: BulkUpdateField,
+function resolveIdFieldDisplay(
+  key: BulkUpdateIdField,
   value: number | null,
   wallets: Wallet[],
   concerns: Concern[],
