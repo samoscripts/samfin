@@ -1,6 +1,6 @@
 import type { ClassificationItemDraft } from '@/shared/components/classification/ClassificationItemsEditor'
 import type { TransactionTemplate, TransactionTemplatePayload } from '@/shared/api/transactionTemplates'
-import type { BulkUpdateField } from '@/shared/api/transactions'
+import type { BulkUpdateIdField } from '@/shared/api/transactions'
 import type { Direction, Transaction } from '@/shared/types'
 import { isOwnSideLocked, isPartyFieldBulkBlocked } from './partyAssignment'
 
