@@ -41,10 +41,10 @@ class SettlementItemQuery
             SELECT
                 t.id AS transactionId,
                 ti.id AS itemId,
-                t.operation_date AS operationDate,
+                t.trans_date AS operationDate,
                 t.direction AS direction,
                 t.status AS status,
-                t.description AS description,
+                COALESCE(NULLIF(TRIM(t.trans_title), ''), t.trans_description) AS description,
                 pfp.id AS paidFromPartyId,
                 pfp.name AS paidFrom,
                 ptp.id AS paidToPartyId,
@@ -57,14 +57,14 @@ class SettlementItemQuery
             LEFT JOIN party pfp ON pfp.id = t.paid_from_party_id
             LEFT JOIN party ptp ON ptp.id = t.paid_to_party_id
             LEFT JOIN wallet w ON w.id = ti.wallet_id
-            WHERE t.operation_date >= :dateFrom
-              AND t.operation_date <= :dateTo
+            WHERE t.trans_date >= :dateFrom
+              AND t.trans_date <= :dateTo
               AND {$statusFilter}
               AND (
                   t.paid_from_party_id = :settlementPartyId
                   OR t.paid_to_party_id = :settlementPartyId
               )
-            ORDER BY t.operation_date ASC, t.id ASC, ti.id ASC
+            ORDER BY t.trans_date ASC, t.id ASC, ti.id ASC
         SQL;
 
         $rows = $this->em->getConnection()->fetchAllAssociative($sql, [
@@ -122,10 +122,10 @@ class SettlementItemQuery
             SELECT
                 t.id AS transactionId,
                 ti.id AS itemId,
-                t.operation_date AS operationDate,
+                t.trans_date AS operationDate,
                 t.direction AS direction,
                 t.status AS status,
-                t.description AS description,
+                COALESCE(NULLIF(TRIM(t.trans_title), ''), t.trans_description) AS description,
                 pfp.id AS paidFromPartyId,
                 pfp.name AS paidFrom,
                 ptp.id AS paidToPartyId,
@@ -138,13 +138,13 @@ class SettlementItemQuery
             LEFT JOIN party pfp ON pfp.id = t.paid_from_party_id
             LEFT JOIN party ptp ON ptp.id = t.paid_to_party_id
             LEFT JOIN wallet w ON w.id = ti.wallet_id
-            WHERE t.operation_date >= :dateFrom
+            WHERE t.trans_date >= :dateFrom
               AND {$statusFilter}
               AND (
                   t.paid_from_party_id = :settlementPartyId
                   OR t.paid_to_party_id = :settlementPartyId
               )
-            ORDER BY t.operation_date ASC, t.id ASC, ti.id ASC
+            ORDER BY t.trans_date ASC, t.id ASC, ti.id ASC
         SQL;
 
         $rows = $this->em->getConnection()->fetchAllAssociative($sql, [
@@ -191,7 +191,7 @@ class SettlementItemQuery
         $sql = <<<SQL
             SELECT
                 t.id AS transactionId,
-                t.operation_date AS operationDate,
+                t.trans_date AS operationDate,
                 ti.amount_minor AS amountMinor,
                 t.paid_from_party_id AS paidFromPartyId
             FROM transaction_items ti
@@ -200,9 +200,9 @@ class SettlementItemQuery
               AND t.paid_to_party_id = ?
               AND t.paid_from_party_id IN ({$placeholders})
               AND ti.wallet_id = ?
-              AND t.operation_date <= ?
+              AND t.trans_date <= ?
               AND t.paid_from_party_id IS NOT NULL
-            ORDER BY t.operation_date DESC, t.id DESC
+            ORDER BY t.trans_date DESC, t.id DESC
             LIMIT 1
         SQL;
 
