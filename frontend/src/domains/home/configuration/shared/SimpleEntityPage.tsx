@@ -197,7 +197,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
   const [items, setItems]             = useState<T[]>([])
   const [isLoading, setIsLoading]     = useState(true)
   const [editingItem, setEditingItem] = useState<T | null>(null)
-  const [editLoading, setEditLoading] = useState(false)
+  const [editSettled, setEditSettled] = useState(false)
   const [deactivating, setDeactivating] = useState<number | null>(null)
 
   useEffect(() => {
@@ -209,22 +209,25 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
   useEffect(() => {
     if (!isEdit || entityId === null) {
       setEditingItem(null)
+      setEditSettled(false)
       return
     }
 
     const fromList = items.find((i) => i.id === entityId)
     if (fromList) {
       setEditingItem(fromList)
+      setEditSettled(true)
       return
     }
 
     if (!fetchOne) {
       setEditingItem(null)
+      setEditSettled(true)
       return
     }
 
     let cancelled = false
-    setEditLoading(true)
+    setEditSettled(false)
     fetchOne(entityId)
       .then((item) => {
         if (!cancelled) setEditingItem(item)
@@ -233,7 +236,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
         if (!cancelled) setEditingItem(null)
       })
       .finally(() => {
-        if (!cancelled) setEditLoading(false)
+        if (!cancelled) setEditSettled(true)
       })
 
     return () => {
@@ -254,6 +257,8 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
       setDeactivating(null)
     }
   }
+
+  const editHeading = isCreate ? addLabel : editingItem ? editLabel(editingItem) : 'Edycja…'
 
   function handleSaved(saved: T) {
     if (isCreate) {
@@ -279,7 +284,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
         <>
           <ChevronRight size={12} className="shrink-0" />
           <span className="text-gray-600 dark:text-gray-400 font-medium">
-            {isCreate ? addLabel : editLabel(editingItem!)}
+            {editHeading}
           </span>
         </>
       )}
@@ -287,7 +292,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
   )
 
   if (isCreate || isEdit) {
-    if (isEdit && editLoading) {
+    if (isEdit && !editingItem && !editSettled) {
       return (
         <div>
           {breadcrumb}
@@ -313,7 +318,7 @@ export default function SimpleEntityPage<T extends SimpleEntity>({
         <div className="w-full space-y-6">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {isCreate ? addLabel : editLabel(editingItem!)}
+              {editHeading}
             </h2>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

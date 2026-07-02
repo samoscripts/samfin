@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { TrendingUp, TrendingDown, Scale, AlertCircle, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Scale, AlertCircle, ArrowRight } from 'lucide-react'
 import PageHeader from '@/layout/PageHeader'
 import Pill from '@/shared/components/Pill'
+import PeriodNavigator from '@/shared/components/PeriodNavigator'
 import TransactionOperationText from '@/domains/home/transactions/components/TransactionOperationText'
 import { STATUS_PILL } from '@/shared/constants/pillMaps'
 import { STATUS_LABEL_BY_VALUE } from '@/domains/home/transactions/constants/labels'
 import { fetchTransactionStats, fetchTransactions, type TransactionStats } from '@/shared/api/transactions'
 import { Transaction } from '@/shared/types'
 import { formatAmount } from '@/shared/utils/format'
-import { currentMonthParam, monthLabel, shiftMonth } from '@/shared/utils/monthQuery'
+import { currentMonthParam, monthLabel } from '@/shared/utils/monthQuery'
 import {
   parseDashboardSearchParams,
   serializeDashboardSearchParams,
@@ -157,36 +158,15 @@ export default function Dashboard() {
         subtitle={isCurrentMonth ? 'Podsumowanie finansów domowych' : `Okres: ${monthLabel(urlState.month)}`}
       />
 
-      <div className="flex items-center justify-center gap-3 mb-6">
-        <button
-          type="button"
-          onClick={() => setMonth(shiftMonth(urlState.month, -1))}
-          className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Poprzedni miesiąc"
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 min-w-[10rem] text-center">
-          {monthLabel(urlState.month)}
-        </span>
-        <button
-          type="button"
-          onClick={() => setMonth(shiftMonth(urlState.month, 1))}
-          className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Następny miesiąc"
-        >
-          <ChevronRight size={18} />
-        </button>
-        {!isCurrentMonth && (
-          <button
-            type="button"
-            onClick={() => setMonth(currentMonthParam())}
-            className="text-xs font-medium text-[#c9a96e] hover:text-[#d4bc8e] transition-colors"
-          >
-            Bieżący miesiąc
-          </button>
-        )}
-      </div>
+      <PeriodNavigator
+        className="mb-6"
+        monthParam={urlState.month}
+        isCustomRange={false}
+        dateFrom={urlState.dateFrom}
+        dateTo={urlState.dateTo}
+        showAdvanced={false}
+        onMonthChange={setMonth}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6 md:mb-8">
         <StatCard

@@ -12,6 +12,8 @@ export interface AnalyticsReportResponse extends TransactionStats {
 export interface AnalyticsReportParams {
   year?: number
   month?: number
+  dateFrom?: string
+  dateTo?: string
   walletId?: number | string
   concernId?: number | string
   categoryId?: number | string

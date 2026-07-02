@@ -46,6 +46,18 @@ frontend/src/domains/home/reports/
 
 ---
 
+### Nawigacja okresu (UI)
+
+Wspólny komponent [`PeriodNavigator.tsx`](../frontend/src/shared/components/PeriodNavigator.tsx):
+
+- **Domyślnie:** strzałki ← / → między miesiącami + ikona powrotu do bieżącego miesiąca (stały slot — bez przesuwania layoutu).
+- **Panel „Więcej”** (Analizy, Rozliczenia): prawy sidebar (`?panel=period`) z wyborem roku i miesiąca **albo** zakresem dat Od–Do — ten sam wzorzec co filtry transakcji.
+- **Rozliczenia:** preset „Od początku indeksu” w panelu (zakres od `reindexFromDate` do dziś).
+
+Parametry URL bez zmian: `year`+`month` **albo** `dateFrom`+`dateTo` (nie oba naraz). Dashboard używa `month=YYYY-MM`.
+
+---
+
 ## Analizy (MVP)
 
 ### API: `GET /api/reports/analytics`
@@ -54,11 +66,13 @@ Parametry query:
 
 | Parametr | Wymagany | Opis |
 |----------|----------|------|
-| `year` | nie | Rok (domyślnie bieżący) |
-| `month` | nie | Miesiąc 1–12 (domyślnie bieżący) |
+| `year` + `month` | jedna para* | Skrót okresu (domyślnie bieżący miesiąc) |
+| `dateFrom` + `dateTo` | alternatywa* | Dowolny zakres dat |
 | `walletId` | nie | Filtr po portfelu (join na pozycje) |
 | `concernId` | nie | W DTO backendu; brak w UI |
 | `categoryId` | nie | W DTO backendu; brak w UI |
+
+\*Podaj albo `year`+`month`, albo `dateFrom`+`dateTo`.
 
 Odpowiedź (jak `GET /api/transactions/stats` w zakresie miesiąca):
 
@@ -78,9 +92,7 @@ Odpowiedź (jak `GET /api/transactions/stats` w zakresie miesiąca):
 
 Implementacja: `AnalyticsController`, `AnalyticsQuery`, `TransactionRepository::getPeriodStats()`.
 
-Przykład: `/app/raporty/analytics?year=2026&month=6&walletId=2`
-
-Docelowo: filtr zakresu dat z presetem „Miesięczny” (nie w URL).
+Przykład: `/app/raporty/analytics?year=2026&month=6&walletId=2` lub `?dateFrom=2026-01-01&dateTo=2026-06-30`
 
 ---
 
@@ -90,15 +102,28 @@ Raport wylicza sugerowaną kolejną wpłatę Maćka/Basi na podmiot rozliczenia 
 
 Indeks rozliczeń (`settlement_ledger_entry`) jest budowany z pozycji 1:1; stan na dany dzień odczytywany jest z ostatniego wiersza ledgera `operation_date <= dateTo`. Po zmianie transakcji lub konfiguracji ustawiane jest `needsRefresh` — użytkownik odświeża indeks przyciskiem w UI (`POST /refresh`).
 
-### Model A „dopasuj” (sugerowana wpłata)
+### Model B „stan + anchor” (sugerowana wpłata)
+
+Zastępuje wcześniejszy Model A (`base − carry`). Od `reindexFromDate`:
 
 ```
-suggested = baseDeposit − rotation_carry + wallet_balance[osoba] − rotation_prepaid[osoba]
+stan_maciek = Σ_wpłat_maciek − Σ_wpłat_basia
+stan_basia  = −stan_maciek
 ```
 
-(w UI: `max(0, raw)`). Slot rotacji zamyka wpłata `standard_deposit` osoby na kolejce; wpłata poza kolejką **też zamyka bieżący slot** (bez naliczania prepaid w indeksie).
+- **Anchor** (kotwica) = osoba z ujemnym stanem (z tyłu w rotacji); przy remisie Σ przechodzi na drugą osobę względem poprzedniej kotwicy.
+- **Sugerowana wpłata anchor:**
+  ```
+  catchUp = (stan < 0) ? (Σ_druga − Σ_anchor) : baseDeposit   // przy remisie: base
+  suggested = max(0, catchUp + wallet_balance[anchor] − rotation_prepaid[anchor])
+  ```
+- **Podgląd nie-anchor:** `max(0, wallet_balance[osoba] − prepaid)` — bez składnika rotacyjnego.
+- Fakt portfelowy **nie zmienia** anchor (tylko saldo portfela w kwocie sugerowanej).
+- Wpłata rotacyjna aktualizuje Σ i przelicza anchor (również wpłata „poza kolejką”).
 
-`rotation_prepaid` w formule to wyłącznie **Prepaid Maciek/Basia na start** z konfiguracji (od `reindexFromDate`). Transakcje z indeksu **nie zwiększają** prepaid — tylko carry, kolej i salda portfeli.
+`rotation_prepaid` = wyłącznie **Prepaid Maciek/Basia na start** z konfiguracji. Pole `rotation_carry` w ledgerze deprecated (zawsze 0).
+
+Po deploy Modelu B: **obowiązkowy** `POST /refresh` (migracja czyści ledger i ustawia `needsRefresh`).
 
 ### API: `GET /api/reports/settlements`
 
@@ -106,22 +131,25 @@ suggested = baseDeposit − rotation_carry + wallet_balance[osoba] − rotation_
 |----------|----------|------|
 | `year` + `month` | jedna para* | Skrót okresu |
 | `dateFrom` + `dateTo` | alternatywa* | Zakres dat (ma pierwszeństwo w UI gdy oba w URL) |
-| `nextDepositor` | nie | `maciek` \| `basia` — nadpisuje auto z ledgera |
+| `nextDepositor` | nie | **deprecated** — ignorowany; anchor wynika z indeksu |
 | `includePartial` | nie | Uwzględnij `PARTIALLY_CLASSIFIED` (domyślnie false) |
 
 \*Podaj albo `year`+`month`, albo `dateFrom`+`dateTo`.
 
 Odpowiedź (skrót):
 
-- `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net`
-- `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego
-- `nextDeposit` — m.in. `suggestedAmount`, `rotationCarry`, `rotationPrepaid`, `walletBreakdown`, `asOfDate` (ostatni wpis ledgera — **niezależny od zakresu raportu**); `paidInPeriod` dotyczy wybranego okresu
+- `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net` (net w wybranym okresie)
+- `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego w wybranym okresie
+- `rotation` — `anchor`, `baseAmount`, `maciekDepositsTotal`, `basiaDepositsTotal`, `stanMaciek`, `stanBasia`, opcjonalnie `asOfDate` (ostatni wpis ledgera — **niezależny od zakresu raportu**)
+- `personOutlook` — per `maciek` / `basia`: `isAnchor`, `suggestedAmount`, `suggestedAmountRaw`, `catchUpAmount`, `walletNetCumulative` (z indeksu), `walletNetInPeriod`, `rotationPrepaid`, `formulaSummary`, `walletBreakdown`
 - `indexState` — `needsRefresh`, `refreshInProgress`, `lastRefreshedAt`, `lastRefreshStats`
 - `warnings`, `excludedItemsCount`
 
-Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `nextDeposit`.
+**UI raportu (kafelki):** 2× „Wpłata rotacyjna” / „Podgląd” (Maciek/Basia, badge „Wpisuje teraz” u osoby z `isAnchor`) + 2× „Portfele osobiste” (skumulowane + zmiana w okresie). Opis formuły wyłącznie z `formulaSummary` (backend).
 
-Gdy `needsRefresh=true`, szczegóły okresu liczone są na żywo; `nextDeposit` korzysta z legacy `carryOver*` z configu.
+Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `personOutlook`.
+
+Gdy `needsRefresh=true`, `personOutlook` odtwarzany jest replayem `SettlementRotationEngine` od `reindexFromDate` do `dateTo` (ten sam kod co indexer — bez legacy `carryOver*`).
 
 ### API: `POST /api/reports/settlements/refresh`
 
@@ -144,7 +172,7 @@ Pola konfiguracji (per użytkownik, tabela `settlement_config`):
 - **Indeks:** `reindexFromDate`, `openingWalletBalances` (opcjonalnie), `openingRotationPrepaidMaciek`, `openingRotationPrepaidBasia`, `openingNextDepositor`
 - **Deprecated (ignorowane):** `openingRotationCarry` — zawsze 0
 - **Stan indeksu (read-only z API):** `needsRefresh`, `refreshInProgress`, `lastRefreshedAt`, `lastRefreshStats`, `configVersion`
-- **Legacy:** `carryOverMaciek`, `carryOverBasia` — fallback gdy indeks nieaktualny
+- **Legacy:** `carryOverMaciek`, `carryOverBasia` — deprecated, nieużywane w Modelu B
 
 Wymaga skonfigurowania podmiotu rozliczenia i portfela budżetu domowego — inaczej `422`.
 
@@ -160,7 +188,7 @@ backend/src/Home/Report/Settlement/
 ├── Repository/SettlementConfigRepository.php, SettlementItemQuery.php, SettlementLedgerRepository.php
 └── Service/
     ├── SettlementService.php, SettlementConfigService.php
-    ├── SettlementItemClassifier.php, SettlementBalanceEngine.php
+    ├── SettlementItemClassifier.php, SettlementRotationEngine.php, SettlementOutlookBuilder.php
     ├── SettlementIndexerService.php, SettlementIndexStateService.php
 ```
 

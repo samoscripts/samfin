@@ -51,26 +51,28 @@ export interface WalletSettlementGroup {
 
 export type WalletGroupKey = 'maciek' | 'basia' | 'other'
 
-export interface SettlementNextDeposit {
-  person: 'maciek' | 'basia'
+export type PersonKey = 'maciek' | 'basia'
+
+export interface SettlementRotationState {
+  anchor: PersonKey
   baseAmount: number
-  walletNet: number
-  rotationCarry: number
-  rotationPrepaid: number
-  suggestedAmount: number
-  suggestedAmountRaw?: number
-  overpaymentCredit?: number
-  corrections: number
-  carryOver: number
-  dueAmount: number
-  paidInPeriod: number
-  balance: number
-  underpayment: number
-  overpayment: number
-  carryForward: number
-  walletBreakdown?: { walletId: number; balance: number }[]
-  /** Data ostatniego wpisu ledgera (niezależna od zakresu raportu). */
+  maciekDepositsTotal: number
+  basiaDepositsTotal: number
+  stanMaciek: number
+  stanBasia: number
   asOfDate?: string
+}
+
+export interface SettlementPersonOutlook {
+  isAnchor: boolean
+  suggestedAmount: number
+  suggestedAmountRaw: number
+  catchUpAmount: number
+  walletNetCumulative: number
+  walletNetInPeriod: number
+  rotationPrepaid: number
+  formulaSummary: string
+  walletBreakdown: { walletId: number; balance: number }[]
 }
 
 export interface SettlementReportResponse {
@@ -82,13 +84,8 @@ export interface SettlementReportResponse {
     maciek: WalletGroupBucket
     basia: WalletGroupBucket
   }
-  nextDeposit: SettlementNextDeposit
-  balances: Record<string, {
-    walletNet: number
-    carryOver: number
-    paidInPeriod: number
-    walletNetLedger?: number
-  }>
+  rotation: SettlementRotationState
+  personOutlook: Record<PersonKey, SettlementPersonOutlook>
   warnings: string[]
   excludedItemsCount: number
   indexState?: {

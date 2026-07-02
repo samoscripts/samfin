@@ -61,8 +61,14 @@ class SettlementLedgerEntry
     #[ORM\Column(name: 'rotation_prepaid_basia_minor')]
     private int $rotationPrepaidBasiaMinor = 0;
 
-    #[ORM\Column(name: 'next_depositor', length: 10)]
-    private string $nextDepositor = SettlementConfig::DEPOSITOR_MACIEK;
+    #[ORM\Column(name: 'maciek_deposits_total_minor')]
+    private int $maciekDepositsTotalMinor = 0;
+
+    #[ORM\Column(name: 'basia_deposits_total_minor')]
+    private int $basiaDepositsTotalMinor = 0;
+
+    #[ORM\Column(name: 'anchor', length: 10)]
+    private string $anchor = SettlementConfig::DEPOSITOR_MACIEK;
 
     #[ORM\Column(name: 'suggested_amount_minor')]
     private int $suggestedAmountMinor = 0;
@@ -117,8 +123,20 @@ class SettlementLedgerEntry
     public function getRotationPrepaidBasiaMinor(): int { return $this->rotationPrepaidBasiaMinor; }
     public function setRotationPrepaidBasiaMinor(int $v): static { $this->rotationPrepaidBasiaMinor = $v; return $this; }
 
-    public function getNextDepositor(): string { return $this->nextDepositor; }
-    public function setNextDepositor(string $v): static { $this->nextDepositor = $v; return $this; }
+    public function getBasiaDepositsTotalMinor(): int { return $this->basiaDepositsTotalMinor; }
+    public function setBasiaDepositsTotalMinor(int $v): static { $this->basiaDepositsTotalMinor = $v; return $this; }
+
+    public function getMaciekDepositsTotalMinor(): int { return $this->maciekDepositsTotalMinor; }
+    public function setMaciekDepositsTotalMinor(int $v): static { $this->maciekDepositsTotalMinor = $v; return $this; }
+
+    public function getAnchor(): string { return $this->anchor; }
+    public function setAnchor(string $v): static { $this->anchor = $v; return $this; }
+
+    /** @deprecated użyj getAnchor() */
+    public function getNextDepositor(): string { return $this->anchor; }
+
+    /** @deprecated użyj setAnchor() */
+    public function setNextDepositor(string $v): static { return $this->setAnchor($v); }
 
     public function getSuggestedAmountMinor(): int { return $this->suggestedAmountMinor; }
     public function setSuggestedAmountMinor(int $v): static { $this->suggestedAmountMinor = $v; return $this; }

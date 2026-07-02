@@ -102,10 +102,12 @@ class SettlementIndexerService
                 $entry->setAmountMinor($fact['amountMinor']);
                 $entry->setWalletDeltaMinor($fact['walletDeltaMinor']);
                 $entry->setWalletBalancesJson($snapshot['walletBalancesMinor']);
-                $entry->setRotationCarryMinor($snapshot['rotationCarryMinor']);
+                $entry->setMaciekDepositsTotalMinor($snapshot['maciekDepositsTotalMinor']);
+                $entry->setBasiaDepositsTotalMinor($snapshot['basiaDepositsTotalMinor']);
+                $entry->setRotationCarryMinor(0);
                 $entry->setRotationPrepaidMaciekMinor($snapshot['rotationPrepaidMaciekMinor']);
                 $entry->setRotationPrepaidBasiaMinor($snapshot['rotationPrepaidBasiaMinor']);
-                $entry->setNextDepositor($snapshot['nextDepositor']);
+                $entry->setAnchor($snapshot['anchor']);
                 $entry->setSuggestedAmountMinor($snapshot['suggestedAmountMinor']);
                 $entry->setConfigVersion($configVersion);
                 $entry->setCreatedAt($now);
@@ -145,18 +147,17 @@ class SettlementIndexerService
         }
     }
 
-    private function buildInitialEngine(SettlementConfig $config): SettlementBalanceEngine
+    private function buildInitialEngine(SettlementConfig $config): SettlementRotationEngine
     {
         $openingBalances = $config->getOpeningWalletBalancesJson();
 
-        return new SettlementBalanceEngine(
+        return new SettlementRotationEngine(
             $config->getBaseDepositAmountMinor(),
             $config->getWalletSettlementOwner(),
             $config->getOpeningNextDepositor(),
-            0,
             $config->getOpeningRotationPrepaidMaciekMinor(),
             $config->getOpeningRotationPrepaidBasiaMinor(),
-            $openingBalances,
+            $openingBalances ?? [],
         );
     }
 }

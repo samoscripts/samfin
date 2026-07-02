@@ -1,35 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { Loader2, TrendingDown, TrendingUp, Scale, List } from 'lucide-react'
 import { fetchAnalyticsReport, type AnalyticsReportResponse } from '@/shared/api/analytics'
 import { fetchWallets, type Wallet } from '@/shared/api/wallets'
-import { buildSearchParams, parsePositiveInt } from '@/shared/utils/urlQuery'
-import { formatAmount } from '@/shared/utils/format'
+import { useReportPeriodPanel } from '@/domains/home/reports/hooks/useReportPeriodPanel'
+import PeriodNavigator from '@/shared/components/PeriodNavigator'
+import PeriodSidebar from '@/shared/components/PeriodSidebar'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
-
-const MONTH_NAMES = [
-  'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-  'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
-]
-
-function currentYearMonth() {
-  const now = new Date()
-  return { year: now.getFullYear(), month: now.getMonth() + 1 }
-}
+import { formatAmount } from '@/shared/utils/format'
+import {
+  currentYearMonth,
+  parseReportPeriod,
+  paramToYearMonth,
+  serializeReportMonthPeriod,
+  serializeReportRangePeriod,
+  withReportPeriodPanel,
+} from '@/shared/utils/periodUrl'
 
 export default function AnalyticsReport() {
+  const periodTriggerRef = useRef<HTMLButtonElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const defaults = currentYearMonth()
-
-  const year = useMemo(
-    () => parsePositiveInt(searchParams.get('year')) ?? defaults.year,
-    [searchParams, defaults.year],
-  )
-  const month = useMemo(() => {
-    const m = parsePositiveInt(searchParams.get('month')) ?? defaults.month
-    return m >= 1 && m <= 12 ? m : defaults.month
-  }, [searchParams, defaults.month])
-
+  const { open: periodPanelOpen, openPanel, closePanel, portalRoot } = useReportPeriodPanel()
+  const defaults = useMemo(() => currentYearMonth(), [])
+  const period = useMemo(() => parseReportPeriod(searchParams, defaults), [searchParams, defaults])
   const walletId = searchParams.get('walletId') ?? ''
 
   const [wallets, setWallets] = useState<Wallet[]>([])
@@ -37,19 +31,59 @@ export default function AnalyticsReport() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const updateParams = useCallback(
-    (patch: { year?: number; month?: number; walletId?: string }) => {
-      const nextYear = patch.year ?? year
-      const nextMonth = patch.month ?? month
-      const nextWallet = patch.walletId !== undefined ? patch.walletId : walletId
-      const params = buildSearchParams({
-        year: nextYear !== defaults.year ? nextYear : undefined,
-        month: nextMonth !== defaults.month ? nextMonth : undefined,
-        walletId: nextWallet || undefined,
-      })
+  const walletExtra = useMemo(
+    () => ({ walletId: walletId || undefined }),
+    [walletId],
+  )
+
+  const handleMonthChange = useCallback(
+    (monthParam: string) => {
+      const ym = paramToYearMonth(monthParam)
+      if (!ym) return
+      setSearchParams(
+        serializeReportMonthPeriod(ym.year, ym.month, defaults, walletExtra),
+        { replace: true },
+      )
+    },
+    [defaults, setSearchParams, walletExtra],
+  )
+
+  const handleApplyMonthPick = useCallback(
+    (year: number, month: number) => {
+      const params = withReportPeriodPanel(
+        serializeReportMonthPeriod(year, month, defaults, walletExtra),
+        periodPanelOpen,
+      )
       setSearchParams(params, { replace: true })
     },
-    [year, month, walletId, defaults.year, defaults.month, setSearchParams],
+    [defaults, setSearchParams, walletExtra, periodPanelOpen],
+  )
+
+  const handleRangeChange = useCallback(
+    (dateFrom: string, dateTo: string) => {
+      const params = withReportPeriodPanel(
+        serializeReportRangePeriod(dateFrom, dateTo, walletExtra),
+        periodPanelOpen,
+      )
+      setSearchParams(params, { replace: true })
+    },
+    [setSearchParams, walletExtra, periodPanelOpen],
+  )
+
+  const updateWallet = useCallback(
+    (id: string | number | null) => {
+      const nextWallet = id == null ? '' : String(id)
+      const params = period.isCustomRange
+        ? serializeReportRangePeriod(period.dateFrom, period.dateTo, {
+            walletId: nextWallet || undefined,
+          })
+        : serializeReportMonthPeriod(period.year, period.month, defaults, {
+            walletId: nextWallet || undefined,
+          })
+      if (periodPanelOpen) params.set('panel', 'period')
+      setSearchParams(params, { replace: true })
+    },
+    [period, defaults, setSearchParams, periodPanelOpen],
   )
 
   useEffect(() => {
@@ -60,11 +94,20 @@ export default function AnalyticsReport() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchAnalyticsReport({
-      year,
-      month,
-      walletId: walletId || undefined,
-    })
+
+    const params = period.isCustomRange
+      ? {
+          dateFrom: period.dateFrom,
+          dateTo: period.dateTo,
+          walletId: walletId || undefined,
+        }
+      : {
+          year: period.year,
+          month: period.month,
+          walletId: walletId || undefined,
+        }
+
+    fetchAnalyticsReport(params)
       .then((resp) => {
         if (!cancelled) setData(resp)
       })
@@ -80,53 +123,36 @@ export default function AnalyticsReport() {
     return () => {
       cancelled = true
     }
-  }, [year, month, walletId])
-
-  const years = useMemo(() => {
-    const y = new Date().getFullYear()
-    return Array.from({ length: 6 }, (_, i) => y - i)
-  }, [])
+  }, [period, walletId])
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
-        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
-          Rok
-          <select
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-            value={year}
-            onChange={(e) => updateParams({ year: Number(e.target.value) })}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
-          Miesiąc
-          <select
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-            value={month}
-            onChange={(e) => updateParams({ month: Number(e.target.value) })}
-          >
-            {MONTH_NAMES.map((name, idx) => (
-              <option key={name} value={idx + 1}>{name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1 min-w-[200px]">
-          Portfel
-          <DictionarySelect
-            items={wallets}
-            value={walletId}
-            onChange={(id) => updateParams({ walletId: id == null ? '' : String(id) })}
-            emptyLabel="Wszystkie portfele"
-            valueType="string"
+    <>
+      <div className="space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
+          <PeriodNavigator
+            monthParam={period.monthParam}
+            isCustomRange={period.isCustomRange}
+            dateFrom={period.dateFrom}
+            dateTo={period.dateTo}
+            showAdvanced
+            advancedOpen={periodPanelOpen}
+            onOpenAdvanced={openPanel}
+            advancedButtonRef={periodTriggerRef}
+            onMonthChange={handleMonthChange}
           />
-        </label>
-      </div>
+          <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1 min-w-[200px] shrink-0">
+            Portfel
+            <DictionarySelect
+              items={wallets}
+              value={walletId}
+              onChange={updateWallet}
+              emptyLabel="Wszystkie portfele"
+              valueType="string"
+            />
+          </label>
+        </div>
 
-      {loading ? (
+        {loading ? (
         <div className="flex justify-center py-16 text-gray-400">
           <Loader2 size={24} className="animate-spin" />
         </div>
@@ -173,7 +199,25 @@ export default function AnalyticsReport() {
           </div>
         </>
       ) : null}
-    </div>
+      </div>
+
+      {portalRoot &&
+        createPortal(
+          <PeriodSidebar
+            open={periodPanelOpen}
+            onClose={closePanel}
+            year={period.year}
+            month={period.month}
+            dateFrom={period.dateFrom}
+            dateTo={period.dateTo}
+            isCustomRange={period.isCustomRange}
+            onApplyMonth={handleApplyMonthPick}
+            onApplyRange={handleRangeChange}
+            returnFocusRef={periodTriggerRef}
+          />,
+          portalRoot,
+        )}
+    </>
   )
 }
 

@@ -4,10 +4,8 @@ namespace App\Home\Report\Settlement\Service;
 
 use App\Home\Report\Settlement\DTO\SettlementQuery;
 use App\Home\Report\Settlement\Entity\SettlementConfig;
-use App\Home\Report\Settlement\Entity\SettlementLedgerEntry;
 use App\Home\Report\Settlement\Repository\SettlementItemQuery;
 use App\Home\Report\Settlement\Repository\SettlementLedgerRepository;
-use App\Identity\Entity\User;
 
 class SettlementService
 {
@@ -15,6 +13,7 @@ class SettlementService
         private SettlementItemQuery $itemQuery,
         private SettlementLedgerRepository $ledgerRepository,
         private SettlementItemClassifier $classifier,
+        private SettlementOutlookBuilder $outlookBuilder,
     ) {}
 
     /**
@@ -107,42 +106,22 @@ class SettlementService
         $useLedger = $user !== null && !$config->isNeedsRefresh();
 
         if ($useLedger) {
-            $nextDeposit = $this->buildNextDepositFromLedger(
-                $config,
-                $query,
-                $standardDepositsMinor,
-                $baseMinor,
-            );
+            $outlook = $this->buildPersonOutlookFromLedger($config, $walletGroups, $baseMinor);
         } else {
-            $nextDeposit = $this->buildNextDepositLegacy(
-                $query,
+            $engine = $this->replayEngineToDate(
                 $config,
-                $walletGroups,
-                $standardDepositsMinor,
+                $query->dateTo,
                 $settlementPartyId,
                 $homeBudgetId,
                 $maciekSources,
                 $basiaSources,
-                $baseMinor,
             );
-        }
-
-        $balances = [];
-        foreach (['maciek', 'basia'] as $person) {
-            $balances[$person] = [
-                'walletNet'      => $walletGroups[$person]['net'],
-                'carryOver'      => 0,
-                'paidInPeriod'   => $standardDeposits[$person]['total'],
-            ];
-        }
-
-        if ($useLedger && $user !== null) {
-            $reindexFrom = $config->getReindexFromDate()?->format('Y-m-d');
-            $ledgerEntry = $this->ledgerRepository->findLatestEntry($user, $reindexFrom);
-            if ($ledgerEntry !== null) {
-                $balances['maciek']['walletNetLedger'] = $this->walletNetFromLedger($ledgerEntry, 'maciek', $walletOwners);
-                $balances['basia']['walletNetLedger']  = $this->walletNetFromLedger($ledgerEntry, 'basia', $walletOwners);
-            }
+            $outlook = $this->outlookBuilder->build(
+                $engine,
+                $walletGroups,
+                $baseMinor,
+                $walletOwners,
+            );
         }
 
         return [
@@ -151,8 +130,8 @@ class SettlementService
             'config'             => $config->toApiArray(),
             'walletGroups'       => $walletGroups,
             'standardDeposits'   => $standardDeposits,
-            'nextDeposit'        => $nextDeposit,
-            'balances'           => $balances,
+            'rotation'           => $outlook['rotation'],
+            'personOutlook'      => $outlook['personOutlook'],
             'warnings'           => array_values(array_unique($warnings)),
             'excludedItemsCount' => $excludedCount,
             'indexState'         => [
@@ -165,241 +144,98 @@ class SettlementService
     }
 
     /**
-     * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $standardDepositsMinor
+     * @param array<string, array{expenses: array{total: float, items: list}, incomes: array{total: float, items: list}, net: float}> $walletGroups
      *
-     * @return array<string, mixed>
+     * @return array{rotation: array<string, mixed>, personOutlook: array<string, array<string, mixed>>}
      */
-    private function buildNextDepositFromLedger(
+    private function buildPersonOutlookFromLedger(
         SettlementConfig $config,
-        SettlementQuery $query,
-        array $standardDepositsMinor,
+        array $walletGroups,
         int $baseMinor,
     ): array {
         $user = $config->getUser();
         $reindexFrom = $config->getReindexFromDate()?->format('Y-m-d');
         $entry = $this->ledgerRepository->findLatestEntry($user, $reindexFrom);
+        $walletOwners = $config->getWalletSettlementOwner();
 
         if ($entry === null) {
-            return $this->buildNextDepositFromOpening($config, $query, $standardDepositsMinor, $baseMinor);
+            $engine = $this->buildEngineFromConfig($config);
+
+            return $this->outlookBuilder->build($engine, $walletGroups, $baseMinor, $walletOwners);
         }
 
-        $engine = SettlementBalanceEngine::fromLedgerRow(
+        $engine = SettlementRotationEngine::fromLedgerRow(
             [
-                'wallet_balances_json'           => $entry->getWalletBalancesJson(),
-                'rotation_carry_minor'           => $entry->getRotationCarryMinor(),
-                'rotation_prepaid_maciek_minor'  => $entry->getRotationPrepaidMaciekMinor(),
-                'rotation_prepaid_basia_minor'   => $entry->getRotationPrepaidBasiaMinor(),
-                'next_depositor'                 => $entry->getNextDepositor(),
+                'wallet_balances_json'          => $entry->getWalletBalancesJson(),
+                'maciek_deposits_total_minor'   => $entry->getMaciekDepositsTotalMinor(),
+                'basia_deposits_total_minor'    => $entry->getBasiaDepositsTotalMinor(),
+                'anchor'                        => $entry->getAnchor(),
+                'rotation_prepaid_maciek_minor' => $entry->getRotationPrepaidMaciekMinor(),
+                'rotation_prepaid_basia_minor'  => $entry->getRotationPrepaidBasiaMinor(),
             ],
             $baseMinor,
-            $config->getWalletSettlementOwner(),
+            $walletOwners,
         );
 
-        $person = $query->nextDepositor ?? $engine->getNextDepositor();
-        $walletNetMinor = $engine->walletBalanceForPerson($person);
-        $prepaidMinor   = $person === SettlementConfig::DEPOSITOR_MACIEK
-            ? $engine->getRotationPrepaidMaciekMinor()
-            : $engine->getRotationPrepaidBasiaMinor();
-        $suggestedRaw   = $baseMinor - $engine->getRotationCarryMinor() + $walletNetMinor - $prepaidMinor;
-        $suggestedMinor = max(0, $suggestedRaw);
-        $paidMinor      = $standardDepositsMinor[$person]['total'];
-
-        $result = $this->formatNextDeposit(
-            $person,
+        return $this->outlookBuilder->build(
+            $engine,
+            $walletGroups,
             $baseMinor,
-            $walletNetMinor,
-            $engine->getRotationCarryMinor(),
-            $prepaidMinor,
-            $suggestedMinor,
-            $suggestedRaw,
-            $paidMinor,
-            $engine->getWalletBalancesMinor(),
-            $config->getWalletSettlementOwner(),
+            $walletOwners,
+            $entry->getOperationDate()->format('Y-m-d'),
         );
-        $result['asOfDate'] = $entry->getOperationDate()->format('Y-m-d');
-
-        return $result;
     }
 
-    /**
-     * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $standardDepositsMinor
-     *
-     * @return array<string, mixed>
-     */
-    private function buildNextDepositFromOpening(
-        SettlementConfig $config,
-        SettlementQuery $query,
-        array $standardDepositsMinor,
-        int $baseMinor,
-    ): array {
-        $engine = new SettlementBalanceEngine(
-            $baseMinor,
+    private function buildEngineFromConfig(SettlementConfig $config): SettlementRotationEngine
+    {
+        return new SettlementRotationEngine(
+            $config->getBaseDepositAmountMinor(),
             $config->getWalletSettlementOwner(),
             $config->getOpeningNextDepositor(),
-            0,
             $config->getOpeningRotationPrepaidMaciekMinor(),
             $config->getOpeningRotationPrepaidBasiaMinor(),
-            $config->getOpeningWalletBalancesJson(),
-        );
-
-        $person = $query->nextDepositor ?? $engine->getNextDepositor();
-        $walletNetMinor = $engine->walletBalanceForPerson($person);
-        $prepaidMinor   = $person === SettlementConfig::DEPOSITOR_MACIEK
-            ? $engine->getRotationPrepaidMaciekMinor()
-            : $engine->getRotationPrepaidBasiaMinor();
-        $suggestedRaw   = $baseMinor - $engine->getRotationCarryMinor() + $walletNetMinor - $prepaidMinor;
-        $suggestedMinor = max(0, $suggestedRaw);
-        $paidMinor      = $standardDepositsMinor[$person]['total'];
-
-        return $this->formatNextDeposit(
-            $person,
-            $baseMinor,
-            $walletNetMinor,
-            $engine->getRotationCarryMinor(),
-            $prepaidMinor,
-            $suggestedMinor,
-            $suggestedRaw,
-            $paidMinor,
-            $engine->getWalletBalancesMinor(),
-            $config->getWalletSettlementOwner(),
+            $config->getOpeningWalletBalancesJson() ?? [],
         );
     }
 
-    /**
-     * @param array<string, int> $walletBalancesMinor
-     * @param array<string, string> $walletOwners
-     *
-     * @return array<string, mixed>
-     */
-    private function formatNextDeposit(
-        string $person,
-        int $baseMinor,
-        int $walletNetMinor,
-        int $rotationCarryMinor,
-        int $prepaidMinor,
-        int $suggestedMinor,
-        int $suggestedRawMinor,
-        int $paidMinor,
-        array $walletBalancesMinor,
-        array $walletOwners,
-    ): array {
-        $balanceMinor = $suggestedMinor - $paidMinor;
-
-        return [
-            'person'            => $person,
-            'baseAmount'        => round($baseMinor / 100, 2),
-            'walletNet'         => round($walletNetMinor / 100, 2),
-            'rotationCarry'     => round($rotationCarryMinor / 100, 2),
-            'rotationPrepaid'   => round($prepaidMinor / 100, 2),
-            'suggestedAmount'   => round($suggestedMinor / 100, 2),
-            'suggestedAmountRaw'=> round($suggestedRawMinor / 100, 2),
-            'overpaymentCredit' => round(max(0, -$suggestedRawMinor) / 100, 2),
-            'corrections'       => round($walletNetMinor / 100, 2),
-            'carryOver'         => round($rotationCarryMinor / 100, 2),
-            'dueAmount'         => round($suggestedMinor / 100, 2),
-            'paidInPeriod'      => round($paidMinor / 100, 2),
-            'balance'           => round($balanceMinor / 100, 2),
-            'underpayment'      => round(max(0, $balanceMinor) / 100, 2),
-            'overpayment'       => round(max(0, -$balanceMinor) / 100, 2),
-            'carryForward'      => round(max(0, $balanceMinor) / 100, 2),
-            'walletBreakdown'   => $this->walletBreakdownForPerson($walletBalancesMinor, $walletOwners, $person),
-        ];
-    }
-
-    /**
-     * @param array<string, int> $walletBalancesMinor
-     * @param array<string, string> $walletOwners
-     *
-     * @return list<array{walletId: int, balance: float}>
-     */
-    private function walletBreakdownForPerson(array $walletBalancesMinor, array $walletOwners, string $person): array
-    {
-        $result = [];
-        foreach ($walletBalancesMinor as $walletId => $balanceMinor) {
-            if (($walletOwners[$walletId] ?? null) !== $person) {
-                continue;
-            }
-            if ($balanceMinor === 0) {
-                continue;
-            }
-            $result[] = [
-                'walletId' => (int) $walletId,
-                'balance'  => round($balanceMinor / 100, 2),
-            ];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<string, string> $walletOwners
-     */
-    private function walletNetFromLedger(SettlementLedgerEntry $entry, string $person, array $walletOwners): float
-    {
-        $sum = 0;
-        foreach ($entry->getWalletBalancesJson() as $walletId => $balance) {
-            if (($walletOwners[$walletId] ?? null) === $person) {
-                $sum += (int) $balance;
-            }
-        }
-
-        return round($sum / 100, 2);
-    }
-
-    /**
-     * @param array<string, array{expenses: array{total: float, items: list}, incomes: array{total: float, items: list}, net: float}> $walletGroups
-     * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $standardDepositsMinor
-     *
-     * @return array<string, mixed>
-     */
-    private function buildNextDepositLegacy(
-        SettlementQuery $query,
+    private function replayEngineToDate(
         SettlementConfig $config,
-        array $walletGroups,
-        array $standardDepositsMinor,
+        string $dateTo,
         int $settlementPartyId,
         int $homeBudgetId,
         array $maciekSources,
         array $basiaSources,
-        int $baseMinor,
-    ): array {
-        $nextDepositor = $query->nextDepositor ?? $this->resolveNextDepositor(
-            $query->dateTo,
+    ): SettlementRotationEngine {
+        $engine = $this->buildEngineFromConfig($config);
+        $reindexFrom = $config->getReindexFromDate()?->format('Y-m-d') ?? '2000-01-01';
+        $walletOwners = $config->getWalletSettlementOwner();
+
+        $items = $this->itemQuery->fetchItemsFromDate(
+            $reindexFrom,
             $settlementPartyId,
-            $homeBudgetId,
-            $maciekSources,
-            $basiaSources,
-            $config->getDefaultNextDepositor(),
+            false,
         );
 
-        $carryOverMaciek = $config->getCarryOverMaciekMinor();
-        $carryOverBasia  = $config->getCarryOverBasiaMinor();
+        foreach ($items as $item) {
+            if ($item['operationDate'] > $dateTo) {
+                break;
+            }
 
-        $personNetMinor   = (int) round($walletGroups[$nextDepositor]['net'] * 100);
-        $carryOver        = $nextDepositor === 'maciek' ? $carryOverMaciek : $carryOverBasia;
-        $dueMinor         = $baseMinor + $personNetMinor + $carryOver;
-        $paidMinor        = $standardDepositsMinor[$nextDepositor]['total'];
-        $balanceMinor     = $dueMinor - $paidMinor;
+            $fact = $this->classifier->classifyFact(
+                $item,
+                $settlementPartyId,
+                $homeBudgetId,
+                $maciekSources,
+                $basiaSources,
+                $walletOwners,
+            );
 
-        return [
-            'person'            => $nextDepositor,
-            'baseAmount'        => round($baseMinor / 100, 2),
-            'walletNet'         => round($personNetMinor / 100, 2),
-            'rotationCarry'     => round($carryOver / 100, 2),
-            'rotationPrepaid'   => 0.0,
-            'suggestedAmount'   => round($dueMinor / 100, 2),
-            'suggestedAmountRaw'=> round($dueMinor / 100, 2),
-            'overpaymentCredit' => 0.0,
-            'corrections'       => round($personNetMinor / 100, 2),
-            'carryOver'         => round($carryOver / 100, 2),
-            'dueAmount'         => round($dueMinor / 100, 2),
-            'paidInPeriod'      => round($paidMinor / 100, 2),
-            'balance'           => round($balanceMinor / 100, 2),
-            'underpayment'      => round(max(0, $balanceMinor) / 100, 2),
-            'overpayment'       => round(max(0, -$balanceMinor) / 100, 2),
-            'carryForward'      => round(max(0, $balanceMinor) / 100, 2),
-            'walletBreakdown'   => [],
-        ];
+            if ($fact !== null) {
+                $engine->applyFact($fact);
+            }
+        }
+
+        return $engine;
     }
 
     /** @return array{expenses: array{total: int, items: list}, incomes: array{total: int, items: list}} */
@@ -461,31 +297,6 @@ class SettlementService
         }
 
         return 'other';
-    }
-
-    private function resolveNextDepositor(
-        string $dateTo,
-        int $settlementPartyId,
-        int $homeBudgetId,
-        array $maciekSources,
-        array $basiaSources,
-        string $default,
-    ): string {
-        $last = $this->itemQuery->findLastStandardDeposit(
-            $dateTo,
-            $settlementPartyId,
-            $homeBudgetId,
-            $maciekSources,
-            $basiaSources,
-        );
-
-        if ($last === null) {
-            return $default;
-        }
-
-        return $last['person'] === 'maciek'
-            ? SettlementConfig::DEPOSITOR_BASIA
-            : SettlementConfig::DEPOSITOR_MACIEK;
     }
 
     /**

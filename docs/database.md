@@ -211,6 +211,7 @@ Historia: do 2026-06 jeden token w `app_user.api_token` (usunięty w migracji `V
 | `20260705120000` | Multi-token auth: `user_api_token`, migracja z `app_user.api_token` |
 | `20260706120000` | Repair: rename `common_account_settlement_config` → `settlement_config`; ledger + kolumny indeksu jeśli brak |
 | `20260707120000` | `user_category_pick_event` — log wyborów kategorii (najczęściej wybierane, okno 90 dni) |
+| `20260710120000` | `settlement_ledger_entry`: `maciek_deposits_total_minor`, `basia_deposits_total_minor`; rename `next_depositor`→`anchor`; TRUNCATE ledger + `needs_refresh` (Model B rotacji) |
 
 ## Zapytania diagnostyczne (tylko SELECT)
 

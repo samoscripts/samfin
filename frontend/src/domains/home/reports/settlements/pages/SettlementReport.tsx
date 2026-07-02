@@ -1,21 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, Loader2, Wallet, ArrowDownLeft, ArrowUpRight, RefreshCw } from 'lucide-react'
+import { AlertTriangle, ArrowRightToLine, Loader2, Wallet, RefreshCw } from 'lucide-react'
 import {
   fetchSettlementReport,
   refreshSettlementIndex,
   type SettlementReportResponse,
   type SettlementItemRef,
+  type SettlementPersonOutlook,
+  type PersonKey,
   type WalletGroupKey,
   type WalletSettlementGroup,
 } from '@/shared/api/settlements'
-import { buildSearchParams, parsePositiveInt } from '@/shared/utils/urlQuery'
+import { useReportPeriodPanel } from '@/domains/home/reports/hooks/useReportPeriodPanel'
+import PeriodNavigator from '@/shared/components/PeriodNavigator'
+import PeriodSidebar from '@/shared/components/PeriodSidebar'
 import { formatAmount } from '@/shared/utils/format'
-
-const MONTH_NAMES = [
-  'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-  'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
-]
+import {
+  currentYearMonth,
+  parseReportPeriod,
+  paramToYearMonth,
+  serializeReportMonthPeriod,
+  serializeReportRangePeriod,
+  todayIsoDate,
+  withReportPeriodPanel,
+} from '@/shared/utils/periodUrl'
 
 const PERSON_LABELS: Record<string, string> = {
   maciek: 'Maciek',
@@ -28,42 +37,46 @@ const WALLET_GROUP_LABELS: Record<WalletGroupKey, string> = {
   other: 'Inne',
 }
 
-function currentYearMonth() {
-  const now = new Date()
-  return { year: now.getFullYear(), month: now.getMonth() + 1 }
+type PersonTheme = {
+  card: string
+  cardQueue: string
+  icon: string
+  label: string
+  badge: string
+  badgeDot: string
+  section: string
 }
 
-function monthRange(year: number, month: number) {
-  const mm = String(month).padStart(2, '0')
-  const lastDay = new Date(year, month, 0).getDate()
-  return {
-    dateFrom: `${year}-${mm}-01`,
-    dateTo: `${year}-${mm}-${String(lastDay).padStart(2, '0')}`,
-  }
+const PERSON_THEMES: Record<PersonKey, PersonTheme> = {
+  maciek: {
+    card: 'bg-[#163526]/5 dark:bg-[#163526]/15 border-[#163526]/20 dark:border-[#163526]/35',
+    cardQueue: 'ring-1 ring-[#163526]/30 dark:ring-emerald-500/40',
+    icon: 'text-[#1a472a] dark:text-emerald-400',
+    label: 'text-[#163526] dark:text-emerald-300/90',
+    badge: 'bg-[#1a472a] text-white dark:bg-[#163526]',
+    badgeDot: 'bg-emerald-500',
+    section: 'bg-[#163526]/[0.03] dark:bg-[#163526]/10 border-[#163526]/15 dark:border-[#163526]/30',
+  },
+  basia: {
+    card: 'bg-[#c9a96e]/8 dark:bg-[#c9a96e]/10 border-[#c9a96e]/35 dark:border-[#c9a96e]/30',
+    cardQueue: 'ring-1 ring-[#c9a96e]/45 dark:ring-[#c9a96e]/50',
+    icon: 'text-[#8a7340] dark:text-[#c9a96e]',
+    label: 'text-[#7a6340] dark:text-[#c9a96e]',
+    badge: 'bg-[#c9a96e] text-white',
+    badgeDot: 'bg-[#c9a96e]',
+    section: 'bg-[#c9a96e]/5 dark:bg-[#c9a96e]/8 border-[#c9a96e]/25 dark:border-[#c9a96e]/22',
+  },
 }
+
+const OTHER_SECTION_THEME = 'bg-gray-50/50 dark:bg-gray-900/60 border-gray-200 dark:border-gray-700'
+
 
 export default function SettlementReport() {
+  const periodTriggerRef = useRef<HTMLButtonElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const defaults = currentYearMonth()
-
-  const year = useMemo(
-    () => parsePositiveInt(searchParams.get('year')) ?? defaults.year,
-    [searchParams, defaults.year],
-  )
-  const month = useMemo(() => {
-    const m = parsePositiveInt(searchParams.get('month')) ?? defaults.month
-    return m >= 1 && m <= 12 ? m : defaults.month
-  }, [searchParams, defaults.month])
-
-  const dateFromParam = searchParams.get('dateFrom')
-  const dateToParam = searchParams.get('dateTo')
-  const isCustomRange = Boolean(dateFromParam && dateToParam)
-  const period = useMemo(() => {
-    if (isCustomRange) {
-      return { dateFrom: dateFromParam!, dateTo: dateToParam! }
-    }
-    return monthRange(year, month)
-  }, [isCustomRange, dateFromParam, dateToParam, year, month])
+  const { open: periodPanelOpen, openPanel, closePanel, portalRoot } = useReportPeriodPanel()
+  const defaults = useMemo(() => currentYearMonth(), [])
+  const period = useMemo(() => parseReportPeriod(searchParams, defaults), [searchParams, defaults])
 
   const [data, setData] = useState<SettlementReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -78,51 +91,50 @@ export default function SettlementReport() {
     })
   }, [period.dateFrom, period.dateTo])
 
-  const updateMonthParams = useCallback(
-    (patch: { year?: number; month?: number }) => {
-      const nextYear = patch.year ?? year
-      const nextMonth = patch.month ?? month
-      const params = buildSearchParams({
-        year: nextYear !== defaults.year ? nextYear : undefined,
-        month: nextMonth !== defaults.month ? nextMonth : undefined,
-      })
-      // Miesiąc/rok nadpisują jawny zakres dat w URL.
-      params.delete('dateFrom')
-      params.delete('dateTo')
-      setSearchParams(params, { replace: true })
+  const handleMonthChange = useCallback(
+    (monthParam: string) => {
+      const ym = paramToYearMonth(monthParam)
+      if (!ym) return
+      setSearchParams(
+        serializeReportMonthPeriod(ym.year, ym.month, defaults),
+        { replace: true },
+      )
     },
-    [year, month, defaults.year, defaults.month, setSearchParams],
+    [defaults, setSearchParams],
   )
 
-  const updateDateRange = useCallback(
-    (patch: { dateFrom?: string; dateTo?: string }) => {
-      const nextFrom = patch.dateFrom ?? period.dateFrom
-      const nextTo = patch.dateTo ?? period.dateTo
-      if (nextFrom > nextTo) {
-        return
-      }
-      const params = buildSearchParams({
-        dateFrom: nextFrom,
-        dateTo: nextTo,
-      })
+  const handleApplyMonthPick = useCallback(
+    (year: number, month: number) => {
+      const params = withReportPeriodPanel(
+        serializeReportMonthPeriod(year, month, defaults),
+        periodPanelOpen,
+      )
       setSearchParams(params, { replace: true })
     },
-    [period.dateFrom, period.dateTo, setSearchParams],
+    [defaults, setSearchParams, periodPanelOpen],
   )
 
-  const resetToMonthRange = useCallback(() => {
-    setSearchParams(buildSearchParams({
-      year: year !== defaults.year ? year : undefined,
-      month: month !== defaults.month ? month : undefined,
-    }), { replace: true })
-  }, [year, month, defaults.year, defaults.month, setSearchParams])
+  const handleRangeChange = useCallback(
+    (dateFrom: string, dateTo: string) => {
+      const params = withReportPeriodPanel(
+        serializeReportRangePeriod(dateFrom, dateTo),
+        periodPanelOpen,
+      )
+      setSearchParams(params, { replace: true })
+    },
+    [setSearchParams, periodPanelOpen],
+  )
 
-  const applyFullIndexRange = useCallback((reindexFrom: string | null) => {
-    const today = new Date()
-    const dateTo = today.toISOString().slice(0, 10)
-    const dateFrom = reindexFrom ?? dateTo
-    setSearchParams(buildSearchParams({ dateFrom, dateTo }), { replace: true })
-  }, [setSearchParams])
+  const rangePresets = useMemo(() => {
+    const reindexFrom = data?.config.reindexFromDate
+    if (!reindexFrom) return []
+    return [{
+      label: 'Od początku indeksu',
+      dateFrom: reindexFrom,
+      dateTo: todayIsoDate(),
+      hint: `Od ${reindexFrom} do dziś`,
+    }]
+  }, [data?.config.reindexFromDate])
 
   useEffect(() => {
     let cancelled = false
@@ -165,11 +177,6 @@ export default function SettlementReport() {
     }
   }
 
-  const years = useMemo(() => {
-    const y = new Date().getFullYear()
-    return Array.from({ length: 6 }, (_, i) => y - i)
-  }, [])
-
   if (configMissing) {
     return (
       <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-6">
@@ -185,84 +192,32 @@ export default function SettlementReport() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
-        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
-          Rok
-          <select
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm disabled:opacity-50"
-            value={year}
-            disabled={isCustomRange}
-            title={isCustomRange ? 'Wyłącz zakres niestandardowy, aby wybrać miesiąc' : undefined}
-            onChange={(e) => updateMonthParams({ year: Number(e.target.value) })}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
-          Miesiąc
-          <select
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm disabled:opacity-50"
-            value={month}
-            disabled={isCustomRange}
-            title={isCustomRange ? 'Wyłącz zakres niestandardowy, aby wybrać miesiąc' : undefined}
-            onChange={(e) => updateMonthParams({ month: Number(e.target.value) })}
-          >
-            {MONTH_NAMES.map((name, idx) => (
-              <option key={name} value={idx + 1}>{name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
-          Od
-          <input
-            type="date"
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-            value={period.dateFrom}
-            onChange={(e) => updateDateRange({ dateFrom: e.target.value })}
+    <>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 justify-between">
+          <PeriodNavigator
+            monthParam={period.monthParam}
+            isCustomRange={period.isCustomRange}
+            dateFrom={period.dateFrom}
+            dateTo={period.dateTo}
+            showAdvanced
+            advancedOpen={periodPanelOpen}
+            onOpenAdvanced={openPanel}
+            advancedButtonRef={periodTriggerRef}
+            onMonthChange={handleMonthChange}
           />
-        </label>
-        <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1">
-          Do
-          <input
-            type="date"
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-            value={period.dateTo}
-            onChange={(e) => updateDateRange({ dateTo: e.target.value })}
-          />
-        </label>
-        {isCustomRange && (
           <button
             type="button"
-            onClick={resetToMonthRange}
-            className="text-sm text-gray-600 dark:text-gray-400 underline-offset-2 hover:underline"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 shrink-0"
           >
-            Miesiąc zamiast zakresu
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            Odśwież rozliczenia
           </button>
-        )}
-        {data?.config.reindexFromDate && (
-          <button
-            type="button"
-            onClick={() => applyFullIndexRange(data.config.reindexFromDate)}
-            className="text-sm text-[#c9a96e] underline-offset-2 hover:underline"
-          >
-            Cały indeks
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={refreshing || loading}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-        >
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-          Odśwież rozliczenia
-        </button>
-      </div>
+        </div>
 
-      {loading ? (
+        {loading ? (
         <div className="flex justify-center py-16 text-gray-400">
           <Loader2 size={24} className="animate-spin" />
         </div>
@@ -271,12 +226,32 @@ export default function SettlementReport() {
       ) : data ? (
         <SettlementContent data={data} />
       ) : null}
-    </div>
+      </div>
+
+      {portalRoot &&
+        createPortal(
+          <PeriodSidebar
+            open={periodPanelOpen}
+            onClose={closePanel}
+            year={period.year}
+            month={period.month}
+            dateFrom={period.dateFrom}
+            dateTo={period.dateTo}
+            isCustomRange={period.isCustomRange}
+            rangePresets={rangePresets}
+            onApplyMonth={handleApplyMonthPick}
+            onApplyRange={handleRangeChange}
+            returnFocusRef={periodTriggerRef}
+          />,
+          portalRoot,
+        )}
+    </>
   )
 }
 
 function SettlementContent({ data }: { data: SettlementReportResponse }) {
-  const nd = data.nextDeposit
+  const { rotation, personOutlook } = data
+  const needsRefresh = data.indexState?.needsRefresh ?? false
 
   return (
     <>
@@ -284,7 +259,7 @@ function SettlementContent({ data }: { data: SettlementReportResponse }) {
         Okres raportu: {data.dateFrom} — {data.dateTo}
       </p>
 
-      {data.indexState?.needsRefresh && (
+      {needsRefresh && (
         <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
           Indeks rozliczeń wymaga odświeżenia — dane mogą być nieaktualne. Kliknij „Odśwież rozliczenia”.
         </div>
@@ -304,89 +279,191 @@ function SettlementContent({ data }: { data: SettlementReportResponse }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          label={`Następna wpłata: ${PERSON_LABELS[nd.person]}`}
-          value={formatAmount(nd.suggestedAmount ?? nd.dueAmount)}
-          sub={[
-            nd.asOfDate ? `Stan indeksu na ${nd.asOfDate}.` : null,
-            `${formatAmount(nd.baseAmount)} − carry ${formatAmount(nd.rotationCarry ?? nd.carryOver)} + portfele ${formatAmount(nd.walletNet)}${(nd.rotationPrepaid ?? 0) > 0 ? ` − prepaid ${formatAmount(nd.rotationPrepaid)}` : ''}`,
-          ].filter(Boolean).join(' ')}
-          icon={<Wallet size={18} className="text-[#c9a96e]" />}
-          highlight
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+        <PersonOutlookColumn
+          person="maciek"
+          outlook={personOutlook.maciek}
+          rotation={rotation}
+          needsRefresh={needsRefresh}
         />
-        <StatCard
-          label="Wpłacono w okresie"
-          value={formatAmount(nd.paidInPeriod)}
-          sub={nd.underpayment > 0 ? `Niedopłata: ${formatAmount(nd.underpayment)}` : nd.overpayment > 0 ? `Nadpłata: ${formatAmount(nd.overpayment)}` : 'Rozliczone w wybranym okresie'}
-          icon={<ArrowDownLeft size={18} className="text-emerald-600" />}
-        />
-        <StatCard
-          label={`Saldo portfeli (${PERSON_LABELS[nd.person]})`}
-          value={formatAmount(nd.walletNet)}
-          sub="Skumulowane w indeksie (nie tylko w okresie)"
-          icon={<ArrowUpRight size={18} className="text-orange-600" />}
-        />
-        <StatCard
-          label="Saldo do przeniesienia"
-          value={formatAmount(nd.carryForward)}
-          sub="niedopłata na kolejny okres"
+        <PersonOutlookColumn
+          person="basia"
+          outlook={personOutlook.basia}
+          rotation={rotation}
+          needsRefresh={needsRefresh}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
         <StandardDepositsSection
+          person="maciek"
           title="Wpłaty rotacyjne — Maciek"
           total={data.standardDeposits.maciek.total}
           items={data.standardDeposits.maciek.items}
+          isAnchor={personOutlook.maciek.isAnchor}
+          className="h-full"
         />
         <StandardDepositsSection
+          person="basia"
           title="Wpłaty rotacyjne — Basia"
           total={data.standardDeposits.basia.total}
           items={data.standardDeposits.basia.items}
+          isAnchor={personOutlook.basia.isAnchor}
+          className="h-full"
         />
       </div>
 
-      <div className="space-y-6">
-        {(['maciek', 'basia', 'other'] as const).map((key) => (
-          <WalletGroupSection
-            key={key}
-            title={WALLET_GROUP_LABELS[key]}
-            group={data.walletGroups[key]}
-            informational={key === 'other'}
-          />
-        ))}
-      </div>
+      <PairedWalletGroups
+        maciek={data.walletGroups.maciek}
+        basia={data.walletGroups.basia}
+      />
+
+      <WalletGroupSection
+        personKey="other"
+        title={WALLET_GROUP_LABELS.other}
+        group={data.walletGroups.other}
+        informational
+      />
     </>
   )
 }
 
+function PersonOutlookColumn({
+  person,
+  outlook,
+  rotation,
+  needsRefresh,
+}: {
+  person: PersonKey
+  outlook: SettlementPersonOutlook
+  rotation: SettlementReportResponse['rotation']
+  needsRefresh: boolean
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full auto-rows-fr">
+      <DepositOutlookCard
+        person={person}
+        outlook={outlook}
+      />
+      <WalletOutlookCard
+        person={person}
+        outlook={outlook}
+        asOfDate={rotation.asOfDate}
+        needsRefresh={needsRefresh}
+      />
+    </div>
+  )
+}
+
+function DepositOutlookCard({
+  person,
+  outlook,
+}: {
+  person: PersonKey
+  outlook: SettlementPersonOutlook
+}) {
+  const label = outlook.isAnchor
+    ? `Wpłata rotacyjna — ${PERSON_LABELS[person]}`
+    : `Podgląd — ${PERSON_LABELS[person]}`
+
+  return (
+    <StatCard
+      person={person}
+      label={label}
+      value={formatAmount(outlook.suggestedAmount)}
+      sub={outlook.formulaSummary}
+      icon={<Wallet size={18} />}
+      queueActive={outlook.isAnchor}
+    />
+  )
+}
+
+function WalletOutlookCard({
+  person,
+  outlook,
+  asOfDate,
+  needsRefresh,
+}: {
+  person: PersonKey
+  outlook: SettlementPersonOutlook
+  asOfDate?: string
+  needsRefresh: boolean
+}) {
+  const periodLabel = outlook.walletNetInPeriod >= 0
+    ? `+${formatAmount(outlook.walletNetInPeriod)}`
+    : formatAmount(outlook.walletNetInPeriod)
+
+  const subParts = [
+    `W okresie: ${periodLabel}`,
+    asOfDate ? `Skumulowane w indeksie (stan na ${asOfDate})` : 'Skumulowane w indeksie',
+    needsRefresh ? 'Odśwież indeks, aby zobaczyć saldo skumulowane' : null,
+  ].filter(Boolean)
+
+  return (
+    <StatCard
+      person={person}
+      label={`Portfele osobiste — ${PERSON_LABELS[person]}`}
+      value={formatAmount(outlook.walletNetCumulative)}
+      sub={subParts.join(' · ')}
+    />
+  )
+}
+
 function StatCard({
+  person,
   label,
   value,
   sub,
   icon,
-  highlight,
+  queueActive,
 }: {
+  person: PersonKey
   label: string
   value: string
   sub?: string
   icon?: React.ReactNode
-  highlight?: boolean
+  queueActive?: boolean
 }) {
+  const theme = PERSON_THEMES[person]
+
   return (
     <div className={[
-      'border rounded-xl p-5',
-      highlight
-        ? 'bg-[#c9a96e]/5 border-[#c9a96e]/30 dark:bg-[#c9a96e]/10'
-        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800',
+      'relative border rounded-xl p-5 transition-shadow h-full',
+      theme.card,
+      queueActive ? theme.cardQueue : '',
     ].join(' ')}>
-      <div className="flex items-start gap-3">
-        {icon && <div className="shrink-0 mt-0.5">{icon}</div>}
-        <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{label}</p>
+      {queueActive && (
+        <div
+          className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-white dark:bg-gray-900 shadow-md ring-1 ring-black/5 dark:ring-white/10"
+          title="Ta osoba wpisuje w tej rotacji"
+        >
+          <ArrowRightToLine size={14} className={theme.icon} aria-hidden />
+        </div>
+      )}
+      <div className="flex h-full items-start gap-3">
+        {icon && (
+          <div className={['shrink-0 mt-0.5', theme.icon].join(' ')}>
+            {icon}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className={['text-sm font-medium', theme.label].join(' ')}>{label}</p>
+            {queueActive && (
+              <span className={[
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold',
+                theme.badge,
+              ].join(' ')}>
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className={['absolute inline-flex h-full w-full animate-ping rounded-full opacity-60', theme.badgeDot].join(' ')} />
+                  <span className={['relative inline-flex h-1.5 w-1.5 rounded-full', theme.badgeDot].join(' ')} />
+                </span>
+                Wpisuje teraz
+              </span>
+            )}
+          </div>
           <p className="text-2xl font-semibold mt-1 tabular-nums text-gray-900 dark:text-gray-100">{value}</p>
-          {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{sub}</p>}
+          {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sub}</p>}
         </div>
       </div>
     </div>
@@ -394,47 +471,191 @@ function StatCard({
 }
 
 function StandardDepositsSection({
+  person,
   title,
   total,
   items,
+  isAnchor,
+  className,
 }: {
+  person: PersonKey
   title: string
   total: number
   items: SettlementItemRef[]
+  isAnchor: boolean
+  className?: string
 }) {
+  const theme = PERSON_THEMES[person]
+
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
-      <div className="flex items-baseline justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-        <span className="text-sm font-medium tabular-nums text-gray-700 dark:text-gray-300">
+    <div className={[
+      'border rounded-xl p-5 flex flex-col',
+      theme.section,
+      isAnchor ? theme.cardQueue : '',
+      className,
+    ].join(' ')}>
+      <div className="flex items-baseline justify-between gap-2 mb-3">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <h3 className={['text-sm font-semibold', theme.label].join(' ')}>{title}</h3>
+          {isAnchor && (
+            <span className={['inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', theme.badge].join(' ')}>
+              <ArrowRightToLine size={12} aria-hidden />
+              Wpisuje teraz
+            </span>
+          )}
+        </div>
+        <span className="text-sm font-medium tabular-nums text-gray-700 dark:text-gray-300 shrink-0">
           {formatAmount(total)}
         </span>
       </div>
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400">Brak wpłat w okresie.</p>
+        <p className="text-sm text-gray-400 flex-1">Brak wpłat w okresie.</p>
       ) : (
-        <ItemsTable items={items} />
+        <div className="flex-1 min-h-0">
+          <ItemsTable items={items} />
+        </div>
       )}
     </div>
   )
 }
 
+function PairedWalletGroups({
+  maciek,
+  basia,
+}: {
+  maciek: WalletSettlementGroup
+  basia: WalletSettlementGroup
+}) {
+  return (
+    <>
+      <div className="space-y-4 lg:hidden">
+        <WalletGroupSection
+          personKey="maciek"
+          title={WALLET_GROUP_LABELS.maciek}
+          group={maciek}
+        />
+        <WalletGroupSection
+          personKey="basia"
+          title={WALLET_GROUP_LABELS.basia}
+          group={basia}
+        />
+      </div>
+
+      <div className="hidden lg:grid lg:grid-cols-2 gap-4 items-stretch">
+        <WalletGroupHeader
+          personKey="maciek"
+          title={WALLET_GROUP_LABELS.maciek}
+          group={maciek}
+          className="h-full"
+        />
+        <WalletGroupHeader
+          personKey="basia"
+          title={WALLET_GROUP_LABELS.basia}
+          group={basia}
+          className="h-full"
+        />
+        <BucketSection
+          personKey="maciek"
+          title="Wydatki"
+          total={maciek.expenses.total}
+          items={maciek.expenses.items}
+          className="h-full"
+        />
+        <BucketSection
+          personKey="basia"
+          title="Wydatki"
+          total={basia.expenses.total}
+          items={basia.expenses.items}
+          className="h-full"
+        />
+        <BucketSection
+          personKey="maciek"
+          title="Wpływy"
+          total={maciek.incomes.total}
+          items={maciek.incomes.items}
+          className="h-full"
+        />
+        <BucketSection
+          personKey="basia"
+          title="Wpływy"
+          total={basia.incomes.total}
+          items={basia.incomes.items}
+          className="h-full"
+        />
+      </div>
+    </>
+  )
+}
+
+function WalletGroupHeader({
+  personKey,
+  title,
+  group,
+  className,
+}: {
+  personKey: PersonKey
+  title: string
+  group: WalletSettlementGroup
+  className?: string
+}) {
+  const theme = PERSON_THEMES[personKey]
+
+  return (
+    <div className={[
+      'rounded-xl p-5 border',
+      theme.section,
+      className,
+    ].join(' ')}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 h-full">
+        <h3 className={['text-sm font-semibold', theme.label].join(' ')}>{title}</h3>
+        <div className="text-right">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Saldo netto</p>
+          <p className={[
+            'text-lg font-semibold tabular-nums',
+            group.net > 0 ? 'text-orange-600' : group.net < 0 ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-300',
+          ].join(' ')}>
+            {formatAmount(group.net)}
+          </p>
+          <p className="text-xs text-gray-400">
+            wydatki {formatAmount(group.expenses.total)} − wpływy {formatAmount(group.incomes.total)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function WalletGroupSection({
+  personKey,
   title,
   group,
   informational,
+  className,
 }: {
+  personKey: WalletGroupKey
   title: string
   group: WalletSettlementGroup
   informational?: boolean
+  className?: string
 }) {
   const hasItems = group.expenses.items.length > 0 || group.incomes.items.length > 0
+  const isPerson = personKey === 'maciek' || personKey === 'basia'
+  const theme = isPerson ? PERSON_THEMES[personKey] : null
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 space-y-4">
+    <div className={[
+      'rounded-xl p-5 space-y-4 border h-full',
+      isPerson ? theme!.section : OTHER_SECTION_THEME,
+      className,
+    ].join(' ')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+          <h3 className={[
+            'text-sm font-semibold',
+            isPerson ? theme!.label : 'text-gray-700 dark:text-gray-300',
+          ].join(' ')}>
+            {title}
+          </h3>
           {informational && (
             <p className="text-xs text-gray-400 mt-0.5">Tylko informacyjnie — nie wpływa na następną wpłatę.</p>
           )}
@@ -456,9 +677,9 @@ function WalletGroupSection({
       {!hasItems ? (
         <p className="text-sm text-gray-400">Brak pozycji w tej grupie.</p>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <BucketSection title="Wydatki" total={group.expenses.total} items={group.expenses.items} />
-          <BucketSection title="Wpływy" total={group.incomes.total} items={group.incomes.items} />
+        <div className="flex flex-col gap-4">
+          <BucketSection title="Wydatki" total={group.expenses.total} items={group.expenses.items} personKey={isPerson ? personKey : undefined} />
+          <BucketSection title="Wpływy" total={group.incomes.total} items={group.incomes.items} personKey={isPerson ? personKey : undefined} />
         </div>
       )}
     </div>
@@ -469,21 +690,38 @@ function BucketSection({
   title,
   total,
   items,
+  personKey,
+  className,
 }: {
   title: string
   total: number
   items: SettlementItemRef[]
+  personKey?: PersonKey
+  className?: string
 }) {
+  const theme = personKey ? PERSON_THEMES[personKey] : null
+
   return (
-    <div className="border border-gray-100 dark:border-gray-800 rounded-lg p-4">
-      <div className="flex items-baseline justify-between mb-3">
-        <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">{title}</h4>
+    <div className={[
+      'border rounded-lg p-4 flex flex-col h-full',
+      personKey ? theme!.section : 'border-gray-100 dark:border-gray-800',
+      className,
+    ].join(' ')}>
+      <div className="flex items-baseline justify-between mb-3 shrink-0">
+        <h4 className={[
+          'text-sm font-medium',
+          personKey ? theme!.label : 'text-gray-800 dark:text-gray-200',
+        ].join(' ')}>
+          {title}
+        </h4>
         <span className="text-sm tabular-nums text-gray-600 dark:text-gray-400">{formatAmount(total)}</span>
       </div>
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400">Brak pozycji.</p>
+        <p className="text-sm text-gray-400 flex-1">Brak pozycji.</p>
       ) : (
-        <ItemsTable items={items} compact />
+        <div className="flex-1 min-h-0">
+          <ItemsTable items={items} compact />
+        </div>
       )}
     </div>
   )

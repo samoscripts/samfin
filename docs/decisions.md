@@ -552,6 +552,23 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-037: Rozliczenia — Model B rotacji (stan + anchor)
+
+**Kontekst:** Model A (`base − rotation_carry + portfele`) nie odzwierciedlał reguły „dorównaj sumę wpłat drugiej osoby”. UI wymagało osobnych kafelków per osoba z kotwicą (anchor) i opisem formuły z backendu.
+
+**Decyzja:**
+
+- Zastąpić `SettlementBalanceEngine` klasą `SettlementRotationEngine`: Σ wpłat M/B, `stan`, anchor, sugerowana = dorównanie + portfel − prepaid.
+- Anchor zmienia się **wyłącznie** przy wpłacie rotacyjnej; remis Σ → anchor przechodzi na drugą osobę względem poprzedniej kotwicy.
+- API: `rotation.anchor`, `stanMaciek`/`stanBasia`, `personOutlook.isAnchor`, `catchUpAmount`, `formulaSummary` (tekst po polsku z `SettlementFormulaFormatter`).
+- Ledger: kolumny `maciek_deposits_total_minor`, `basia_deposits_total_minor`; rename `next_depositor` → `anchor`; `rotation_carry_minor` deprecated (0).
+- Migracja `Version20260710120000`: TRUNCATE ledger + `needs_refresh=1` — wymuszony rebuild po deploy.
+- Frontend renderuje wyłącznie pola API (bez składania formuł w TS).
+
+**Pliki:** `SettlementRotationEngine.php`, `SettlementOutlookBuilder.php`, `SettlementFormulaFormatter.php`, `SettlementIndexerService.php`, `SettlementService.php`, `SettlementReport.tsx`, migracja `Version20260710120000`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -572,3 +589,4 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-27 | ADR-033: aplikacja Android — Capacitor remote URL, intent CSV, workflow WSL+Windows |
 | 2026-06-27 | ADR-034: publikacja APK (downloads/, mobile.json), aktualizacje i strona O aplikacji |
 | 2026-06-30 | ADR-035: hard delete nieaktywnych kategorii z UI zarządzania |
+| 2026-07-02 | ADR-037: rozliczenia — Model B rotacji (stan + anchor), zastąpienie Modelu A |

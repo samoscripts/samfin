@@ -27,10 +27,10 @@ class AnalyticsController extends AbstractController
         $stats = $this->transactionRepository->getPeriodStats($query->toRepositoryFilters());
 
         return $this->json([
-            'year'     => $query->year,
-            'month'    => $query->month,
-            'dateFrom' => $query->dateFrom(),
-            'dateTo'   => $query->dateTo(),
+            'year'     => $query->year(),
+            'month'    => $query->month(),
+            'dateFrom' => $query->dateFrom,
+            'dateTo'   => $query->dateTo,
             ...$stats,
         ]);
     }

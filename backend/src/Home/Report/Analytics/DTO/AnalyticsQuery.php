@@ -9,8 +9,8 @@ use Symfony\Component\HttpFoundation\InputBag;
 final readonly class AnalyticsQuery
 {
     public function __construct(
-        public int $year,
-        public int $month,
+        public string $dateFrom,
+        public string $dateTo,
         public ?string $walletId = null,
         public ?string $concernId = null,
         public ?string $categoryId = null,
@@ -19,21 +19,60 @@ final readonly class AnalyticsQuery
     /** @return self|QueryValidationErrors */
     public static function fromInputBag(InputBag $query): self|QueryValidationErrors
     {
-        $now    = new \DateTimeImmutable();
-        $errors = [];
+        $hasYearMonth = $query->has('year') || $query->has('month');
+        $hasDateRange = $query->has('dateFrom') || $query->has('dateTo');
 
-        $year = $query->has('year')
-            ? QueryParams::positiveInt($query->get('year'), 'year', (int) $now->format('Y'), 2000, 2100)
-            : (int) $now->format('Y');
-        $errors = QueryParams::mergeErrors($errors, $year);
+        if ($hasYearMonth && $hasDateRange) {
+            return new QueryValidationErrors([
+                'period' => 'Podaj albo year+month, albo dateFrom+dateTo — nie oba naraz.',
+            ]);
+        }
 
-        $month = $query->has('month')
-            ? QueryParams::positiveInt($query->get('month'), 'month', (int) $now->format('m'), 1, 12)
-            : (int) $now->format('m');
-        $errors = QueryParams::mergeErrors($errors, $month);
+        if ($hasYearMonth) {
+            $now   = new \DateTimeImmutable();
+            $year  = $query->has('year')
+                ? QueryParams::positiveInt($query->get('year'), 'year', (int) $now->format('Y'), 2000, 2100)
+                : (int) $now->format('Y');
+            if ($year instanceof QueryValidationErrors) {
+                return $year;
+            }
 
-        if ($errors !== []) {
-            return new QueryValidationErrors($errors);
+            $month = $query->has('month')
+                ? QueryParams::positiveInt($query->get('month'), 'month', (int) $now->format('m'), 1, 12)
+                : (int) $now->format('m');
+            if ($month instanceof QueryValidationErrors) {
+                return $month;
+            }
+
+            $dateFrom = sprintf('%04d-%02d-01', $year, $month);
+            $lastDay  = (int) (new \DateTimeImmutable($dateFrom))->format('t');
+            $dateTo   = sprintf('%04d-%02d-%02d', $year, $month, $lastDay);
+        } elseif ($hasDateRange) {
+            $dateFrom = QueryParams::optionalDate($query->get('dateFrom'), 'dateFrom');
+            if ($dateFrom instanceof QueryValidationErrors) {
+                return $dateFrom;
+            }
+            $dateTo = QueryParams::optionalDate($query->get('dateTo'), 'dateTo');
+            if ($dateTo instanceof QueryValidationErrors) {
+                return $dateTo;
+            }
+
+            if ($dateFrom === null || $dateTo === null) {
+                return new QueryValidationErrors([
+                    'period' => 'Wymagane dateFrom i dateTo albo year i month.',
+                ]);
+            }
+
+            if ($dateFrom > $dateTo) {
+                return new QueryValidationErrors(['dateTo' => 'dateTo nie może być wcześniejsze niż dateFrom.']);
+            }
+        } else {
+            $now      = new \DateTimeImmutable();
+            $year     = (int) $now->format('Y');
+            $month    = (int) $now->format('m');
+            $dateFrom = sprintf('%04d-%02d-01', $year, $month);
+            $lastDay  = (int) $now->format('t');
+            $dateTo   = sprintf('%04d-%02d-%02d', $year, $month, $lastDay);
         }
 
         foreach (['walletId', 'concernId', 'categoryId'] as $field) {
@@ -53,32 +92,30 @@ final readonly class AnalyticsQuery
         }
 
         return new self(
-            year: $year,
-            month: $month,
+            dateFrom: $dateFrom,
+            dateTo: $dateTo,
             walletId: self::nullableString($query->get('walletId')),
             concernId: self::nullableString($query->get('concernId')),
             categoryId: self::nullableString($query->get('categoryId')),
         );
     }
 
-    public function dateFrom(): string
+    public function year(): int
     {
-        return sprintf('%04d-%02d-01', $this->year, $this->month);
+        return (int) substr($this->dateFrom, 0, 4);
     }
 
-    public function dateTo(): string
+    public function month(): int
     {
-        $lastDay = (int) (new \DateTimeImmutable($this->dateFrom()))->format('t');
-
-        return sprintf('%04d-%02d-%02d', $this->year, $this->month, $lastDay);
+        return (int) substr($this->dateFrom, 5, 2);
     }
 
     /** @return array<string, mixed> */
     public function toRepositoryFilters(): array
     {
         return array_filter([
-            'dateFrom'   => $this->dateFrom(),
-            'dateTo'     => $this->dateTo(),
+            'dateFrom'   => $this->dateFrom,
+            'dateTo'     => $this->dateTo,
             'walletId'   => $this->walletId,
             'concernId'  => $this->concernId,
             'categoryId' => $this->categoryId,
