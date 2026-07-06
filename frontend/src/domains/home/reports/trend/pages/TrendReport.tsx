@@ -1,209 +1,601 @@
-import { useCallback, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+
 import { useSearchParams } from 'react-router-dom'
+
+import { currentYearMonth } from '@/shared/utils/periodUrl'
+
+import { Loader2 } from 'lucide-react'
+
+import ReportPageShell from '@/domains/home/reports/shared/components/ReportPageShell'
+
+import { useReportSidebar } from '@/domains/home/reports/shared/components/ReportSidebar'
+
+import { buildCurrentPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
+
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import { useRightPanelPortal } from '@/layout/RightPanelContext'
-import { useTheme } from '@/app/providers/ThemeProvider'
-import PeriodNavigator from '@/shared/components/PeriodNavigator'
-import PeriodSidebar from '@/shared/components/PeriodSidebar'
-import { chartThemeColors } from '@/shared/components/charts/chartColors'
-import { formatAmount } from '@/shared/utils/format'
+
+  navigatePeriod,
+
+  parseReportPeriodState,
+
+  serializeReportPeriodState,
+
+  switchPeriodMode,
+
+  type ReportPeriodMode,
+
+} from '@/domains/home/reports/shared/utils/reportPeriod'
+
+import TrendChart from '@/domains/home/reports/trend/components/TrendChart'
+
+import TrendFilterChips from '@/domains/home/reports/trend/components/TrendFilterChips'
+
+import TrendGranularityTabs from '@/domains/home/reports/trend/components/TrendGranularityTabs'
+
+import TrendPeriodTransactions from '@/domains/home/reports/trend/components/TrendPeriodTransactions'
+
+import TrendSidebar from '@/domains/home/reports/trend/components/TrendSidebar'
+
+import { fetchTrendReport, type TrendReportParams } from '@/shared/api/trend'
+
+import type {
+  TrendBarSelection,
+  TrendGranularity,
+  TrendQueryState,
+  TrendReportData,
+} from '@/domains/home/reports/trend/types/trend'
+
+import { trendGranularityLabel } from '@/domains/home/reports/trend/utils/trendGranularity'
+
 import {
-  currentYearMonth,
-  parseReportPeriod,
-  paramToYearMonth,
-  serializeReportMonthPeriod,
-  serializeReportRangePeriod,
-  withReportPeriodPanel,
-} from '@/shared/utils/periodUrl'
-import MockBanner from '@/domains/home/reports/shared/components/MockBanner'
-import { getTrendMockData } from '@/domains/home/reports/trend/fixtures/trend.fixture'
+
+  countTrendQueryState,
+
+  parseTrendQueryState,
+
+  serializeTrendQueryState,
+
+  trendFilterParamsSignature,
+
+} from '@/domains/home/reports/trend/utils/trendUrl'
+
+import { fetchCategories, type Category } from '@/shared/api/categories'
+
+import { fetchConcerns, type Concern } from '@/shared/api/concerns'
+
+import { fetchWallets, type Wallet } from '@/shared/api/wallets'
+
+import { useChartStyle } from '@/shared/hooks/useChartStyle'
+
+function serializeList(list: string[]): string | undefined {
+  return list.length > 0 ? list.join(',') : undefined
+}
+
+function emptyTrendData(
+  dateFrom: string,
+  dateTo: string,
+  query: TrendQueryState,
+): TrendReportData {
+  return {
+    dateFrom,
+    dateTo,
+    granularity: query.granularity ?? 'month',
+    seriesBy: query.seriesBy,
+    points: [],
+  }
+}
+
+function buildTrendParams(
+  dateFrom: string,
+  dateTo: string,
+  query: TrendQueryState,
+): TrendReportParams {
+  const params: TrendReportParams = {
+    dateFrom,
+    dateTo,
+    trendSeriesBy: query.seriesBy,
+    trendDirections: query.directions.join(','),
+  }
+  if (query.granularity) params.trendGranularity = query.granularity
+  if (query.seriesBy === 'description') params.trendTerms = serializeList(query.terms)
+  if (query.seriesBy === 'category') params.trendCategoryIds = serializeList(query.categoryIds)
+  if (query.seriesBy === 'wallet') params.trendWalletIds = serializeList(query.walletIds)
+  if (query.seriesBy === 'concern') params.trendConcernIds = serializeList(query.concernIds)
+
+  const n = query.narrow
+  if (n.description) params.description = n.description
+  if (n.categoryId) params.categoryId = n.categoryId
+  if (n.walletId) params.walletId = n.walletId
+  if (n.concernId) params.concernId = n.concernId
+  if (n.amountMin) params.amountMin = n.amountMin
+  if (n.amountMax) params.amountMax = n.amountMax
+  if (n.paidFromPartyId) params.paidFromPartyId = n.paidFromPartyId
+  if (n.paidToPartyId) params.paidToPartyId = n.paidToPartyId
+
+  return params
+}
 
 export default function TrendReport() {
-  const periodTriggerRef = useRef<HTMLButtonElement>(null)
+
   const [searchParams, setSearchParams] = useSearchParams()
-  const portalRoot = useRightPanelPortal()
-  const { effective } = useTheme()
-  const theme = chartThemeColors(effective)
+
+  const { open: sidebarOpen, openPanel, closePanel } = useReportSidebar()
+
+  const [chartStyle, setChartStyle] = useChartStyle()
+
+  const [categories, setCategories] = useState<Category[]>([])
+
+  const [wallets, setWallets] = useState<Wallet[]>([])
+
+  const [concerns, setConcerns] = useState<Concern[]>([])
+
+  const [barSelection, setBarSelection] = useState<TrendBarSelection | null>(null)
+
+
 
   const defaults = useMemo(() => currentYearMonth(), [])
-  const period = useMemo(() => parseReportPeriod(searchParams, defaults), [searchParams, defaults])
-  const periodPanelOpen = searchParams.get('panel') === 'period'
-  const chartType = searchParams.get('chart') === 'bar' ? 'bar' : 'line'
 
-  const data = useMemo(
-    () => getTrendMockData(period.dateFrom, period.dateTo),
-    [period.dateFrom, period.dateTo],
+  const period = useMemo(
+
+    () => parseReportPeriodState(searchParams, defaults),
+
+    [searchParams, defaults],
+
   )
 
-  const handleMonthChange = useCallback(
-    (monthParam: string) => {
-      const ym = paramToYearMonth(monthParam)
-      if (!ym) return
-      setSearchParams(serializeReportMonthPeriod(ym.year, ym.month, defaults), { replace: true })
-    },
-    [defaults, setSearchParams],
+  const trendQuery = useMemo(
+
+    () => parseTrendQueryState(searchParams, period),
+
+    [searchParams, period],
+
   )
 
-  const openPeriodPanel = useCallback(() => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev)
-      params.set('panel', 'period')
-      return params
-    }, { replace: true })
-  }, [setSearchParams])
+  const chartType = searchParams.get('chart') === 'line' ? 'line' : 'bar'
 
-  const closePeriodPanel = useCallback(() => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev)
-      params.delete('panel')
-      return params
-    }, { replace: true })
-  }, [setSearchParams])
+  const filterCount = countTrendQueryState(trendQuery)
 
-  const handleApplyMonthPick = useCallback(
-    (year: number, month: number) => {
-      const params = withReportPeriodPanel(
-        serializeReportMonthPeriod(year, month, defaults),
-        periodPanelOpen,
+  const trendFilterSignature = useMemo(
+
+    () => trendFilterParamsSignature(searchParams),
+
+    [searchParams],
+
+  )
+
+
+
+  useEffect(() => {
+
+    Promise.all([fetchCategories(), fetchWallets(), fetchConcerns()])
+
+      .then(([cat, w, c]) => {
+
+        setCategories(cat)
+
+        setWallets(w)
+
+        setConcerns(c)
+
+      })
+
+      .catch(() => {
+
+        setCategories([])
+
+        setWallets([])
+
+        setConcerns([])
+
+      })
+
+  }, [])
+
+
+
+  const [data, setData] = useState<TrendReportData>(() =>
+    emptyTrendData(period.dateFrom, period.dateTo, trendQuery),
+  )
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetchTrendReport(buildTrendParams(period.dateFrom, period.dateTo, trendQuery))
+      .then((res) => {
+        if (!cancelled) setData(res)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Nie udało się załadować raportu.')
+          setData(emptyTrendData(period.dateFrom, period.dateTo, trendQuery))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [period.dateFrom, period.dateTo, trendQuery])
+
+
+
+  useEffect(() => {
+
+    setBarSelection(null)
+
+  }, [
+
+    period.dateFrom,
+
+    period.dateTo,
+
+    period.mode,
+
+    trendQuery.granularity,
+
+    trendFilterSignature,
+
+    chartType,
+
+  ])
+
+
+
+  const applyPeriod = useCallback(
+
+    (
+
+      next: Pick<
+
+        typeof period,
+
+        'mode' | 'year' | 'month' | 'quarter' | 'dateFrom' | 'dateTo' | 'monthParam' | 'isCustomRange'
+
+      >,
+
+    ) => {
+
+      setSearchParams(
+
+        (prev) => serializeReportPeriodState(next, new URLSearchParams(prev), defaults),
+
+        { replace: true },
+
       )
-      setSearchParams(params, { replace: true })
+
     },
-    [defaults, setSearchParams, periodPanelOpen],
+
+    [setSearchParams, defaults],
+
   )
 
-  const handleRangeChange = useCallback(
+
+
+  const handlePeriodModeChange = useCallback(
+
+    (mode: ReportPeriodMode) => {
+
+      if (mode === period.mode) return
+
+      applyPeriod(switchPeriodMode(period, mode))
+
+    },
+
+    [period, applyPeriod],
+
+  )
+
+
+
+  const handlePeriodNavigate = useCallback(
+
+    (dir: -1 | 1) => {
+
+      applyPeriod(navigatePeriod(period, dir))
+
+    },
+
+    [period, applyPeriod],
+
+  )
+
+
+
+  const handlePeriodJumpToCurrent = useCallback(() => {
+
+    applyPeriod(buildCurrentPeriodState(period.mode))
+
+  }, [period.mode, applyPeriod])
+
+
+
+  const handlePeriodRangeChange = useCallback(
+
     (dateFrom: string, dateTo: string) => {
-      const params = withReportPeriodPanel(
-        serializeReportRangePeriod(dateFrom, dateTo),
-        periodPanelOpen,
-      )
-      setSearchParams(params, { replace: true })
+
+      applyPeriod({
+
+        ...period,
+
+        mode: 'range',
+
+        dateFrom,
+
+        dateTo,
+
+        isCustomRange: true,
+
+      })
+
     },
-    [setSearchParams, periodPanelOpen],
+
+    [period, applyPeriod],
+
   )
+
+
+
+  const applyTrendQuery = useCallback(
+
+    (next: typeof trendQuery) => {
+
+      setSearchParams(
+
+        (prev) => serializeTrendQueryState(next, new URLSearchParams(prev), period.mode),
+
+        { replace: true },
+
+      )
+
+    },
+
+    [setSearchParams, period.mode],
+
+  )
+
+
+
+  const handleGranularityChange = useCallback(
+
+    (granularity: TrendGranularity) => {
+
+      applyTrendQuery({ ...trendQuery, granularity })
+
+    },
+
+    [applyTrendQuery, trendQuery],
+
+  )
+
+
 
   const toggleChart = useCallback(
+
     (type: 'line' | 'bar') => {
+
       setSearchParams((prev) => {
+
         const params = new URLSearchParams(prev)
-        if (type === 'line') params.delete('chart')
-        else params.set('chart', 'bar')
+
+        if (type === 'line') params.set('chart', 'line')
+        else params.delete('chart')
+
         return params
+
       }, { replace: true })
+
     },
+
     [setSearchParams],
+
   )
+
+
+
+  const handleBarClick = useCallback((selection: TrendBarSelection) => {
+
+    setBarSelection((prev) =>
+
+      prev?.period === selection.period && prev?.dataKey === selection.dataKey
+
+        ? null
+
+        : selection,
+
+    )
+
+  }, [])
+
+
+
+  const subtitle =
+
+    trendQuery.seriesBy === 'none'
+
+      ? `Trend ${trendGranularityLabel(data.granularity).toLowerCase()}`
+
+      : `Porównanie ${trendGranularityLabel(data.granularity).toLowerCase()}`
+
+
 
   return (
-    <>
-      <div className="space-y-5">
-        <MockBanner />
 
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-          <PeriodNavigator
-            monthParam={period.monthParam}
-            isCustomRange={period.isCustomRange}
-            dateFrom={period.dateFrom}
-            dateTo={period.dateTo}
-            showAdvanced
-            advancedOpen={periodPanelOpen}
-            onOpenAdvanced={openPeriodPanel}
-            advancedButtonRef={periodTriggerRef}
-            onMonthChange={handleMonthChange}
-          />
-          <div className="flex gap-1.5">
-            {(['line', 'bar'] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => toggleChart(type)}
-                className={[
-                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                  chartType === type
-                    ? 'bg-[#163526] text-white dark:bg-[#c9a96e] dark:text-[#163526]'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
-                ].join(' ')}
-              >
-                {type === 'line' ? 'Liniowy' : 'Słupkowy'}
-              </button>
-            ))}
+    <ReportPageShell
+
+      sidebarOpen={sidebarOpen}
+
+      onOpenSidebar={openPanel}
+
+      onCloseSidebar={closePanel}
+
+      filterCount={filterCount}
+
+      sidebar={
+
+        <TrendSidebar
+
+          open={sidebarOpen}
+
+          onClose={closePanel}
+
+          period={period}
+
+          onPeriodModeChange={handlePeriodModeChange}
+
+          onPeriodNavigate={handlePeriodNavigate}
+
+          onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
+
+          onPeriodRangeChange={handlePeriodRangeChange}
+
+          activeQuery={trendQuery}
+
+          appliedFilterSignature={trendFilterSignature}
+
+          onApplyQuery={applyTrendQuery}
+
+          chartStyle={chartStyle}
+
+          onChartStyleChange={setChartStyle}
+
+        />
+
+      }
+
+    >
+
+      <div className="space-y-5">
+
+        {error && (
+          <div className="rounded-xl border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+            {error}
           </div>
+        )}
+
+        <TrendFilterChips
+
+          query={trendQuery}
+
+          categories={categories}
+
+          wallets={wallets}
+
+          concerns={concerns}
+
+          onChange={applyTrendQuery}
+
+        />
+
+
+
+        <div className="flex flex-wrap items-center gap-3">
+
+          <div className="flex gap-1.5">
+
+            {(['line', 'bar'] as const).map((type) => (
+
+              <button
+
+                key={type}
+
+                type="button"
+
+                onClick={() => toggleChart(type)}
+
+                className={[
+
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+
+                  chartType === type
+
+                    ? 'bg-[#163526] text-white dark:bg-[#c9a96e] dark:text-[#163526]'
+
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
+
+                ].join(' ')}
+
+              >
+
+                {type === 'line' ? 'Liniowy' : 'Słupkowy'}
+
+              </button>
+
+            ))}
+
+          </div>
+
+
+
+          <TrendGranularityTabs
+
+            periodMode={period.mode}
+
+            value={trendQuery.granularity ?? data.granularity}
+
+            onChange={handleGranularityChange}
+
+          />
+
         </div>
 
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Trend miesięczny · {data.dateFrom} — {data.dateTo}
+
+
+        <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+
+          <span>{subtitle} · {period.dateFrom} — {period.dateTo}</span>
+
+          {loading && <Loader2 size={14} className="animate-spin text-gray-400" />}
+
         </p>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
-          <ResponsiveContainer width="100%" height={360}>
-            {chartType === 'line' ? (
-              <LineChart data={data.points} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                <CartesianGrid stroke={theme.grid} strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fill: theme.tick, fontSize: 12 }} />
-                <YAxis tick={{ fill: theme.tick, fontSize: 11 }} tickFormatter={(v) => `${v}`} />
-                <Tooltip
-                  contentStyle={{
-                    background: theme.tooltipBg,
-                    border: `1px solid ${theme.tooltipBorder}`,
-                    borderRadius: 8,
-                  }}
-                  formatter={(value: number) => formatAmount(value)}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="income" name="Przychody" stroke="#2d6a4f" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="expenses" name="Wydatki" stroke="#c0392b" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="balance" name="Saldo" stroke="#c9a96e" strokeWidth={2} dot={false} />
-              </LineChart>
-            ) : (
-              <BarChart data={data.points} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                <CartesianGrid stroke={theme.grid} strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fill: theme.tick, fontSize: 12 }} />
-                <YAxis tick={{ fill: theme.tick, fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    background: theme.tooltipBg,
-                    border: `1px solid ${theme.tooltipBorder}`,
-                    borderRadius: 8,
-                  }}
-                  formatter={(value: number) => formatAmount(value)}
-                />
-                <Legend />
-                <Bar dataKey="income" name="Przychody" fill="#2d6a4f" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" name="Wydatki" fill="#c0392b" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            )}
-          </ResponsiveContainer>
+
+
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 space-y-4">
+
+          <TrendChart
+
+            data={data}
+
+            chartType={chartType}
+
+            directions={trendQuery.directions}
+
+            chartStyle={chartStyle}
+
+            activeBar={barSelection}
+
+            onBarClick={chartType === 'bar' ? handleBarClick : undefined}
+
+          />
+
+
+
+          {chartType === 'bar' && (
+
+            <TrendPeriodTransactions
+
+              selection={barSelection}
+
+              query={trendQuery}
+
+              onClose={() => setBarSelection(null)}
+
+            />
+
+          )}
+
         </div>
+
       </div>
 
-      {portalRoot &&
-        createPortal(
-          <PeriodSidebar
-            open={periodPanelOpen}
-            onClose={closePeriodPanel}
-            year={period.year}
-            month={period.month}
-            dateFrom={period.dateFrom}
-            dateTo={period.dateTo}
-            isCustomRange={period.isCustomRange}
-            onApplyMonth={handleApplyMonthPick}
-            onApplyRange={handleRangeChange}
-            returnFocusRef={periodTriggerRef}
-          />,
-          portalRoot,
-        )}
-    </>
+    </ReportPageShell>
+
   )
+
 }
+
+

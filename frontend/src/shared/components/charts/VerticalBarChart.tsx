@@ -5,6 +5,7 @@ import {
   XAxis,
   YAxis,
   ResponsiveContainer,
+  CartesianGrid,
 } from 'recharts'
 import { useTheme } from '@/app/providers/ThemeProvider'
 import type { ChartStyle } from '@/shared/components/charts/chartStyle'
@@ -12,31 +13,31 @@ import { chartThemeColors } from '@/shared/components/charts/chartColors'
 import ChartHoverPanel, { type ChartHoverPayload } from '@/shared/components/charts/ChartHoverPanel'
 import {
   chartBarCommonProps,
-  CHART_BAR_RADIUS_HORIZONTAL,
+  CHART_BAR_RADIUS,
   renderBarCells,
 } from '@/shared/components/charts/chartBarShared'
 
-export interface HorizontalBarChartItem {
+export interface VerticalBarChartItem {
   id: string
   name: string
   value: number
 }
 
-interface HorizontalBarChartProps {
-  data: HorizontalBarChartItem[]
+interface VerticalBarChartProps {
+  data: VerticalBarChartItem[]
   onBarClick?: (id: string) => void
   activeId?: string | null
   chartStyle: ChartStyle
   direction: 'INCOME' | 'EXPENSE'
 }
 
-export default function HorizontalBarChart({
+export default function VerticalBarChart({
   data,
   onBarClick,
   activeId,
   chartStyle,
   direction,
-}: HorizontalBarChartProps) {
+}: VerticalBarChartProps) {
   const { effective } = useTheme()
   const theme = chartThemeColors(effective)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
@@ -45,36 +46,37 @@ export default function HorizontalBarChart({
 
   if (items.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm text-gray-400">
+      <div className="flex items-center justify-center h-52 text-sm text-gray-400">
         Brak danych do wyświetlenia
       </div>
     )
   }
 
-  const height = Math.max(200, items.length * 36 + 24)
-
   return (
     <ChartHoverPanel payload={hoverPayload} emptyLabel="Najedź na słupek">
-      <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={items} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+      <ResponsiveContainer width="100%" height={260}>
+        <BarChart data={items} margin={{ left: 4, right: 8, top: 8, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} vertical={false} />
           <XAxis
-            type="number"
+            dataKey="name"
             tick={{ fill: theme.tick, fontSize: 11 }}
             axisLine={{ stroke: theme.grid }}
             tickLine={false}
-            tickFormatter={(v) => `${v} zł`}
+            interval={0}
+            angle={items.length > 4 ? -28 : 0}
+            textAnchor={items.length > 4 ? 'end' : 'middle'}
+            height={items.length > 4 ? 56 : 32}
           />
           <YAxis
-            type="category"
-            dataKey="name"
-            width={120}
-            tick={{ fill: theme.tick, fontSize: 12 }}
+            tick={{ fill: theme.tick, fontSize: 11 }}
             axisLine={false}
             tickLine={false}
+            width={56}
+            tickFormatter={(v) => `${v} zł`}
           />
           <Bar
             dataKey="value"
-            radius={CHART_BAR_RADIUS_HORIZONTAL}
+            radius={CHART_BAR_RADIUS}
             {...chartBarCommonProps()}
             onClick={(entry) => onBarClick?.(String(entry.id))}
             onMouseEnter={(entry, index) => {

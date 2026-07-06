@@ -330,9 +330,23 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ### ADR-P05: Moduł raportów jako agregaty SQL
 
-**Propozycja:** Nowe endpointy agregujące po `transaction_items` z GROUP BY category/wallet/concern.
+**Status:** Przyjęte (2026-07-07) — Rozbicie i Trend.
+
+**Decyzja:** Endpointy `GET /api/reports/breakdown` i `GET /api/reports/trend` agregują **pozycje** (`transaction_items` JOIN `transactions`) przez DBAL SQL z GROUP BY category/wallet/concern (Rozbicie) oraz kubełkami czasowymi + seriami (Trend). Kwoty na poziomie pozycji (`ABS(ti.amount_minor)`), inaczej niż Analizy/Dashboard (nagłówek transakcji).
+
+**Ustalenia:**
+- Okres jednym sposobem jak Analytics: `dateFrom`+`dateTo` albo `year`+`month` (backend normalizuje; oba naraz → 422).
+- Status: uwzględniane pozycje `status IN ('CLASSIFIED','PARTIALLY_CLASSIFIED')` (UI nie ma filtra statusu).
+- Kategoria główna: `COALESCE(category.parent_id, category.id)`; buckety „bez wartości” → `id:null` z etykietą („Bez kategorii/portfela/Dotyczy”).
+- `unclassifiedAmount` = suma pozycji `ti.category_id IS NULL` w zakresie tego samego zbioru co grupy.
+- Bez scope’u po userze — spójnie z Analizami i listą transakcji.
+- `chartTop` (limit „Top N”) pozostaje po stronie FE.
+- Wspólne filtry pozycji: `Home/Report/Shared/` (`ReportItemFilterCriteria`, `ReportItemQuery`).
+- Drill-down transakcji: faza 1 = link do `/transakcje` (filtry item-level vs header-level mogą się różnić); faza 2 = `GET /api/transactions` z filtrami pozycji.
 
 **Powód:** Dashboard stats operuje na nagłówku transakcji, niewystarczające dla typowych raportów domowych.
+
+**Dokumentacja:** pełna spec w [`docs/reporting.md`](reporting.md).
 
 ---
 

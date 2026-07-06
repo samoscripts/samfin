@@ -5,8 +5,8 @@
 Moduł raportów jest **częściowo zaimplementowany**:
 
 1. **Analizy** — `/app/raporty/analytics` z filtrami w URL (`year`, `month`, `walletId`); API `GET /api/reports/analytics`.
-2. **Rozbicie** — `/app/raporty/breakdown` — **plansza UI (mock)** z wykresami i filtrami; dane z fixture, backend `GET /api/reports/breakdown` — do implementacji.
-3. **Trend** — `/app/raporty/trend` — **plansza UI (mock)** wykresu miesięcznego; backend `GET /api/reports/trend` — do implementacji.
+2. **Rozbicie** — `/app/raporty/breakdown` z filtrami w URL; API `GET /api/reports/breakdown` (agregacja pozycji, spec poniżej).
+3. **Trend** — `/app/raporty/trend` — wykres liniowy/słupkowy z porównaniem serii; API `GET /api/reports/trend` (agregacja pozycji w czasie, spec poniżej).
 4. **Rozliczenia** — `/app/raporty/settlements` z zakładką konfiguracji; API `GET /api/reports/settlements` oraz `GET/PUT .../config`.
 5. **Podstawowe statystyki transakcji** — endpoint API i dashboard.
 6. **Lista transakcji z filtrami** — eksploracja operacyjna (nie raport formalny).
@@ -17,8 +17,8 @@ Moduł raportów jest **częściowo zaimplementowany**:
 
 - **Sidebar:** pozycja „Raporty” rozwija podmenu (nie zakładki w treści strony):
   - **Analizy** (`/raporty/analytics`)
-  - **Rozbicie** (`/raporty/breakdown`) — mock UI
-  - **Trend** (`/raporty/trend`) — mock UI
+  - **Rozbicie** (`/raporty/breakdown`)
+  - **Trend** (`/raporty/trend`)
   - **Rozliczenia** (`/raporty/settlements`)
 - **Layout raportów:** [`ReportsLayout.tsx`](../frontend/src/domains/home/reports/pages/ReportsLayout.tsx) — nagłówek + `<Outlet />` (bez poziomego podmenu).
 - **Rozliczenia:** [`SettlementLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementLayout.tsx) — jeden pasek: **Podsumowanie | Wpłaty rotacyjne | Portfele | Pozostałe** (lewa strona) oraz **Konfiguracja** (prawa strona). Filtr okresu w [`SettlementReportLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementReportLayout.tsx) — na wszystkich 4 zakładkach raportu, nie na konfiguracji.
@@ -28,7 +28,15 @@ Moduł raportów jest **częściowo zaimplementowany**:
 ```
 frontend/src/domains/home/reports/
 ├── pages/ReportsLayout.tsx
+├── shared/                    # okres, sidebar, kolory wykresów, fixture transakcji
 ├── analytics/pages/AnalyticsReport.tsx
+├── breakdown/pages/BreakdownReport.tsx
+├── trend/
+│   ├── pages/TrendReport.tsx
+│   ├── components/            # TrendSidebar, TrendChart, chipy filtrów
+│   ├── fixtures/trend.fixture.ts
+│   ├── types/trend.ts
+│   └── utils/trendUrl.ts
 └── settlements/pages/
     ├── SettlementLayout.tsx
     ├── SettlementReportLayout.tsx
@@ -45,8 +53,8 @@ frontend/src/domains/home/reports/
 |-------|------|
 | `/raporty` | redirect → `/raporty/analytics` |
 | `/raporty/analytics` | analizy (obecnie: zestawienie miesięczne) |
-| `/raporty/breakdown` | rozbicie wg kategorii/portfela/obszaru (mock) |
-| `/raporty/trend` | trend miesięczny przychody/wydatki (mock) |
+| `/raporty/breakdown` | rozbicie wg kategorii/portfela/obszaru |
+| `/raporty/trend` | trend przychody/wydatki w czasie; porównanie serii |
 | `/raporty/settlements` | rozliczenie — podsumowanie |
 | `/raporty/settlements/rotacyjne` | wpłaty rotacyjne (szczegóły) |
 | `/raporty/settlements/portfele` | portfele Maćka/Basi |
@@ -275,33 +283,214 @@ Cztery karty: przychody, wydatki, saldo, niesklasyfikowane. URL: `/?month=YYYY-M
 
 ---
 
-## Plansze UI (mock w React)
+## Wygląd i konfiguracja wykresów
 
-Strony prototypowe z **danymi przykładowymi** (fixture w `frontend/src/domains/home/reports/shared/fixtures/`). Banner „Podgląd — dane przykładowe” na górze strony. Po akceptacji UX podłączenie backendu bez zmiany układu.
+Raporty **Trend** i **Rozbicie** korzystają z realnego API (mocki i `MockBanner` usunięte). Poniżej wspólna konfiguracja wykresów.
+
+### Wygląd wykresów (`chartStyle`)
+
+**Globalna paleta** kolorów dla **Trendu** i **Rozbicia** — zakładka **Konfiguracja** w sidebarze filtrów (obok **Parametry raportu**). Zmiana natychmiastowa, bez „Zastosuj”.
+
+| Parametr URL | Wartości | Domyślnie |
+|--------------|----------|-----------|
+| `chartStyle` | patrz tabele poniżej | `rainbow` |
+
+Persystencja: `localStorage` (`fin.chartStyle`). Priorytet: URL → localStorage → domyślny.
+
+**Zasada kolorów:** każda **seria / kategoria** ma **inny kolor** (niebieski, zielony, żółty…). W obrębie serii: wpływ = jaśniejszy odcień, wydatek = ciemniejszy **tej samej** barwy. Wyjątek: palety **jednej tonacji** (3 szt.) — wszystkie serie w tej samej rodzinie barw.
+
+**Różnorodne** (`kind: diverse`):
+
+| ID | Opis |
+|----|------|
+| `rainbow` | Pełne zróżnicowanie — niebieski, zielony, żółty, pomarańcz, róż… |
+| `vivid` | Nasycone, wyraziste kolory |
+| `pastel` | Miękkie pastele — wydatki ciemniejsze |
+| `spring` | Świeże, wiosenne tony |
+| `autumn` | Ciepłe jesienne barwy |
+| `cool` | Chłodne: błękit, turkus, fiolet |
+| `warm` | Ciepłe: żółć, pomarańcz, róż |
+| `candy` | Jaskrawe „cukierkowe” odcienie |
+
+**Jedna tonacja** (`kind: mono`):
+
+| ID | Opis |
+|----|------|
+| `graphite` | Skala szarości |
+| `forest` | Zielenie (wpływy) i czerwienie (wydatki) |
+| `brand` | Zieleń i złoto aplikacji SamFin |
+
+**Sidebar:** zakładki `Parametry raportu` \| `Konfiguracja` — [`ReportSidebarTabs.tsx`](../frontend/src/domains/home/reports/shared/components/ReportSidebarTabs.tsx).
+
+**Trend (słupkowy):** para wydatek\|wpływ styka się (`barGap` ujemny), kolejność: wydatek → wpływ.
+
+Implementacja: [`chartPalettes.ts`](../frontend/src/shared/components/charts/chartPalettes.ts), [`chartStyle.ts`](../frontend/src/shared/components/charts/chartStyle.ts), [`useChartStyle.ts`](../frontend/src/shared/hooks/useChartStyle.ts), [`ChartStyleSection.tsx`](../frontend/src/domains/home/reports/shared/components/ChartStyleSection.tsx).
 
 ### Rozbicie (`BreakdownReport.tsx`)
 
-- Filtry w URL (jak transakcje): okres, portfel, kategoria, kierunek, status, kwota, opis, Skąd/Dokąd.
+- Filtry w URL (jak transakcje): okres, portfel, kategoria, kierunek, kwota, opis, Skąd/Dokąd (UI nie udostępnia filtra statusu).
 - Przełącznik grupowania: kategorie główne / podkategorie / portfele / obszary.
 - Kierunek: wydatki / przychody.
 - KPI: suma, liczba pozycji, średnia, kwota bez kategorii.
 - Wykresy (recharts): donut + słupki poziome + tabela z udziałem %.
 - Drill-down: klik kategorii głównej → podkategorie (`groupBy=categorySub` + `categoryId`).
+- Klik grupy → panel boczny z linkiem do `/transakcje` z filtrami okresu i kierunku (faza 1).
 
-Docelowe API: `GET /api/reports/breakdown` — kształt odpowiedzi w `shared/types/breakdown.ts`.
+#### API: `GET /api/reports/breakdown`
+
+Agregacja **pozycji transakcji** (`transaction_items`) w jednym okresie — kompozycja wg wybranego wymiaru (bez osi czasu). W przeciwieństwie do Trendu i Analiz (transakcje) — **sumy na poziomie pozycji**.
+
+Implementacja: `Home/Report/Breakdown/` (Controller + DTO + `BreakdownService`) + wspólny filtr `Home/Report/Shared/` (`ReportItemFilterCriteria`, `ReportItemQuery`). Wzorzec joinów: `SettlementItemQuery.php`.
+
+Parametry query:
+
+| Parametr | Wymagany | Opis |
+|----------|----------|------|
+| `dateFrom` + `dateTo` | tak* | Zakres dat raportu (`t.trans_date`) |
+| `year` + `month` | alternatywa* | Skrót okresu — backend normalizuje do `dateFrom`/`dateTo` (jak Analytics) |
+| `groupBy` | nie | `categoryMain` (domyślnie), `categorySub`, `wallet`, `concern` |
+| `reportDirection` | nie | `EXPENSE` (domyślnie) lub `INCOME` — filtr `t.direction` |
+| `walletId` | nie | Zawężenie pozycji do portfela (`ti.wallet_id`) |
+| `categoryId` | nie | Przy `groupBy=categorySub` — tylko podkategorie tej kategorii głównej; przy innych `groupBy` — zawężenie pozycji do kategorii |
+| `concernId` | nie | Zawężenie Dotyczy (`ti.concern_id`) |
+| `description` | nie | Szukaj w opisie (tytuł / opis transakcji / opis pozycji `ti.description`) |
+| `amountMin`, `amountMax` | nie | Zakres kwoty **pozycji** w PLN (`ABS(ti.amount_minor)`) |
+| `paidFromPartyId`, `paidToPartyId` | nie | Jak w filtrach transakcji |
+
+\*Jeden spójny sposób okresu — jak `GET /api/reports/analytics`. Frontend zawsze wysyła wyliczone `dateFrom`/`dateTo` z `reportPeriod.ts`.
+
+**Nie w API (tylko FE):** `chartTop` — limit wykresu („Top N” + „Pozostałe”) liczy frontend z pełnej listy `groups`.
+
+**Status transakcji:** UI nie udostępnia filtra statusu. Backend uwzględnia pozycje transakcji ze `status IN ('CLASSIFIED', 'PARTIALLY_CLASSIFIED')`.
+
+Reguły agregacji:
+
+- Źródło: `transaction_items ti` JOIN `transactions t` (+ słowniki wg `groupBy`).
+- Kwota pozycji: `ABS(ti.amount_minor) / 100` (2 miejsca); tylko transakcje o kierunku `reportDirection`.
+- **`groupBy=categoryMain`:** grupuj po kategorii głównej — `COALESCE(category.parent_id, category.id)`; nazwa = nazwa kategorii głównej.
+- **`groupBy=categorySub`:** grupuj po `ti.category_id`. Gdy `categoryId` ustawione — tylko dzieci tej kategorii; bez `categoryId` — wszystkie podkategorie w okresie.
+- **`groupBy=wallet`:** grupuj po `ti.wallet_id`; `id=null` → „Bez portfela”.
+- **`groupBy=concern`:** grupuj po `ti.concern_id` (pole **Dotyczy**); `id=null` → „Bez Dotyczy”.
+- **Grupa „Bez kategorii”:** `id: null`, `name: "Bez kategorii"` — pozycje z `ti.category_id IS NULL`.
+- **`unclassifiedAmount`:** suma kwot pozycji z `ti.category_id IS NULL` (liczona w zakresie tego samego zbioru co grupy).
+- **`share`:** `amount / total * 100`, 1 miejsce po przecinku; przy `total=0` → `0`.
+- **`averageAmount`:** `total / itemCount` (2 miejsca); przy `itemCount=0` → `0`.
+- Sortowanie `groups`: malejąco po `amount`.
+
+Odpowiedź (zgodna z `BreakdownReportData` / `shared/types/breakdown.ts`):
+
+```json
+{
+  "dateFrom": "2025-01-01",
+  "dateTo": "2025-01-31",
+  "groupBy": "categoryMain",
+  "direction": "EXPENSE",
+  "total": 4820.75,
+  "itemCount": 114,
+  "averageAmount": 42.29,
+  "unclassifiedAmount": 120.00,
+  "groups": [
+    { "id": 1, "name": "Żywność", "amount": 1240.50, "share": 25.7, "itemCount": 34 },
+    { "id": null, "name": "Bez kategorii", "amount": 120.00, "share": 2.5, "itemCount": 3 }
+  ]
+}
+```
+
+- `direction` w odpowiedzi = echo `reportDirection` z zapytania.
+- `id` grupy: ID encji słownikowej lub `null` dla bucketów „bez wartości”.
+
+**Drill-down transakcji (FE, faza 1):** klik grupy → panel boczny; link do `/transakcje?dateFrom=…&dateTo=…&direction=…` z filtrami grupy. **Uwaga:** raport liczy na pozycjach (`ti.description`, `ABS(ti.amount_minor)`), a lista `/transakcje` filtruje na nagłówkach (`t.amount_minor`, opis bez `ti.description`) — przy filtrach opisu/kwoty wyniki linku mogą się różnić od raportu. Pełną zgodność da **faza 2** (`GET /api/transactions` z filtrami item-level). Pozycje „Bez kategorii” linkują bez `categoryId` (lista nie ma filtra „pozycja bez kategorii”).
+
+Przykłady URL FE:
+
+- Kategorie główne, wydatki: `/app/raporty/breakdown?dateFrom=2025-01-01&dateTo=2025-01-31&groupBy=categoryMain&reportDirection=EXPENSE`
+- Podkategorie Żywności: `…&groupBy=categorySub&categoryId=1&reportDirection=EXPENSE`
+- Portfele, wpływy: `…&groupBy=wallet&reportDirection=INCOME`
 
 ### Trend (`TrendReport.tsx`)
 
-- Wykres liniowy lub słupkowy: przychody, wydatki, saldo miesiąc po miesiącu (mock 6 miesięcy).
-- Docelowe API: `GET /api/reports/trend`.
+- **Okres:** ten sam model co Rozbicie/Analizy (`year`+`month`, kwartał, zakres `dateFrom`+`dateTo`) — [`reportPeriod.ts`](../frontend/src/domains/home/reports/shared/utils/reportPeriod.ts).
+- **Kierunek:** multi-toggle Wpływ / Wydatek (`trendDirections`, domyślnie tylko Wydatek).
+- **Porównanie serii** (`trendSeriesBy`): brak | opisy | kategorie | portfele | Dotyczy — **jeden wymiar naraz**; wiele wartości w ramach wymiaru (`trendTerms`, `trendCategoryIds`, `trendWalletIds`, `trendConcernIds`).
+- **Zawężenie** (filtry opcjonalne): opis, kategoria, portfel, Dotyczy, kwota od/do — ukrywane w sidebarze, gdy ten sam wymiar jest użyty jako `seriesBy`.
+- **Granularność:** zależna od trybu okresu w sidebarze — zakładki nad wykresem:
+  - tryb **miesiąc** / **kwartał** — brak wyboru (miesięczne kubełki w kwartale);
+  - tryb **rok** — Miesięczny \| Kwartalny (`trendGranularity`);
+  - tryb **zakres dat** — Miesięczny \| Kwartalny \| Roczny.
+- **Wykres:** **słupkowy domyślnie** (`?chart=line` dla liniowego); stały panel wartości w prawym górnym rogu wykresu ([`ChartHoverPanel.tsx`](../frontend/src/shared/components/charts/ChartHoverPanel.tsx)) — bez tooltipu zasłaniającego wykres (Trend + Rozbicie).
+- **Schemat kolorów:** globalny `chartStyle` (patrz wyżej); przy obu kierunkach — para słupków wydatek\|wpływ stykająca się.
+- Klik pojedynczego słupka (okres + seria) i panel transakcji **pod** wykresem z linkiem do `/transakcje` (faza 1); wspólny styl słupków ([`chartBarShared.ts`](../frontend/src/shared/components/charts/chartBarShared.ts), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts)).
+
+Typy FE: [`trend/types/trend.ts`](../frontend/src/domains/home/reports/trend/types/trend.ts). Parsowanie URL + link drill-down: [`trend/utils/trendUrl.ts`](../frontend/src/domains/home/reports/trend/utils/trendUrl.ts).
+
+#### API: `GET /api/reports/trend`
+
+Agregacja **pozycji transakcji** (`transaction_items`) w kubełkach czasowych. W przeciwieństwie do Rozbicia — oś czasu zamiast kompozycji w jednym okresie.
+
+Parametry query:
+
+| Parametr | Wymagany | Opis |
+|----------|----------|------|
+| `dateFrom` + `dateTo` | tak* | Zakres dat raportu |
+| `year` + `month` / kwartał | alternatywa* | Skrót okresu (jak inne raporty) — backend normalizuje do `dateFrom`/`dateTo` |
+| `trendSeriesBy` | nie | `none` (domyślnie), `description`, `category`, `wallet`, `concern` |
+| `trendTerms` | nie | Lista opisów (CSV), gdy `seriesBy=description` |
+| `trendCategoryIds` | nie | ID kategorii (CSV), gdy `seriesBy=category` |
+| `trendWalletIds` | nie | ID portfeli (CSV), gdy `seriesBy=wallet` |
+| `trendConcernIds` | nie | ID Dotyczy (CSV), gdy `seriesBy=concern` |
+| `trendDirections` | nie | `EXPENSE`, `INCOME` lub oba (CSV); domyślnie `EXPENSE` |
+| `trendGranularity` | nie | `month`, `quarter` lub `year`; widoczność i dozwolone wartości zależą od `periodMode` (patrz UI powyżej) |
+| `description` | nie | Zawężenie: opis zawiera (gdy `seriesBy≠description`) |
+| `categoryId` | nie | Zawężenie pojedynczej kategorii (gdy `seriesBy≠category`) |
+| `walletId` | nie | Zawężenie portfela (gdy `seriesBy≠wallet`) |
+| `concernId` | nie | Zawężenie Dotyczy (gdy `seriesBy≠concern`) |
+| `amountMin`, `amountMax` | nie | Zakres kwoty pozycji |
+| `paidFromPartyId`, `paidToPartyId` | nie | Jak w filtrach transakcji |
+
+\*Jeden spójny sposób określenia okresu — jak [`GET /api/reports/analytics`](#analizy-mvp).
+
+Reguły:
+
+- Gdy `trendSeriesBy=none` — jedna seria „Razem” (sumy w kubełku).
+- Gdy `seriesBy≠none` — każda wartość z listy to osobna seria; brak listy → pusta odpowiedź lub `422`.
+- Nie mieszać wymiarów serii (np. kategorie + portfele jednocześnie) — tylko przez `trendSeriesBy`.
+- `concern` w API = pole **Dotyczy** (Basia, Maciek, Wspólne), nie obszar domowy.
+
+Odpowiedź (zgodna z `TrendReportData`):
+
+```json
+{
+  "dateFrom": "2025-01-01",
+  "dateTo": "2025-12-31",
+  "granularity": "month",
+  "seriesBy": "description",
+  "points": [
+    {
+      "period": "2025-01",
+      "label": "Sty",
+      "totals": { "income": 0, "expenses": 4200.50 },
+      "series": [
+        { "id": "term:Allegro", "name": "Allegro", "income": 0, "expenses": 890.00 },
+        { "id": "term:Biedronka", "name": "Biedronka", "income": 0, "expenses": 1200.00 }
+      ]
+    }
+  ]
+}
+```
+
+- `period`: `YYYY-MM` dla `month`, `YYYY-Qn` dla `quarter`, `YYYY` dla `year`.
+- `income` / `expenses`: sumy w PLN (2 miejsca), zgodnie z kierunkiem pozycji; filtrowane wg `trendDirections`.
+- `totals`: suma wszystkich serii w kubełku (przy `seriesBy=none` — to jedyna seria logiczna).
+
+Przykład URL FE: `/app/raporty/trend?dateFrom=2025-01-01&dateTo=2025-12-31&trendSeriesBy=description&trendTerms=Allegro,Biedronka&trendDirections=EXPENSE`
 
 ---
 
 ## Czego brakuje
 
 - Okresy rozliczeniowe ze snapshotami i zamknięciem okresu (docelowy wariant rozliczeń)
-- Zestawienia wg kategorii / obszarów (agregaty ogólne)
-- Raport roczny, wykresy trendów
+- Drill-down transakcji faza 2: `GET /api/transactions` z filtrami item-level w panelach Rozbicia/Trendu (obecnie link do wyszukiwarki)
+- Skróty okresu `year`/`month`/`quarter` w API Rozbicia/Trendu na poziomie UI (backend przyjmuje `year`+`month`)
 - Eksport danych (PDF, CSV)
 - Budżet vs wykonanie
 - Filtr zakresu dat w analizach (preset „Miesięczny”)

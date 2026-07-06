@@ -1,7 +1,11 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { useState } from 'react'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { useTheme } from '@/app/providers/ThemeProvider'
-import { chartColor, chartThemeColors } from '@/shared/components/charts/chartColors'
-import { formatAmount } from '@/shared/utils/format'
+import type { ChartStyle } from '@/shared/components/charts/chartStyle'
+import { chartBarHoverOpacityIndex } from '@/shared/components/charts/chartDirectionBarStyle'
+import { getDonutSlicePaint } from '@/shared/components/charts/chartDirectionBarStyle'
+import { applyChartStyleSelectionStroke } from '@/shared/components/charts/chartStyleSchemes'
+import ChartHoverPanel, { type ChartHoverPayload } from '@/shared/components/charts/ChartHoverPanel'
 
 export interface DonutChartItem {
   id: string
@@ -13,11 +17,20 @@ interface DonutChartProps {
   data: DonutChartItem[]
   onSliceClick?: (id: string) => void
   activeId?: string | null
+  chartStyle: ChartStyle
+  direction: 'INCOME' | 'EXPENSE'
 }
 
-export default function DonutChart({ data, onSliceClick, activeId }: DonutChartProps) {
+export default function DonutChart({
+  data,
+  onSliceClick,
+  activeId,
+  chartStyle,
+  direction,
+}: DonutChartProps) {
   const { effective } = useTheme()
-  const theme = chartThemeColors(effective)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [hoverPayload, setHoverPayload] = useState<ChartHoverPayload | null>(null)
 
   if (data.length === 0) {
     return (
@@ -28,42 +41,62 @@ export default function DonutChart({ data, onSliceClick, activeId }: DonutChartP
   }
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          innerRadius={62}
-          outerRadius={100}
-          paddingAngle={2}
-          onClick={(_, index) => onSliceClick?.(data[index]?.id ?? '')}
-          className={onSliceClick ? 'cursor-pointer' : undefined}
-        >
-          {data.map((entry, index) => (
-            <Cell
-              key={entry.id}
-              fill={chartColor(index)}
-              stroke={activeId === entry.id ? theme.tooltipText : 'transparent'}
-              strokeWidth={activeId === entry.id ? 2 : 0}
-              opacity={activeId && activeId !== entry.id ? 0.45 : 1}
-            />
-          ))}
-        </Pie>
-        <Tooltip
-          contentStyle={{
-            background: theme.tooltipBg,
-            border: `1px solid ${theme.tooltipBorder}`,
-            borderRadius: 8,
-            fontSize: 13,
-          }}
-          labelStyle={{ color: theme.tooltipText }}
-          itemStyle={{ color: theme.tooltipText }}
-          formatter={(value: number) => formatAmount(value)}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <ChartHoverPanel payload={hoverPayload} emptyLabel="Najedź na wykres kołowy">
+      <ResponsiveContainer width="100%" height={280}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius={62}
+            outerRadius={100}
+            paddingAngle={2}
+            onClick={(_, index) => onSliceClick?.(data[index]?.id ?? '')}
+            className={onSliceClick ? 'cursor-pointer' : undefined}
+            onMouseEnter={(_, index) => {
+              const entry = data[index]
+              if (!entry) return
+              setHoveredIndex(index)
+              setHoverPayload({ label: entry.name, value: entry.value })
+            }}
+            onMouseLeave={() => {
+              setHoveredIndex(null)
+              setHoverPayload(null)
+            }}
+          >
+            {data.map((entry, index) => {
+              const fillOpacity = chartBarHoverOpacityIndex(
+                index,
+                entry.id,
+                activeId,
+                hoveredIndex,
+              )
+              const paint = applyChartStyleSelectionStroke(
+                getDonutSlicePaint(index, direction, chartStyle, fillOpacity),
+                entry.id,
+                activeId,
+              )
+              const sliceStroke =
+                paint.stroke !== 'transparent'
+                  ? paint.stroke
+                  : effective === 'dark'
+                    ? '#111827'
+                    : '#ffffff'
+              return (
+                <Cell
+                  key={entry.id}
+                  fill={paint.fill}
+                  fillOpacity={paint.fillOpacity}
+                  stroke={sliceStroke}
+                  strokeWidth={paint.strokeWidth > 0 ? paint.strokeWidth : 2}
+                />
+              )
+            })}
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+    </ChartHoverPanel>
   )
 }

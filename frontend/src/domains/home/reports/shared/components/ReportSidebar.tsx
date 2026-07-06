@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { useIsMobile } from '@/shared/hooks/useIsMobile'
-import TransactionFiltersForm from '@/domains/home/transactions/components/filters/TransactionFiltersForm'
+import ReportFiltersForm from '@/domains/home/reports/shared/components/ReportFiltersForm'
 import type { FlowFilters } from '@/domains/home/transactions/types'
 import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 import { fetchConcerns, type Concern } from '@/shared/api/concerns'
@@ -10,44 +10,33 @@ import { fetchCategories, type Category } from '@/shared/api/categories'
 import { fetchParties } from '@/shared/api/parties'
 import type { Party } from '@/domains/home/configuration/parties/types'
 import { filterPartiesForFilterPanel } from '@/domains/home/transactions/utils/partyAssignment'
-import {
-  parseCommaList,
-  parseOptionalString,
-} from '@/shared/utils/urlQuery'
+import ReportPeriodSection from '@/domains/home/reports/shared/components/ReportPeriodSection'
+import ReportWalletSection from '@/domains/home/reports/shared/components/ReportWalletSection'
+import type { ParsedReportPeriodState, ReportPeriodMode } from '@/domains/home/reports/shared/utils/reportPeriod'
+import { parseOptionalString } from '@/shared/utils/urlQuery'
+import type { BreakdownDirection } from '@/domains/home/reports/shared/types/breakdown'
+import { countActiveReportFilterChips } from '@/domains/home/reports/shared/components/ReportFilterChips'
+import { useSidebarDraftSync } from '@/shared/hooks/useSidebarDraftSync'
+import type { ChartStyle } from '@/shared/components/charts/chartStyle'
+import ChartStyleSection from '@/domains/home/reports/shared/components/ChartStyleSection'
+import ReportSidebarTabs, {
+  useReportSidebarTab,
+} from '@/domains/home/reports/shared/components/ReportSidebarTabs'
 
 const PANEL_WIDTH = 420
-const VALID_DIRECTIONS = new Set(['EXPENSE', 'INCOME'])
 
-function expandMonthSugar(month: string): Pick<FlowFilters, 'dateFrom' | 'dateTo'> {
-  const match = /^(\d{4})-(\d{2})$/.exec(month.trim())
-  if (!match) return {}
-  const year = Number(match[1])
-  const mon = Number(match[2])
-  if (mon < 1 || mon > 12) return {}
-  const lastDay = new Date(year, mon, 0).getDate()
-  const mm = String(mon).padStart(2, '0')
-  return {
-    dateFrom: `${year}-${mm}-01`,
-    dateTo: `${year}-${mm}-${String(lastDay).padStart(2, '0')}`,
-  }
-}
+const FILTER_PARAM_KEYS = [
+  'paidFromPartyId',
+  'paidToPartyId',
+  'concernId',
+  'categoryId',
+  'amountMin',
+  'amountMax',
+  'description',
+] as const
 
 export function parseReportFlowFilters(params: URLSearchParams): FlowFilters {
-  const monthSugar = parseOptionalString(params.get('month'))
-  const monthRange = monthSugar ? expandMonthSugar(monthSugar) : {}
-
-  const directions = parseCommaList(params.get('direction')).filter((d) =>
-    VALID_DIRECTIONS.has(d),
-  ) as NonNullable<FlowFilters['directions']>
-
   return {
-    ...monthRange,
-    dateFrom: parseOptionalString(params.get('dateFrom')) ?? monthRange.dateFrom,
-    dateTo: parseOptionalString(params.get('dateTo')) ?? monthRange.dateTo,
-    directions: directions.length > 0 ? directions : undefined,
-    statuses: parseCommaList(params.get('status')).length
-      ? parseCommaList(params.get('status'))
-      : undefined,
     paidFromPartyId: parseOptionalString(params.get('paidFromPartyId')),
     paidToPartyId: parseOptionalString(params.get('paidToPartyId')),
     walletId: parseOptionalString(params.get('walletId')),
@@ -64,27 +53,11 @@ export function serializeReportFlowFilters(
   base: URLSearchParams,
 ): URLSearchParams {
   const params = new URLSearchParams(base)
-  const keys = [
-    'dateFrom',
-    'dateTo',
-    'direction',
-    'status',
-    'paidFromPartyId',
-    'paidToPartyId',
-    'walletId',
-    'concernId',
-    'categoryId',
-    'amountMin',
-    'amountMax',
-    'description',
-    'month',
-  ] as const
-  for (const key of keys) params.delete(key)
+  for (const key of FILTER_PARAM_KEYS) params.delete(key)
+  params.delete('walletId')
+  params.delete('direction')
+  params.delete('status')
 
-  if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
-  if (filters.dateTo) params.set('dateTo', filters.dateTo)
-  if (filters.directions?.length) params.set('direction', filters.directions.join(','))
-  if (filters.statuses?.length) params.set('status', filters.statuses.join(','))
   if (filters.paidFromPartyId) params.set('paidFromPartyId', filters.paidFromPartyId)
   if (filters.paidToPartyId) params.set('paidToPartyId', filters.paidToPartyId)
   if (filters.walletId) params.set('walletId', filters.walletId)
@@ -97,29 +70,73 @@ export function serializeReportFlowFilters(
   return params
 }
 
-interface ReportFiltersPanelProps {
-  open: boolean
-  onClose: () => void
-  activeFilters: FlowFilters
-  onApply: (filters: FlowFilters) => void
+export function countReportFilters(filters: FlowFilters): number {
+  return countActiveReportFilterChips(filters)
 }
 
-export default function ReportFiltersPanel({
+export function flowFiltersSignature(filters: FlowFilters): string {
+  return [
+    filters.paidFromPartyId ?? '',
+    filters.paidToPartyId ?? '',
+    filters.walletId ?? '',
+    filters.concernId ?? '',
+    filters.categoryId ?? '',
+    filters.amountMin ?? '',
+    filters.amountMax ?? '',
+    filters.description ?? '',
+  ].join('\x1f')
+}
+
+interface ReportSidebarProps {
+  open: boolean
+  onClose: () => void
+  period: ParsedReportPeriodState
+  onPeriodModeChange: (mode: ReportPeriodMode) => void
+  onPeriodNavigate: (direction: -1 | 1) => void
+  onPeriodJumpToCurrent: () => void
+  onPeriodRangeChange: (dateFrom: string, dateTo: string) => void
+  walletId: string
+  onWalletChange: (walletId: string) => void
+  activeFilters: FlowFilters
+  onApplyFilters: (filters: FlowFilters) => void
+  reportDirection?: BreakdownDirection
+  chartStyle: ChartStyle
+  onChartStyleChange: (style: ChartStyle) => void
+  extraSections?: ReactNode
+}
+
+export default function ReportSidebar({
   open,
   onClose,
+  period,
+  onPeriodModeChange,
+  onPeriodNavigate,
+  onPeriodJumpToCurrent,
+  onPeriodRangeChange,
+  walletId,
+  onWalletChange,
   activeFilters,
-  onApply,
-}: ReportFiltersPanelProps) {
+  onApplyFilters,
+  reportDirection,
+  chartStyle,
+  onChartStyleChange,
+  extraSections,
+}: ReportSidebarProps) {
   const isMobile = useIsMobile()
-  const [draft, setDraft] = useState<FlowFilters>(activeFilters)
+  const [activeTab, setActiveTab] = useReportSidebarTab(open)
+  const appliedFilterDraft = useMemo(() => {
+    const { walletId: _, ...filterDraft } = activeFilters
+    return filterDraft
+  }, [activeFilters])
+  const appliedFilterSignature = useMemo(
+    () => flowFiltersSignature(activeFilters),
+    [activeFilters],
+  )
+  const [draft, setDraft] = useSidebarDraftSync(open, appliedFilterDraft, appliedFilterSignature)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [concerns, setConcerns] = useState<Concern[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [parties, setParties] = useState<Party[]>([])
-
-  useEffect(() => {
-    if (open) setDraft(activeFilters)
-  }, [open, activeFilters])
 
   useEffect(() => {
     if (!open) return
@@ -149,7 +166,7 @@ export default function ReportFiltersPanel({
     <div className="flex items-center gap-2 shrink-0 px-5 py-3 border-b border-gray-200 dark:border-gray-800">
       <SlidersHorizontal size={14} className="text-gray-400 shrink-0" />
       <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex-1 min-w-0 truncate">
-        Filtry raportu
+        Filtry i okres
       </h2>
       <button
         type="button"
@@ -169,14 +186,11 @@ export default function ReportFiltersPanel({
         onClick={() => setDraft({})}
         className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       >
-        Wyczyść
+        Wyczyść filtry
       </button>
       <button
         type="button"
-        onClick={() => {
-          onApply(draft)
-          onClose()
-        }}
+        onClick={() => onApplyFilters(draft)}
         className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-[#163526] text-white hover:bg-[#1e4a32] transition-colors"
       >
         Zastosuj filtry
@@ -184,23 +198,63 @@ export default function ReportFiltersPanel({
     </div>
   )
 
+  const paramsBody = (
+    <div className="space-y-6">
+      <ReportPeriodSection
+        period={period}
+        onModeChange={onPeriodModeChange}
+        onNavigate={onPeriodNavigate}
+        onJumpToCurrent={onPeriodJumpToCurrent}
+        onRangeChange={onPeriodRangeChange}
+      />
+
+      {extraSections && (
+        <>
+          <div className="border-t border-gray-100 dark:border-gray-800" />
+          {extraSections}
+        </>
+      )}
+
+      <div className="border-t border-gray-100 dark:border-gray-800" />
+
+      <ReportWalletSection
+        wallets={wallets}
+        walletId={walletId}
+        onChange={onWalletChange}
+      />
+
+      <div className="border-t border-gray-100 dark:border-gray-800" />
+
+      <ReportFiltersForm
+        draft={draft}
+        onFieldChange={handleFieldChange}
+        concerns={concerns}
+        categories={categories}
+        paidFromParties={paidFromParties}
+        paidToParties={paidToParties}
+        reportDirection={reportDirection}
+      />
+    </div>
+  )
+
+  const configBody = (
+    <ChartStyleSection value={chartStyle} onChange={onChartStyleChange} />
+  )
+
   const body = (
-    <TransactionFiltersForm
-      draft={draft}
-      onFieldChange={handleFieldChange}
-      wallets={wallets}
-      concerns={concerns}
-      categories={categories}
-      paidFromParties={paidFromParties}
-      paidToParties={paidToParties}
-    />
+    <div className="flex flex-col flex-1 min-h-0">
+      <ReportSidebarTabs active={activeTab} onChange={setActiveTab} />
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+        {activeTab === 'params' ? paramsBody : configBody}
+      </div>
+    </div>
   )
 
   const inner = (
     <div className="flex flex-col h-full min-h-0">
       {header}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">{body}</div>
-      {footer}
+      {body}
+      {activeTab === 'params' ? footer : null}
     </div>
   )
 
@@ -232,7 +286,7 @@ export default function ReportFiltersPanel({
   )
 }
 
-export function useReportFiltersPanel() {
+export function useReportSidebar() {
   const [searchParams, setSearchParams] = useSearchParams()
   const open = searchParams.get('panel') === 'filters'
 

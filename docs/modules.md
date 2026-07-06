@@ -82,6 +82,11 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 | Plik | Route | Opis |
 |------|-------|------|
 | `Report/Analytics/Controller/AnalyticsController.php` | `GET /api/reports/analytics` | Zestawienie miesięczne (przychody, wydatki, saldo) |
+| `Report/Breakdown/Controller/BreakdownController.php` | `GET /api/reports/breakdown` | Rozbicie: agregacja pozycji w okresie wg kategorii/portfela/obszaru |
+| `Report/Breakdown/Service/BreakdownService.php` | — | Agregacja `transaction_items` (GROUP BY, KPI, share) |
+| `Report/Trend/Controller/TrendController.php` | `GET /api/reports/trend` | Trend: agregacja pozycji w kubełkach czasowych z porównaniem serii |
+| `Report/Trend/Service/TrendAggregationService.php` | — | Kubełki miesiąc/kwartał/rok + serie |
+| `Report/Shared/Repository/ReportItemQuery.php` | — | Wspólne warunki SQL filtrów pozycji (Breakdown + Trend) |
 | `Report/Settlement/Controller/SettlementController.php` | `GET /api/reports/settlements` | Raport rozliczenia wpłat |
 | `Report/Settlement/Controller/SettlementController.php` | `GET/PUT /api/reports/settlements/config` | Konfiguracja rozliczenia per użytkownik |
 | `Report/Settlement/Service/SettlementService.php` | — | Logika obliczeń rozliczenia |

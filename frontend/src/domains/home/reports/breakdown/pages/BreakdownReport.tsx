@@ -1,37 +1,39 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { SlidersHorizontal } from 'lucide-react'
-import { useRightPanelPortal } from '@/layout/RightPanelContext'
-import PeriodNavigator from '@/shared/components/PeriodNavigator'
-import PeriodSidebar from '@/shared/components/PeriodSidebar'
-import DictionarySelect from '@/shared/components/form/DictionarySelect'
-import FilterChips from '@/domains/home/transactions/components/FilterChips'
+import { Loader2 } from 'lucide-react'
 import type { FlowFilters } from '@/domains/home/transactions/types'
-import { countActiveFilters } from '@/domains/home/transactions/types'
-import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 import { fetchCategories, type Category } from '@/shared/api/categories'
+import { fetchBreakdownReport } from '@/shared/api/breakdown'
 import { formatAmount } from '@/shared/utils/format'
-import {
-  currentYearMonth,
-  parseReportPeriod,
-  paramToYearMonth,
-  serializeReportMonthPeriod,
-  serializeReportRangePeriod,
-  withReportPeriodPanel,
-} from '@/shared/utils/periodUrl'
-import MockBanner from '@/domains/home/reports/shared/components/MockBanner'
+import { currentYearMonth } from '@/shared/utils/periodUrl'
 import ReportStatCard from '@/domains/home/reports/shared/components/ReportStatCard'
-import ReportFiltersPanel, {
+import ReportPageShell from '@/domains/home/reports/shared/components/ReportPageShell'
+import ReportFilterChips from '@/domains/home/reports/shared/components/ReportFilterChips'
+import ReportSidebar, {
+  countReportFilters,
   parseReportFlowFilters,
   serializeReportFlowFilters,
-  useReportFiltersPanel,
-} from '@/domains/home/reports/shared/components/ReportFiltersPanel'
-import { getBreakdownMockData } from '@/domains/home/reports/shared/fixtures/breakdown.fixture'
-import type { BreakdownGroup, BreakdownGroupBy, BreakdownDirection } from '@/domains/home/reports/shared/types/breakdown'
-import GroupByToggle from '@/domains/home/reports/breakdown/components/GroupByToggle'
+  useReportSidebar,
+} from '@/domains/home/reports/shared/components/ReportSidebar'
+import ReportChartTopSection from '@/domains/home/reports/shared/components/ReportChartTopSection'
+import { ReportGroupingSection } from '@/domains/home/reports/shared/components/ReportSidebarSections'
+import { parseChartTop, breakdownGroupChartId } from '@/domains/home/reports/shared/utils/chartTopGroups'
+import { buildCurrentPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
+import {
+  navigatePeriod,
+  parseReportPeriodState,
+  serializeReportPeriodState,
+  switchPeriodMode,
+  type ReportPeriodMode,
+} from '@/domains/home/reports/shared/utils/reportPeriod'
+import type {
+  BreakdownGroup,
+  BreakdownGroupBy,
+  BreakdownDirection,
+  BreakdownReportData,
+} from '@/domains/home/reports/shared/types/breakdown'
 import BreakdownCharts from '@/domains/home/reports/breakdown/components/BreakdownCharts'
-import BreakdownTable from '@/domains/home/reports/breakdown/components/BreakdownTable'
+import { useChartStyle } from '@/shared/hooks/useChartStyle'
 
 const VALID_GROUP_BY = new Set<BreakdownGroupBy>([
   'categoryMain',
@@ -45,54 +47,106 @@ function parseGroupBy(raw: string | null): BreakdownGroupBy {
   return 'categoryMain'
 }
 
-function parseDirection(raw: string | null, filters: FlowFilters): BreakdownDirection {
+function parseDirection(raw: string | null): BreakdownDirection {
   if (raw === 'INCOME' || raw === 'EXPENSE') return raw
-  if (filters.directions?.length === 1) return filters.directions[0]
   return 'EXPENSE'
 }
 
+function emptyData(groupBy: BreakdownGroupBy, direction: BreakdownDirection): BreakdownReportData {
+  return {
+    dateFrom: '',
+    dateTo: '',
+    groupBy,
+    direction,
+    total: 0,
+    itemCount: 0,
+    averageAmount: 0,
+    unclassifiedAmount: 0,
+    groups: [],
+  }
+}
+
 export default function BreakdownReport() {
-  const periodTriggerRef = useRef<HTMLButtonElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const portalRoot = useRightPanelPortal()
-  const { open: filtersOpen, openPanel: openFilters, closePanel: closeFilters } = useReportFiltersPanel()
+  const { open: sidebarOpen, openPanel, closePanel } = useReportSidebar()
+  const [chartStyle, setChartStyle] = useChartStyle()
 
   const defaults = useMemo(() => currentYearMonth(), [])
-  const period = useMemo(() => parseReportPeriod(searchParams, defaults), [searchParams, defaults])
+  const period = useMemo(
+    () => parseReportPeriodState(searchParams, defaults),
+    [searchParams, defaults],
+  )
   const filters = useMemo(() => parseReportFlowFilters(searchParams), [searchParams])
   const groupBy = parseGroupBy(searchParams.get('groupBy'))
-  const direction = parseDirection(searchParams.get('reportDirection'), filters)
-  const walletId = filters.walletId ?? searchParams.get('walletId') ?? ''
+  const direction = parseDirection(searchParams.get('reportDirection'))
+  const walletId = filters.walletId ?? ''
   const categoryId = filters.categoryId ?? ''
-  const periodPanelOpen = searchParams.get('panel') === 'period'
 
-  const [wallets, setWallets] = useState<Wallet[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [activeChartId, setActiveChartId] = useState<string | null>(null)
+  const [data, setData] = useState<BreakdownReportData>(() => emptyData(groupBy, direction))
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchWallets().then(setWallets).catch(() => setWallets([]))
     fetchCategories().then(setCategories).catch(() => setCategories([]))
   }, [])
 
-  const data = useMemo(
-    () =>
-      getBreakdownMockData({
-        dateFrom: period.dateFrom,
-        dateTo: period.dateTo,
-        groupBy,
-        direction,
-        categoryId: categoryId || undefined,
-        walletId: walletId || undefined,
-      }),
-    [period.dateFrom, period.dateTo, groupBy, direction, categoryId, walletId],
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetchBreakdownReport({
+      dateFrom: period.dateFrom,
+      dateTo: period.dateTo,
+      groupBy,
+      reportDirection: direction,
+      walletId: filters.walletId,
+      categoryId: filters.categoryId,
+      concernId: filters.concernId,
+      paidFromPartyId: filters.paidFromPartyId,
+      paidToPartyId: filters.paidToPartyId,
+      amountMin: filters.amountMin,
+      amountMax: filters.amountMax,
+      description: filters.description,
+    })
+      .then((res) => {
+        if (!cancelled) setData(res)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Nie udało się załadować raportu.')
+          setData(emptyData(groupBy, direction))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [period.dateFrom, period.dateTo, groupBy, direction, filters])
+
+  const chartTop = useMemo(
+    () => parseChartTop(searchParams.get('chartTop'), data.groups.length),
+    [searchParams, data.groups.length],
   )
 
-  const filterCount = countActiveFilters(filters)
+  const filterCount = countReportFilters(filters)
 
-  const walletExtra = useMemo(
-    () => ({ walletId: walletId || undefined }),
-    [walletId],
+  const applyPeriod = useCallback(
+    (
+      next: Pick<
+        typeof period,
+        'mode' | 'year' | 'month' | 'quarter' | 'dateFrom' | 'dateTo' | 'monthParam' | 'isCustomRange'
+      >,
+    ) => {
+      setSearchParams(
+        (prev) => serializeReportPeriodState(next, new URLSearchParams(prev), defaults),
+        { replace: true },
+      )
+    },
+    [setSearchParams, defaults],
   )
 
   const patchParams = useCallback(
@@ -109,89 +163,64 @@ export default function BreakdownReport() {
     [setSearchParams],
   )
 
-  const handleMonthChange = useCallback(
-    (monthParam: string) => {
-      const ym = paramToYearMonth(monthParam)
-      if (!ym) return
-      const params = serializeReportMonthPeriod(ym.year, ym.month, defaults, {
-        walletId: walletId || undefined,
-      })
-      for (const [key, value] of searchParams.entries()) {
-        if (!['year', 'month', 'dateFrom', 'dateTo', 'walletId'].includes(key)) {
-          params.set(key, value)
-        }
-      }
-      setSearchParams(params, { replace: true })
+  const handlePeriodModeChange = useCallback(
+    (mode: ReportPeriodMode) => {
+      if (mode === period.mode) return
+      applyPeriod(switchPeriodMode(period, mode))
     },
-    [defaults, setSearchParams, searchParams, walletId],
+    [period, applyPeriod],
   )
 
-  const openPeriodPanel = useCallback(() => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev)
-      params.set('panel', 'period')
-      return params
-    }, { replace: true })
-  }, [setSearchParams])
-
-  const closePeriodPanel = useCallback(() => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev)
-      params.delete('panel')
-      return params
-    }, { replace: true })
-  }, [setSearchParams])
-
-  const handleApplyMonthPick = useCallback(
-    (year: number, month: number) => {
-      const params = withReportPeriodPanel(
-        serializeReportMonthPeriod(year, month, defaults, walletExtra),
-        periodPanelOpen,
-      )
-      setSearchParams(params, { replace: true })
+  const handlePeriodNavigate = useCallback(
+    (dir: -1 | 1) => {
+      applyPeriod(navigatePeriod(period, dir))
     },
-    [defaults, setSearchParams, walletExtra, periodPanelOpen],
+    [period, applyPeriod],
   )
 
-  const handleRangeChange = useCallback(
+  const handlePeriodJumpToCurrent = useCallback(() => {
+    applyPeriod(buildCurrentPeriodState(period.mode))
+  }, [period.mode, applyPeriod])
+
+  const handlePeriodRangeChange = useCallback(
     (dateFrom: string, dateTo: string) => {
-      const params = withReportPeriodPanel(
-        serializeReportRangePeriod(dateFrom, dateTo, walletExtra),
-        periodPanelOpen,
-      )
-      setSearchParams(params, { replace: true })
+      applyPeriod({
+        ...period,
+        mode: 'range',
+        dateFrom,
+        dateTo,
+        isCustomRange: true,
+      })
     },
-    [setSearchParams, walletExtra, periodPanelOpen],
+    [period, applyPeriod],
   )
 
-  const updateWallet = useCallback(
-    (id: string | number | null) => {
-      const nextWallet = id == null ? '' : String(id)
-      const params = period.isCustomRange
-        ? serializeReportRangePeriod(period.dateFrom, period.dateTo, {
-            walletId: nextWallet || undefined,
-          })
-        : serializeReportMonthPeriod(period.year, period.month, defaults, {
-            walletId: nextWallet || undefined,
-          })
-      for (const [k, v] of searchParams.entries()) {
-        if (!['year', 'month', 'dateFrom', 'dateTo', 'walletId'].includes(k)) {
-          params.set(k, v)
-        }
-      }
-      if (periodPanelOpen) params.set('panel', 'period')
-      setSearchParams(params, { replace: true })
+  const handleWalletChange = useCallback(
+    (nextWallet: string) => {
+      setSearchParams(
+        (prev) =>
+          serializeReportFlowFilters(
+            { ...parseReportFlowFilters(prev), walletId: nextWallet || undefined },
+            new URLSearchParams(prev),
+          ),
+        { replace: true },
+      )
     },
-    [period, defaults, setSearchParams, periodPanelOpen, searchParams],
+    [setSearchParams],
   )
 
   const applyFilters = useCallback(
     (next: FlowFilters) => {
-      setSearchParams((prev) => serializeReportFlowFilters(next, new URLSearchParams(prev)), {
-        replace: true,
-      })
+      setSearchParams(
+        (prev) =>
+          serializeReportFlowFilters(
+            { ...next, walletId: walletId || undefined },
+            new URLSearchParams(prev),
+          ),
+        { replace: true },
+      )
     },
-    [setSearchParams],
+    [setSearchParams, walletId],
   )
 
   const handleGroupByChange = useCallback(
@@ -212,7 +241,18 @@ export default function BreakdownReport() {
     [patchParams],
   )
 
-  const handleRowClick = useCallback(
+  const handleGroupSelect = useCallback((id: string) => {
+    setActiveChartId((prev) => (prev === id ? null : id))
+  }, [])
+
+  const handleRowSelect = useCallback(
+    (group: BreakdownGroup) => {
+      handleGroupSelect(breakdownGroupChartId(group))
+    },
+    [handleGroupSelect],
+  )
+
+  const handleDrillDown = useCallback(
     (group: BreakdownGroup) => {
       if (group.id === null) return
       patchParams({
@@ -224,15 +264,17 @@ export default function BreakdownReport() {
     [patchParams],
   )
 
-  const handleChartClick = useCallback(
-    (id: string) => {
-      if (groupBy === 'categoryMain') {
-        patchParams({ groupBy: 'categorySub', categoryId: id })
-      }
-      setActiveChartId(id)
+  const handleChartTopChange = useCallback(
+    (next: number) => {
+      patchParams({ chartTop: String(next) })
+      setActiveChartId(null)
     },
-    [groupBy, patchParams],
+    [patchParams],
   )
+
+  const handleClearChartSelection = useCallback(() => {
+    setActiveChartId(null)
+  }, [])
 
   const parentCategoryName =
     categoryId && groupBy === 'categorySub'
@@ -240,69 +282,64 @@ export default function BreakdownReport() {
       : null
 
   return (
-    <>
-      <div className="space-y-5">
-        <MockBanner />
-
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-          <PeriodNavigator
-            monthParam={period.monthParam}
-            isCustomRange={period.isCustomRange}
-            dateFrom={period.dateFrom}
-            dateTo={period.dateTo}
-            showAdvanced
-            advancedOpen={periodPanelOpen}
-            onOpenAdvanced={openPeriodPanel}
-            advancedButtonRef={periodTriggerRef}
-            onMonthChange={handleMonthChange}
-          />
-          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-            <label className="text-sm text-gray-600 dark:text-gray-400 flex flex-col gap-1 min-w-[200px]">
-              Portfel
-              <DictionarySelect
-                items={wallets}
-                value={walletId}
-                onChange={updateWallet}
-                emptyLabel="Wszystkie portfele"
-                valueType="string"
+    <ReportPageShell
+      sidebarOpen={sidebarOpen}
+      onOpenSidebar={openPanel}
+      onCloseSidebar={closePanel}
+      filterCount={filterCount + (walletId ? 1 : 0)}
+      sidebar={
+        <ReportSidebar
+          open={sidebarOpen}
+          onClose={closePanel}
+          period={period}
+          onPeriodModeChange={handlePeriodModeChange}
+          onPeriodNavigate={handlePeriodNavigate}
+          onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
+          onPeriodRangeChange={handlePeriodRangeChange}
+          walletId={walletId}
+          onWalletChange={handleWalletChange}
+          activeFilters={filters}
+          onApplyFilters={applyFilters}
+          reportDirection={direction}
+          chartStyle={chartStyle}
+          onChartStyleChange={setChartStyle}
+          extraSections={
+            <>
+              <ReportGroupingSection
+                groupBy={groupBy}
+                direction={direction}
+                onGroupByChange={handleGroupByChange}
+                onDirectionChange={handleDirectionChange}
               />
-            </label>
-            <button
-              type="button"
-              onClick={openFilters}
-              className={[
-                'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-colors self-end',
-                filterCount > 0
-                  ? 'border-[#163526] dark:border-[#c9a96e] text-[#163526] dark:text-[#c9a96e] bg-[#163526]/5 dark:bg-[#c9a96e]/10'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
-              ].join(' ')}
-            >
-              <SlidersHorizontal size={16} />
-              Filtry
-              {filterCount > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs bg-[#163526] dark:bg-[#c9a96e] text-white dark:text-[#163526]">
-                  {filterCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        <FilterChips filters={filters} categories={categories} onChange={applyFilters} />
-
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Okres: {data.dateFrom} — {data.dateTo}
-          {parentCategoryName && (
-            <> · Podkategorie: <strong className="font-medium">{parentCategoryName}</strong></>
-          )}
-        </p>
-
-        <GroupByToggle
-          groupBy={groupBy}
-          direction={direction}
-          onGroupByChange={handleGroupByChange}
-          onDirectionChange={handleDirectionChange}
+              <div className="border-t border-gray-100 dark:border-gray-800" />
+              <ReportChartTopSection
+                value={chartTop}
+                groupCount={data.groups.length}
+                onChange={handleChartTopChange}
+              />
+            </>
+          }
         />
+      }
+    >
+      <div className="space-y-5">
+        {error && (
+          <div className="rounded-xl border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
+        <ReportFilterChips filters={filters} categories={categories} onChange={applyFilters} />
+
+        <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <span>
+            Okres: {period.dateFrom} — {period.dateTo}
+            {parentCategoryName && (
+              <> · Podkategorie: <strong className="font-medium">{parentCategoryName}</strong></>
+            )}
+          </span>
+          {loading && <Loader2 size={14} className="animate-spin text-gray-400" />}
+        </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <ReportStatCard
@@ -330,42 +367,19 @@ export default function BreakdownReport() {
 
         <BreakdownCharts
           groups={data.groups}
-          activeId={activeChartId}
-          onGroupClick={handleChartClick}
-        />
-
-        <BreakdownTable
-          groups={data.groups}
           groupBy={groupBy}
+          chartTop={chartTop}
           activeId={activeChartId}
-          onRowClick={handleRowClick}
+          onGroupClick={handleGroupSelect}
+          onRowSelect={handleRowSelect}
+          onDrillDown={handleDrillDown}
+          onClearSelection={handleClearChartSelection}
+          direction={direction}
+          chartStyle={chartStyle}
+          dateFrom={period.dateFrom}
+          dateTo={period.dateTo}
         />
       </div>
-
-      {portalRoot &&
-        createPortal(
-          <>
-            <PeriodSidebar
-              open={periodPanelOpen}
-              onClose={closePeriodPanel}
-              year={period.year}
-              month={period.month}
-              dateFrom={period.dateFrom}
-              dateTo={period.dateTo}
-              isCustomRange={period.isCustomRange}
-              onApplyMonth={handleApplyMonthPick}
-              onApplyRange={handleRangeChange}
-              returnFocusRef={periodTriggerRef}
-            />
-            <ReportFiltersPanel
-              open={filtersOpen}
-              onClose={closeFilters}
-              activeFilters={filters}
-              onApply={applyFilters}
-            />
-          </>,
-          portalRoot,
-        )}
-    </>
+    </ReportPageShell>
   )
 }
