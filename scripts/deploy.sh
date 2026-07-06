@@ -275,10 +275,11 @@ if grep -qE '@db[:/]' .env 2>/dev/null; then
 fi
 
 # Jednorazowe przemianowanie wersji migracji 07–10.07 → 06.07 (2026-07). Idempotentne (0 wierszy gdy już zastosowane).
-php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\Migrations\\Version20260706140100' WHERE version = 'App\\Migrations\\Version20260707120000'" --no-interaction --env=prod --quiet || true
-php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\Migrations\\Version20260706140200' WHERE version = 'App\\Migrations\\Version20260708120000'" --no-interaction --env=prod --quiet || true
-php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\Migrations\\Version20260706140300' WHERE version = 'App\\Migrations\\Version20260709120000'" --no-interaction --env=prod --quiet || true
-php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\Migrations\\Version20260706140400' WHERE version = 'App\\Migrations\\Version20260710120000'" --no-interaction --env=prod --quiet || true
+# W SQL namespace wymaga podwójnego backslasha; w bash w cudzysłowie — poczwórnego (\\\\ → \\ w SQL → \ w wartości).
+php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\\\Migrations\\\\Version20260706140100' WHERE version = 'App\\\\Migrations\\\\Version20260707120000'" --no-interaction --env=prod --quiet || true
+php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\\\Migrations\\\\Version20260706140200' WHERE version = 'App\\\\Migrations\\\\Version20260708120000'" --no-interaction --env=prod --quiet || true
+php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\\\Migrations\\\\Version20260706140300' WHERE version = 'App\\\\Migrations\\\\Version20260709120000'" --no-interaction --env=prod --quiet || true
+php bin/console dbal:run-sql "UPDATE doctrine_migration_versions SET version = 'App\\\\Migrations\\\\Version20260706140400' WHERE version = 'App\\\\Migrations\\\\Version20260710120000'" --no-interaction --env=prod --quiet || true
 
 php bin/console doctrine:migrations:migrate --no-interaction --env=prod
 php bin/console cache:clear --env=prod
