@@ -106,15 +106,13 @@ export type PersonTheme = {
   badgeDot: string
 }
 
-/** Klasy sekcji/karty — świecące tło tylko gdy `isAnchor`. Border bez zmian. */
+/** Klasy sekcji/karty per osoba (bez poświaty kotwicy). */
 export function personSectionClasses(
   person: PersonKey,
-  opts: { isAnchor?: boolean; variant?: 'card' | 'section' } = {},
+  opts: { variant?: 'card' | 'section' } = {},
 ): string {
   const theme = PERSON_THEMES[person]
-  const base = opts.variant === 'card' ? theme.card : theme.section
-  if (!opts.isAnchor) return base
-  return [base, theme.anchorGlow].join(' ')
+  return opts.variant === 'card' ? theme.card : theme.section
 }
 
 export const PERSON_THEMES: Record<PersonKey, PersonTheme> = {
@@ -122,7 +120,7 @@ export const PERSON_THEMES: Record<PersonKey, PersonTheme> = {
     card: 'bg-[#163526]/5 dark:bg-[#163526]/15 border-[#163526]/20 dark:border-[#163526]/35',
     section: 'bg-[#163526]/[0.03] dark:bg-[#163526]/10 border-[#163526]/15 dark:border-[#163526]/30',
     anchorGlow:
-      'shadow-[0_0_20px_rgba(134,239,172,0.55)] dark:shadow-[0_0_20px_rgba(52,211,153,0.45)]',
+      'shadow-[0_0_14px_rgba(57,255,130,0.82)] dark:shadow-[0_0_14px_rgba(45,255,150,0.72)]',
     icon: 'text-[#1a472a] dark:text-emerald-400',
     label: 'text-[#163526] dark:text-emerald-300/90',
     badge: 'bg-[#1a472a] text-white dark:bg-[#163526]',
@@ -132,7 +130,7 @@ export const PERSON_THEMES: Record<PersonKey, PersonTheme> = {
     card: 'bg-[#c9a96e]/8 dark:bg-[#c9a96e]/10 border-[#c9a96e]/35 dark:border-[#c9a96e]/30',
     section: 'bg-[#c9a96e]/5 dark:bg-[#c9a96e]/8 border-[#c9a96e]/25 dark:border-[#c9a96e]/22',
     anchorGlow:
-      'shadow-[0_0_20px_rgba(253,230,138,0.6)] dark:shadow-[0_0_20px_rgba(251,191,36,0.45)]',
+      'shadow-[0_0_14px_rgba(255,200,60,0.78)] dark:shadow-[0_0_14px_rgba(255,180,0,0.62)]',
     icon: 'text-[#8a7340] dark:text-[#c9a96e]',
     label: 'text-[#7a6340] dark:text-[#c9a96e]',
     badge: 'bg-[#c9a96e] text-white',

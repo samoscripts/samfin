@@ -148,7 +148,7 @@ function PersonFormulaBlock({
     <div
       className={[
         'rounded-xl border p-4 space-y-3',
-        personSectionClasses(person, { isAnchor: queueActive, variant: 'section' }),
+        personSectionClasses(person, { variant: 'section' }),
       ].join(' ')}
     >
       <div className="flex flex-wrap items-center gap-2">

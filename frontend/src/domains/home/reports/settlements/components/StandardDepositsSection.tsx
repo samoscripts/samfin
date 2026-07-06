@@ -29,7 +29,7 @@ export default function StandardDepositsSection({
     <div
       className={[
         'border rounded-xl p-5 flex flex-col',
-        personSectionClasses(person, { isAnchor, variant: 'section' }),
+        personSectionClasses(person, { variant: 'section' }),
         className,
       ].join(' ')}
     >

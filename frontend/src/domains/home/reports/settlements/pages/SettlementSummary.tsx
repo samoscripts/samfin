@@ -81,14 +81,12 @@ function PersonWalletColumn({
   walletGroup,
   rows,
   walletNames,
-  isAnchor,
 }: {
   person: PersonKey
   outlook: SettlementPersonOutlook
   walletGroup: WalletSettlementGroup
   rows: ReturnType<typeof aggregateItemsByWallet>
   walletNames: Map<number, string>
-  isAnchor: boolean
 }) {
   const theme = PERSON_THEMES[person]
 
@@ -96,7 +94,7 @@ function PersonWalletColumn({
     <div
       className={[
         'rounded-xl border p-4 flex flex-col gap-4 h-full',
-        personSectionClasses(person, { isAnchor, variant: 'section' }),
+        personSectionClasses(person, { variant: 'section' }),
       ].join(' ')}
     >
       <div>
@@ -232,13 +230,7 @@ export default function SettlementSummary() {
           {(['maciek', 'basia'] as const).map((person) => (
               <div
                 key={person}
-                className={[
-                  'rounded-lg border p-4',
-                  personSectionClasses(person, {
-                    isAnchor: personOutlook[person].isAnchor,
-                    variant: 'section',
-                  }),
-                ].join(' ')}
+                className={['rounded-lg border p-4', personSectionClasses(person, { variant: 'section' })].join(' ')}
               >
                 <p className={['text-xs font-medium', PERSON_THEMES[person].label].join(' ')}>
                   {PERSON_LABELS[person]}
@@ -272,7 +264,6 @@ export default function SettlementSummary() {
             walletGroup={filteredWalletGroups.maciek}
             rows={maciekWallets}
             walletNames={walletNames}
-            isAnchor={personOutlook.maciek.isAnchor}
           />
           <PersonWalletColumn
             person="basia"
@@ -280,7 +271,6 @@ export default function SettlementSummary() {
             walletGroup={filteredWalletGroups.basia}
             rows={basiaWallets}
             walletNames={walletNames}
-            isAnchor={personOutlook.basia.isAnchor}
           />
         </div>
 

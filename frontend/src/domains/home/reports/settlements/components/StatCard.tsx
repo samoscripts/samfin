@@ -24,7 +24,8 @@ export default function StatCard({
     <div
       className={[
         'relative border rounded-xl p-5 transition-shadow h-full',
-        personSectionClasses(person, { isAnchor: queueActive, variant: 'card' }),
+        personSectionClasses(person, { variant: 'card' }),
+        queueActive ? theme.anchorGlow : '',
       ].join(' ')}
     >
       {queueActive && (
