@@ -4,6 +4,7 @@ namespace App\Home\Report\Settlement\Service;
 
 use App\Home\Report\Settlement\DTO\SettlementQuery;
 use App\Home\Report\Settlement\Entity\SettlementConfig;
+use App\Home\Report\Settlement\Entity\SettlementPeriod;
 use App\Home\Report\Settlement\Repository\SettlementItemQuery;
 use App\Home\Report\Settlement\Repository\SettlementLedgerRepository;
 
@@ -14,6 +15,7 @@ class SettlementService
         private SettlementLedgerRepository $ledgerRepository,
         private SettlementItemClassifier $classifier,
         private SettlementOutlookBuilder $outlookBuilder,
+        private SettlementPeriodService $periodService,
     ) {}
 
     /**
@@ -25,6 +27,30 @@ class SettlementService
             throw new \InvalidArgumentException('Raport wymaga skonfigurowania podmiotu rozliczenia i portfela budżetu domowego.');
         }
 
+        $user = $config->getUser();
+        if ($user === null) {
+            throw new \InvalidArgumentException('Brak użytkownika w konfiguracji rozliczenia.');
+        }
+
+        $settlementPeriodMeta = null;
+        $period = null;
+        $itemDateFrom = $query->dateFrom;
+        $itemDateTo   = $query->dateTo;
+        $outlookDateTo = $query->dateTo;
+
+        if ($query->settlementYear !== null) {
+            $this->periodService->ensurePeriodsReady($user, $config);
+            $period = $this->periodService->resolvePeriod($user, $config, $query->settlementYear);
+            $bounds = $this->periodService->resolveDateBounds($period, $config);
+            $itemDateFrom = $bounds['effectiveFrom'];
+            $itemDateTo   = $bounds['effectiveTo'];
+            $outlookDateTo = $bounds['effectiveTo'];
+            $settlementPeriodMeta = $period->toApiArray() + [
+                'effectiveFrom' => $bounds['effectiveFrom'],
+                'effectiveTo'   => $bounds['effectiveTo'],
+            ];
+        }
+
         $settlementPartyId = $config->getSettlementParty()->getId();
         $homeBudgetId      = $config->getHomeBudgetWallet()->getId();
         $maciekSources     = $config->getMaciekSourcePartyIds();
@@ -33,10 +59,13 @@ class SettlementService
         $baseMinor         = $config->getBaseDepositAmountMinor();
 
         $items = $this->itemQuery->fetchItemsForPeriod(
-            $query->dateFrom,
-            $query->dateTo,
+            $itemDateFrom,
+            $itemDateTo,
             $settlementPartyId,
             $query->includePartial,
+            $homeBudgetId,
+            $maciekSources,
+            $basiaSources,
         );
 
         $walletGroupsMinor = [
@@ -45,6 +74,10 @@ class SettlementService
             'other'  => $this->emptyWalletGroupMinor(),
         ];
         $standardDepositsMinor = [
+            'maciek' => ['total' => 0, 'items' => []],
+            'basia'  => ['total' => 0, 'items' => []],
+        ];
+        $sourceExpenseDepositsMinor = [
             'maciek' => ['total' => 0, 'items' => []],
             'basia'  => ['total' => 0, 'items' => []],
         ];
@@ -71,8 +104,11 @@ class SettlementService
                     $amountMinor,
                     $settlementPartyId,
                     $homeBudgetId,
+                    $maciekSources,
+                    $basiaSources,
                     $walletOwners,
                     $walletGroupsMinor,
+                    $sourceExpenseDepositsMinor,
                     $excludedCount,
                     $warnings,
                 );
@@ -101,16 +137,24 @@ class SettlementService
             'maciek' => $this->finalizeBucket($standardDepositsMinor['maciek']),
             'basia'  => $this->finalizeBucket($standardDepositsMinor['basia']),
         ];
+        $sourceExpenseDeposits = [
+            'maciek' => $this->finalizeBucket($sourceExpenseDepositsMinor['maciek']),
+            'basia'  => $this->finalizeBucket($sourceExpenseDepositsMinor['basia']),
+        ];
 
         $user = $config->getUser();
         $useLedger = $user !== null && !$config->isNeedsRefresh();
 
-        if ($useLedger) {
+        if ($period !== null && $period->isClosed()) {
+            $outlook = $this->buildPersonOutlookFromSnapshot($config, $period, $walletGroups, $baseMinor, $outlookDateTo);
+        } elseif ($useLedger && $query->settlementYear !== null) {
+            $outlook = $this->buildPersonOutlookFromLedger($config, $walletGroups, $baseMinor, $outlookDateTo);
+        } elseif ($useLedger && $query->settlementYear === null) {
             $outlook = $this->buildPersonOutlookFromLedger($config, $walletGroups, $baseMinor);
         } else {
             $engine = $this->replayEngineToDate(
                 $config,
-                $query->dateTo,
+                $outlookDateTo,
                 $settlementPartyId,
                 $homeBudgetId,
                 $maciekSources,
@@ -121,16 +165,18 @@ class SettlementService
                 $walletGroups,
                 $baseMinor,
                 $walletOwners,
+                $outlookDateTo,
             );
         }
 
-        return [
-            'dateFrom'           => $query->dateFrom,
-            'dateTo'             => $query->dateTo,
+        $result = [
+            'dateFrom'           => $itemDateFrom,
+            'dateTo'             => $itemDateTo,
             'config'             => $config->toApiArray(),
-            'walletGroups'       => $walletGroups,
-            'standardDeposits'   => $standardDeposits,
-            'rotation'           => $outlook['rotation'],
+            'walletGroups'           => $walletGroups,
+            'standardDeposits'       => $standardDeposits,
+            'sourceExpenseDeposits'  => $sourceExpenseDeposits,
+            'rotation'               => $outlook['rotation'],
             'personOutlook'      => $outlook['personOutlook'],
             'warnings'           => array_values(array_unique($warnings)),
             'excludedItemsCount' => $excludedCount,
@@ -141,6 +187,42 @@ class SettlementService
                 'lastRefreshStats'  => $config->getLastRefreshStatsJson(),
             ],
         ];
+
+        if ($settlementPeriodMeta !== null) {
+            $result['settlementPeriod'] = $settlementPeriodMeta;
+            $result['settlementYear'] = $settlementPeriodMeta['year'];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, array{expenses: array{total: float, items: list}, incomes: array{total: float, items: list}, net: float}> $walletGroups
+     *
+     * @return array{rotation: array<string, mixed>, personOutlook: array<string, array<string, mixed>>}
+     */
+    private function buildPersonOutlookFromSnapshot(
+        SettlementConfig $config,
+        SettlementPeriod $period,
+        array $walletGroups,
+        int $baseMinor,
+        string $asOfDate,
+    ): array {
+        $snapshot = $period->getClosingSnapshotJson();
+        if ($snapshot === null) {
+            throw new \RuntimeException('Brak snapshotu zamkniętego okresu rozliczeniowego.');
+        }
+
+        $walletOwners = $config->getWalletSettlementOwner();
+        $engine = SettlementRotationEngine::fromSnapshot($snapshot, $baseMinor, $walletOwners);
+
+        return $this->outlookBuilder->build(
+            $engine,
+            $walletGroups,
+            $baseMinor,
+            $walletOwners,
+            $asOfDate,
+        );
     }
 
     /**
@@ -152,16 +234,25 @@ class SettlementService
         SettlementConfig $config,
         array $walletGroups,
         int $baseMinor,
+        ?string $asOfDate = null,
     ): array {
         $user = $config->getUser();
         $reindexFrom = $config->getReindexFromDate()?->format('Y-m-d');
-        $entry = $this->ledgerRepository->findLatestEntry($user, $reindexFrom);
+        $entry = $asOfDate !== null
+            ? $this->ledgerRepository->findLastAtOrBefore($user, $asOfDate, $reindexFrom)
+            : $this->ledgerRepository->findLatestEntry($user, $reindexFrom);
         $walletOwners = $config->getWalletSettlementOwner();
 
         if ($entry === null) {
             $engine = $this->buildEngineFromConfig($config);
 
-            return $this->outlookBuilder->build($engine, $walletGroups, $baseMinor, $walletOwners);
+            return $this->outlookBuilder->build(
+                $engine,
+                $walletGroups,
+                $baseMinor,
+                $walletOwners,
+                $asOfDate,
+            );
         }
 
         $engine = SettlementRotationEngine::fromLedgerRow(
@@ -177,12 +268,14 @@ class SettlementService
             $walletOwners,
         );
 
+        $ledgerAsOf = $asOfDate ?? $entry->getOperationDate()->format('Y-m-d');
+
         return $this->outlookBuilder->build(
             $engine,
             $walletGroups,
             $baseMinor,
             $walletOwners,
-            $entry->getOperationDate()->format('Y-m-d'),
+            $ledgerAsOf,
         );
     }
 
@@ -214,6 +307,9 @@ class SettlementService
             $reindexFrom,
             $settlementPartyId,
             false,
+            $homeBudgetId,
+            $maciekSources,
+            $basiaSources,
         );
 
         foreach ($items as $item) {
@@ -301,7 +397,10 @@ class SettlementService
 
     /**
      * @param array<string, mixed> $item
+     * @param list<int>            $maciekSources
+     * @param list<int>            $basiaSources
      * @param array<string, array{expenses: array{total: int, items: list}, incomes: array{total: int, items: list}}> $walletGroupsMinor
+     * @param array{maciek: array{total: int, items: list}, basia: array{total: int, items: list}} $sourceExpenseDepositsMinor
      * @param list<string> $warnings
      */
     private function processExpense(
@@ -309,11 +408,39 @@ class SettlementService
         int $amountMinor,
         int $settlementPartyId,
         int $homeBudgetId,
+        array $maciekSources,
+        array $basiaSources,
         array $walletOwners,
         array &$walletGroupsMinor,
+        array &$sourceExpenseDepositsMinor,
         int &$excludedCount,
         array &$warnings,
     ): void {
+        $fromId = $item['paidFromPartyId'];
+
+        if ($item['walletId'] === $homeBudgetId && $fromId !== null && $fromId !== $settlementPartyId) {
+            if (in_array($fromId, $maciekSources, true)) {
+                $sourceExpenseDepositsMinor['maciek']['total'] += $amountMinor;
+                $sourceExpenseDepositsMinor['maciek']['items'][] = $this->itemEntry(
+                    $item,
+                    $amountMinor,
+                    SettlementItemClassifier::ENTRY_SOURCE_EXP_DEPOSIT,
+                );
+
+                return;
+            }
+            if (in_array($fromId, $basiaSources, true)) {
+                $sourceExpenseDepositsMinor['basia']['total'] += $amountMinor;
+                $sourceExpenseDepositsMinor['basia']['items'][] = $this->itemEntry(
+                    $item,
+                    $amountMinor,
+                    SettlementItemClassifier::ENTRY_SOURCE_EXP_DEPOSIT,
+                );
+
+                return;
+            }
+        }
+
         if ($item['paidFromPartyId'] !== $settlementPartyId) {
             return;
         }

@@ -1,0 +1,32 @@
+---
+description: Prawy panel boczny — shell, portal, URL, precedencja
+globs: frontend/src/**/*.tsx
+alwaysApply: false
+---
+
+# Prawy panel boczny
+
+## Shell
+
+- Markup `aside` (desktop resize + mobile slide-over) — **`SidePanelShell`** z `shared/components/panel/SidePanelShell.tsx`.
+- Szerokość i `localStorage` — **`useSidePanelWidth`** z `shared/hooks/useSidePanelWidth.ts`.
+- Stałe szerokości — `shared/components/panel/panelLayout.ts`.
+
+Nie duplikuj `startResize` / markupu `aside` w sidebarach domenowych.
+
+## Portal
+
+- Jeden slot: **`RightPanelContext`** (`layout/RightPanelContext.tsx`).
+- Render: `createPortal(..., portalRoot)` z `useRightPanelPortal()`.
+
+## URL i precedencja
+
+- W danym widoku otwarty **co najwyżej jeden** panel treściowy.
+- Precedencja (np. rozliczenia): `tx` (panel transakcji) **>** `panel=period` (wybór okresu).
+- Otwarcie panelu transakcji czyści `panel=period`; otwarcie okresu czyści `tx`/`tab`.
+- Helpery: `transactions/panel/transactionPanelUrl.ts` (`resolveRightPanelOwner`, `mergeTransactionPanelParams`).
+
+## Panel transakcji poza listą
+
+- Import: `@/domains/home/transactions/panel` (`useTransactionPanel`).
+- Szczegóły + edycja pojedynczej transakcji — bez filtrów/bulk/create (te zostają na `/transactions`).

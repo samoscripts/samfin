@@ -7,6 +7,25 @@ alwaysApply: true
 
 SamFin działa w Docker Compose (`app`, `db`, `frontend`). Backend Symfony jest w kontenerze **`app`**.
 
+Pełne reguły (z przykładami): [`docs/database.md` — Reguły migracji Doctrine](../docs/database.md#reguły-migracji-doctrine).
+
+## Zasada 1 — nie modyfikuj wykonanych migracji
+
+**Nigdy nie edytuj** pliku w `backend/migrations/`, który jest już w `doctrine_migration_versions` (dev lub produkcja).
+
+- Doctrine uruchamia migracje po **numerze wersji**, nie po treści pliku.
+- Nadpisanie pliku po `migrate` → `Already at the latest version`, a brakujący DDL w bazie → 500 (`Table doesn't exist`).
+- Poprawka schematu = **nowy** plik migracji z idempotentnym `up()`.
+
+Przed dotknięciem istniejącego pliku: `doctrine:migrations:status` lub `SELECT version FROM doctrine_migration_versions WHERE version LIKE '%<numer>%'`.
+
+## Zasada 2 — nazewnictwo migracji
+
+- Plik: `VersionYYYYMMDDHHMMSS.php` — **tylko** z `doctrine:migrations:diff` lub `doctrine:migrations:generate` (nie wymyślaj numeru ręcznie).
+- Timestamp: rzeczywista data i czas z CLI; bez sztucznego `120000` w nowych migracjach.
+- FK: `fk_{tabela}_{kolumna}` (walidacja: `composer check:migration-fk-names`).
+- Po dodaniu migracji: wpis w chronologii [`docs/database.md`](../docs/database.md#chronologia-migracji).
+
 ## Migracje bazy
 
 **Zawsze** uruchamiaj migracje **w kontenerze**, jako użytkownik **`www-data`** (ten sam co procesy Apache):
@@ -30,8 +49,6 @@ docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff
 ```
 
 Sprawdź wygenerowany plik w `backend/migrations/`, potem `make migrate`.
-
-Nazewnictwo plików i FK: jedna konwencja w [`docs/database.md`](../docs/database.md#reguły-nazewnictwa-migracji).
 
 ## Inne komendy Symfony
 

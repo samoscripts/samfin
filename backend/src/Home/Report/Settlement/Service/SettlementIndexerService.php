@@ -64,6 +64,9 @@ class SettlementIndexerService
                 $reindexFrom->format('Y-m-d'),
                 $settlementPartyId,
                 false,
+                $homeBudgetId,
+                $maciekSources,
+                $basiaSources,
             );
 
             $sequence  = 1;

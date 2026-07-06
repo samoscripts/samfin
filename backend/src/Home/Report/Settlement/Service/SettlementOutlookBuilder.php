@@ -29,7 +29,7 @@ class SettlementOutlookBuilder
             $suggestedRawMinor = $engine->computeSuggestedRawForPerson($person);
             $suggestedMinor = max(0, $suggestedRawMinor);
 
-            $personOutlook[$person] = [
+            $entry = [
                 'isAnchor'            => $isAnchor,
                 'suggestedAmount'     => round($suggestedMinor / 100, 2),
                 'suggestedAmountRaw'  => round($suggestedRawMinor / 100, 2),
@@ -51,6 +51,17 @@ class SettlementOutlookBuilder
                     $person,
                 ),
             ];
+
+            if (!$isAnchor) {
+                $entry['afterAnchorDepositSimulation'] = $this->buildAfterAnchorDepositSimulation(
+                    $engine,
+                    $person,
+                    $baseMinor,
+                    $walletOwners,
+                );
+            }
+
+            $personOutlook[$person] = $entry;
         }
 
         $stanMaciek = $engine->stanForPerson(SettlementConfig::DEPOSITOR_MACIEK);
@@ -69,6 +80,57 @@ class SettlementOutlookBuilder
         return [
             'rotation'      => $rotation,
             'personOutlook' => $personOutlook,
+        ];
+    }
+
+    /**
+     * @param array<string, string> $walletOwners
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildAfterAnchorDepositSimulation(
+        SettlementRotationEngine $engine,
+        string $person,
+        int $baseMinor,
+        array $walletOwners,
+    ): ?array {
+        $anchor = $engine->getAnchor();
+        if ($person === $anchor) {
+            return null;
+        }
+
+        $simEngine = SettlementRotationEngine::fromSnapshot(
+            $engine->toSnapshot(),
+            $baseMinor,
+            $walletOwners,
+        );
+
+        $anchorPaidMinor = $engine->computeSuggestedForPerson($anchor);
+        $simEngine->applyStandardDeposit($anchor, $anchorPaidMinor);
+
+        $catchUpMinor = $simEngine->computeCatchUpMinor($person);
+        $walletNetCumulativeMinor = $simEngine->walletBalanceForPerson($person);
+        $prepaidMinor = $person === SettlementConfig::DEPOSITOR_MACIEK
+            ? $simEngine->getRotationPrepaidMaciekMinor()
+            : $simEngine->getRotationPrepaidBasiaMinor();
+        $suggestedRawMinor = $simEngine->computeSuggestedRawForPerson($person);
+        $suggestedMinor = max(0, $suggestedRawMinor);
+
+        return [
+            'anchorPerson'        => $anchor,
+            'anchorPaidAmount'    => round($anchorPaidMinor / 100, 2),
+            'suggestedAmount'     => round($suggestedMinor / 100, 2),
+            'catchUpAmount'       => round($catchUpMinor / 100, 2),
+            'walletNetCumulative' => round($walletNetCumulativeMinor / 100, 2),
+            'rotationPrepaid'     => round($prepaidMinor / 100, 2),
+            'formulaSummary'      => SettlementFormulaFormatter::format(
+                true,
+                $catchUpMinor,
+                $walletNetCumulativeMinor,
+                $prepaidMinor,
+                $baseMinor,
+                null,
+            ),
         ];
     }
 

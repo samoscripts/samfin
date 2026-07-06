@@ -8,7 +8,12 @@ import TransactionNewRedirect from '@/domains/home/transactions/pages/Transactio
 import ReportsLayout from '@/domains/home/reports/pages/ReportsLayout'
 import AnalyticsReport from '@/domains/home/reports/analytics/pages/AnalyticsReport'
 import SettlementLayout from '@/domains/home/reports/settlements/pages/SettlementLayout'
-import SettlementReport from '@/domains/home/reports/settlements/pages/SettlementReport'
+import SettlementReportLayout from '@/domains/home/reports/settlements/pages/SettlementReportLayout'
+import SettlementSummary from '@/domains/home/reports/settlements/pages/SettlementSummary'
+import SettlementRotatingDeposits from '@/domains/home/reports/settlements/pages/SettlementRotatingDeposits'
+import SettlementWallets from '@/domains/home/reports/settlements/pages/SettlementWallets'
+import SettlementOwnContributions from '@/domains/home/reports/settlements/pages/SettlementOwnContributions'
+import SettlementOther from '@/domains/home/reports/settlements/pages/SettlementOther'
 import SettlementSettings from '@/domains/home/reports/settlements/pages/SettlementSettings'
 import Settings     from '@/domains/settings/pages/Settings'
 import UsersPage    from '@/domains/settings/users/pages/Users'
@@ -54,7 +59,13 @@ export default function AppRoutes() {
           <Route index element={<Navigate to="analytics" replace />} />
           <Route path="analytics" element={<AnalyticsReport />} />
           <Route path="settlements" element={<SettlementLayout />}>
-            <Route index element={<SettlementReport />} />
+            <Route element={<SettlementReportLayout />}>
+              <Route index element={<SettlementSummary />} />
+              <Route path="rotacyjne" element={<SettlementRotatingDeposits />} />
+              <Route path="portfele" element={<SettlementWallets />} />
+              <Route path="wklady-wlasne" element={<SettlementOwnContributions />} />
+              <Route path="pozostale" element={<SettlementOther />} />
+            </Route>
             <Route path="settings" element={<SettlementSettings />} />
           </Route>
           {/* legacy redirects */}

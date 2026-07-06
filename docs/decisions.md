@@ -379,7 +379,7 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 **Decyzja:**
 
-- Usunięcie kolumn `direction_expense`, `direction_income` i constraintu `chk_category_direction` (migracja `20260708120000`).
+- Usunięcie kolumn `direction_expense`, `direction_income` i constraintu `chk_category_direction` (migracja `20260706140200`, dawniej `08120000`).
 - API kategorii bez pola `directions` — dowolna aktywna subkategoria przypisywalna do wpływu i wydatku.
 - Usunięcie walidacji `supportsDirection` przy klasyfikacji, bulk update, szablonach i merge.
 - **Zachowane:** `user_category_pick_event.direction` — kontekst frequent picks per kierunek transakcji, nie atrybut kategorii.
@@ -562,10 +562,46 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 - Anchor zmienia się **wyłącznie** przy wpłacie rotacyjnej; remis Σ → anchor przechodzi na drugą osobę względem poprzedniej kotwicy.
 - API: `rotation.anchor`, `stanMaciek`/`stanBasia`, `personOutlook.isAnchor`, `catchUpAmount`, `formulaSummary` (tekst po polsku z `SettlementFormulaFormatter`).
 - Ledger: kolumny `maciek_deposits_total_minor`, `basia_deposits_total_minor`; rename `next_depositor` → `anchor`; `rotation_carry_minor` deprecated (0).
-- Migracja `Version20260710120000`: TRUNCATE ledger + `needs_refresh=1` — wymuszony rebuild po deploy.
+- Migracja `Version20260706140400` (dawniej `10120000`): TRUNCATE ledger + `needs_refresh=1` — wymuszony rebuild po deploy.
 - Frontend renderuje wyłącznie pola API (bez składania formuł w TS).
 
-**Pliki:** `SettlementRotationEngine.php`, `SettlementOutlookBuilder.php`, `SettlementFormulaFormatter.php`, `SettlementIndexerService.php`, `SettlementService.php`, `SettlementReport.tsx`, migracja `Version20260710120000`.
+**Pliki:** `SettlementRotationEngine.php`, `SettlementOutlookBuilder.php`, `SettlementFormulaFormatter.php`, `SettlementIndexerService.php`, `SettlementService.php`, `SettlementReportLayout.tsx`, migracja `Version20260706140400`.
+
+---
+
+### ADR-038: Rozliczenia — roczne okresy rozliczeniowe ze snapshotem
+
+**Kontekst:** Termin „indeks” w UI mylił użytkownika z formalnym okresem rozliczeniowym. Potrzebny był podział na lata kalendarzowe (1.01–31.12) z zamknięciem i przeniesieniem stanu otwarcia.
+
+**Decyzja:**
+
+- Tabela `settlement_period` per użytkownik: `year`, `date_from`/`date_to` (zawsze 01.01–31.12), `status` (`open`/`closed`), `closing_snapshot_json`, `closed_at`.
+- API raportu: parametr `settlementYear` (domyślnie bieżący rok); konflikt z `year`+`month` lub `dateFrom`+`dateTo` → `422`.
+- `GET /api/reports/settlements/periods` — lista okresów + `firstYear` (z `reindexFromDate`) i `currentYear`.
+- Auto-zamknięcie po 31.12: replay silnika rotacji, snapshot (`SettlementRotationEngine::toSnapshot()`), carry do `opening*` w konfiguracji, `reindexFromDate` = 1.01 następnego roku, `needsRefresh=true`.
+- Zamknięty okres: outlook ze snapshotu; odświeżanie zablokowane (`assertRefreshAllowed`).
+- `reindexFromDate` — tylko techniczny start ewidencji; w UI termin **„okres rozliczeniowy”** (słownik `SETTLEMENT_UI_LABELS`).
+- Frontend: przełącznik lat w URL `?settlementYear=`, zakładki raportu (Podsumowanie / szczegóły z lokalnym filtrem okresu).
+
+**Pliki:** `SettlementPeriod.php`, `SettlementPeriodService.php`, `SettlementPeriodRepository.php`, `SettlementQuery.php`, `SettlementController.php`, `SettlementReportContext.tsx`, `SettlementPeriodSwitcher.tsx`, migracja `Version20260706133600`.
+
+---
+
+### ADR-039: Rozliczenia — wkłady własne (source_exp_deposit)
+
+**Kontekst:** Gotówka i wydatki ze źródeł wpłat (np. Gotówka Basi, ESTETICA) na portfel Budżet domowy nie trafiały do raportu rozliczeń — zapytanie SQL wymagało Skąd/Dokąd = konto wspólne. Użytkownik odrzucił model kredytu z kieszeni (bez zmiany Σ) na rzecz traktowania wkładu jak wpłaty rotacyjnej.
+
+**Decyzja:**
+
+- Nowy typ faktu ledgera: `source_exp_deposit` — **wydatek** ze źródła wpłat (`maciekSourcePartyIds` / `basiaSourcePartyIds`) na portfel budżetu domowego, przy `paid_from ≠ settlementPartyId`; pole Dokąd nieistotne.
+- Efekt w silniku: ten sam co `standard_deposit` (`applyStandardDeposit` → Σ + anchor).
+- `SettlementItemQuery`: trzecia gałąź OR dla powyższej reguły (transakcje spoza konta wspólnego).
+- API: osobne pole `sourceExpenseDeposits` (maciek/basia); `standardDeposits` = wyłącznie INCOME na konto rozliczenia.
+- UI: zakładka **Wkłady własne** + podsumowanie na zakładce Podsumowanie.
+- **Bez** modelu `out_of_pocket` / kredytu z kieszeni.
+- Ręczne MANUAL + EXPENSE: Skąd musi być OWN+CASH (`TransactionPartyAssignmentValidator`) — gotówka działa od razu; inne typy podmiotów ze źródeł — follow-up.
+
+**Pliki:** `SettlementItemQuery.php`, `SettlementItemClassifier.php`, `SettlementRotationEngine.php`, `SettlementService.php`, `SettlementIndexerService.php`, `SettlementOwnContributions.tsx`, `SettlementSummary.tsx`.
 
 ---
 
@@ -578,7 +614,8 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-13 | ADR-018 (portfel), ADR-019 (transakcje ręczne MVP — plan) |
 | 2026-06-14 | ADR-021..023: reguły klasyfikacji per party, fill_empty, classify service |
 | 2026-06-23 | ADR-025: kategoria — `direction_expense` / `direction_income`, API `directions[]` (superseded ADR-036) |
-| 2026-06-30 | ADR-036: usunięcie kierunku z kategorii — migracja `20260708120000` |
+| 2026-06-30 | ADR-036: usunięcie kierunku z kategorii — migracja `20260706140200` |
+| 2026-07-06 | Przemianowanie migracji `07120000`–`10120000` → `06140100`–`06140400` (spójna kolejność na dev/prod) |
 | 2026-06-24 | ADR-026: lista kategorii — drzewo, DnD przenoszenie, merge subkategorii |
 | 2026-06-24 | ADR-027: blokada dezaktywacji kategorii przy użyciu w transakcjach, szablonach i regułach |
 | 2026-06-24 | ADR-028: kopie zapasowe bazy (ZIP+manifest, CLI, pre-restore) |
@@ -590,3 +627,5 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-06-27 | ADR-034: publikacja APK (downloads/, mobile.json), aktualizacje i strona O aplikacji |
 | 2026-06-30 | ADR-035: hard delete nieaktywnych kategorii z UI zarządzania |
 | 2026-07-02 | ADR-037: rozliczenia — Model B rotacji (stan + anchor), zastąpienie Modelu A |
+| 2026-07-06 | ADR-038: rozliczenia — roczne okresy rozliczeniowe, snapshot przy zamknięciu, `settlementYear` w API |
+| 2026-07-06 | ADR-039: rozliczenia — wkłady własne (`source_exp_deposit`), Σ rotacji bez modelu kredytu |

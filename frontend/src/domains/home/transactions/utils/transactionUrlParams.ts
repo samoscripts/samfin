@@ -8,6 +8,9 @@ import {
   serializeCommaList,
 } from '@/shared/utils/urlQuery'
 import {
+  parseTransactionPanelParams,
+} from '../panel/transactionPanelUrl'
+import {
   parseTransactionNewSearchParams,
   type TransactionNewUrlPrefill,
 } from './transactionNewUrlParams'
@@ -103,7 +106,7 @@ export function parseTransactionSearchParams(params: URLSearchParams): Transacti
     perPage: parsePositiveInt(params.get('perPage')) ?? DEFAULT_PAGINATION.perPage,
   }
 
-  const tx = tab === 'create' ? null : (parsePositiveInt(params.get('tx')) ?? null)
+  const tx = tab === 'create' ? null : parseTransactionPanelParams(params).tx
 
   const createPrefill = tab === 'create' ? parseTransactionNewSearchParams(params) : {}
 

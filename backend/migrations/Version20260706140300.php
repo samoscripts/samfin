@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Add optional user-editable trans_custom_description to transactions and transaction_template.
  */
-final class Version20260709120000 extends AbstractMigration
+final class Version20260706140300 extends AbstractMigration
 {
     public function getDescription(): string
     {

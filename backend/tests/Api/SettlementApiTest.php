@@ -41,9 +41,18 @@ final class SettlementApiTest extends ApiTestCase
 
         $this->requestJson(
             'GET',
-            '/api/reports/settlements?year=2025&month=1&dateFrom=2025-01-01',
+            '/api/reports/settlements?settlementYear=2025&dateFrom=2025-01-01',
             token: self::TEST_USER_TOKEN,
         );
+
+        $this->assertJsonResponse(422);
+    }
+
+    public function testPeriodsWithoutConfigReturns422(): void
+    {
+        $this->createUser(apiToken: self::TEST_USER_TOKEN);
+
+        $this->requestJson('GET', '/api/reports/settlements/periods', token: self::TEST_USER_TOKEN);
 
         $this->assertJsonResponse(422);
     }

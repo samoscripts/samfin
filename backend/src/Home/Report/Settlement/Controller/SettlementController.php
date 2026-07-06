@@ -5,6 +5,7 @@ namespace App\Home\Report\Settlement\Controller;
 use App\Home\Report\Settlement\DTO\SettlementQuery;
 use App\Home\Report\Settlement\Service\SettlementConfigService;
 use App\Home\Report\Settlement\Service\SettlementIndexerService;
+use App\Home\Report\Settlement\Service\SettlementPeriodService;
 use App\Home\Report\Settlement\Service\SettlementService;
 use App\Identity\Entity\User;
 use App\Shared\DTO\QueryValidationErrors;
@@ -21,6 +22,7 @@ class SettlementController extends AbstractController
         private SettlementService $settlementService,
         private SettlementConfigService $configService,
         private SettlementIndexerService $indexerService,
+        private SettlementPeriodService $periodService,
         private Security $security,
     ) {}
 
@@ -43,6 +45,10 @@ class SettlementController extends AbstractController
             ], 422);
         }
 
+        if ($config->getReindexFromDate() !== null) {
+            $this->periodService->ensurePeriodsReady($user, $config);
+        }
+
         try {
             $result = $this->settlementService->calculate($query, $config);
         } catch (\InvalidArgumentException $e) {
@@ -50,6 +56,28 @@ class SettlementController extends AbstractController
         }
 
         return $this->json($result);
+    }
+
+    #[Route('/periods', name: 'api_reports_settlements_periods', methods: ['GET'])]
+    public function periods(): JsonResponse
+    {
+        /** @var User $user */
+        $user   = $this->security->getUser();
+        $config = $this->configService->getForUser($user);
+
+        if (!$config->isConfigured()) {
+            return $this->json([
+                'message' => 'Skonfiguruj rozliczenie i portfel budżetu domowego w zakładce Konfiguracja.',
+            ], 422);
+        }
+
+        if ($config->getReindexFromDate() === null) {
+            return $this->json([
+                'message' => 'Ustaw datę startu ewidencji w konfiguracji rozliczenia.',
+            ], 422);
+        }
+
+        return $this->json($this->periodService->listPeriods($user, $config));
     }
 
     #[Route('/refresh', name: 'api_reports_settlements_refresh', methods: ['POST'])]
@@ -61,11 +89,12 @@ class SettlementController extends AbstractController
 
         if (!$config->isConfigured()) {
             return $this->json([
-                'message' => 'Skonfiguruj rozliczenie przed odświeżeniem indeksu.',
+                'message' => 'Skonfiguruj rozliczenie przed odświeżeniem rozliczeń.',
             ], 422);
         }
 
         try {
+            $this->periodService->assertRefreshAllowed($user, $config);
             $stats = $this->indexerService->rebuild($config);
         } catch (\RuntimeException $e) {
             return $this->json(['message' => $e->getMessage()], 409);

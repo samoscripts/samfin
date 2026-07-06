@@ -63,6 +63,16 @@ export interface SettlementRotationState {
   asOfDate?: string
 }
 
+export interface SettlementAfterAnchorSimulation {
+  anchorPerson: PersonKey
+  anchorPaidAmount: number
+  suggestedAmount: number
+  catchUpAmount: number
+  walletNetCumulative: number
+  rotationPrepaid: number
+  formulaSummary: string
+}
+
 export interface SettlementPersonOutlook {
   isAnchor: boolean
   suggestedAmount: number
@@ -73,14 +83,37 @@ export interface SettlementPersonOutlook {
   rotationPrepaid: number
   formulaSummary: string
   walletBreakdown: { walletId: number; balance: number }[]
+  afterAnchorDepositSimulation?: SettlementAfterAnchorSimulation
+}
+
+export interface SettlementPeriodInfo {
+  year: number
+  dateFrom: string
+  dateTo: string
+  status: 'open' | 'closed'
+  closedAt: string | null
+  effectiveFrom?: string
+  effectiveTo?: string
+}
+
+export interface SettlementPeriodsResponse {
+  periods: SettlementPeriodInfo[]
+  currentYear: number
+  firstYear: number
 }
 
 export interface SettlementReportResponse {
   dateFrom: string
   dateTo: string
+  settlementYear?: number
+  settlementPeriod?: SettlementPeriodInfo
   config: SettlementConfig
   walletGroups: Record<WalletGroupKey, WalletSettlementGroup>
   standardDeposits: {
+    maciek: WalletGroupBucket
+    basia: WalletGroupBucket
+  }
+  sourceExpenseDeposits: {
     maciek: WalletGroupBucket
     basia: WalletGroupBucket
   }
@@ -97,6 +130,7 @@ export interface SettlementReportResponse {
 }
 
 export interface SettlementReportParams {
+  settlementYear?: number
   year?: number
   month?: number
   dateFrom?: string
@@ -118,6 +152,9 @@ export const fetchSettlementConfig = async (): Promise<SettlementConfig> =>
 
 export const updateSettlementConfig = async (payload: Partial<SettlementConfig>): Promise<SettlementConfig> =>
   (await api.put<SettlementConfig>('/reports/settlements/config', payload)).data
+
+export const fetchSettlementPeriods = async (): Promise<SettlementPeriodsResponse> =>
+  (await api.get<SettlementPeriodsResponse>('/reports/settlements/periods')).data
 
 export const fetchSettlementReport = async (
   params: SettlementReportParams,

@@ -136,7 +136,7 @@ Słownik konfigurowalny z hierarchią (`parent_id`). Kategorie są **neutralne**
 - **Hard delete:** tylko nieaktywne kategorie bez użyć i bez subkategorii — `DELETE` (ADR-035).
 - **UI:** lista drzewiasta + panel boczny (`?panel=create|edit|move|merge&id=`); merge i przenoszenie w panelu, nie w modalu (ADR-026).
 
-Historycznie: pole `type` (pojedynczy INCOME/EXPENSE) usunięte w `20260623120000`; flagi `direction_expense` / `direction_income` usunięte w `20260708120000`.
+Historycznie: pole `type` (pojedynczy INCOME/EXPENSE) usunięte w `20260623120000`; flagi `direction_expense` / `direction_income` usunięte w `20260706140200`.
 
 ## CsvImport / CsvImportRow / CsvImportError
 

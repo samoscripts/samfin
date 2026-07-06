@@ -19,7 +19,7 @@ Folder `mock/` zawiera statyczne prototypy HTML — **nie są podłączone** do 
   - **Analizy** (`/raporty/analytics`)
   - **Rozliczenia** (`/raporty/settlements`)
 - **Layout raportów:** [`ReportsLayout.tsx`](../frontend/src/domains/home/reports/pages/ReportsLayout.tsx) — nagłówek + `<Outlet />` (bez poziomego podmenu).
-- **Rozliczenia:** zakładki *Raport* | *Konfiguracja* w [`SettlementLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementLayout.tsx).
+- **Rozliczenia:** [`SettlementLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementLayout.tsx) — jeden pasek: **Podsumowanie | Wpłaty rotacyjne | Portfele | Pozostałe** (lewa strona) oraz **Konfiguracja** (prawa strona). Filtr okresu w [`SettlementReportLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementReportLayout.tsx) — na wszystkich 4 zakładkach raportu, nie na konfiguracji.
 
 ### Struktura katalogów (angielskie nazwy)
 
@@ -29,7 +29,11 @@ frontend/src/domains/home/reports/
 ├── analytics/pages/AnalyticsReport.tsx
 └── settlements/pages/
     ├── SettlementLayout.tsx
-    ├── SettlementReport.tsx
+    ├── SettlementReportLayout.tsx
+    ├── SettlementSummary.tsx
+    ├── SettlementRotatingDeposits.tsx
+    ├── SettlementWallets.tsx
+    ├── SettlementOther.tsx
     └── SettlementSettings.tsx
 ```
 
@@ -39,7 +43,10 @@ frontend/src/domains/home/reports/
 |-------|------|
 | `/raporty` | redirect → `/raporty/analytics` |
 | `/raporty/analytics` | analizy (obecnie: zestawienie miesięczne) |
-| `/raporty/settlements` | rozliczenie wpłat — widok raportu |
+| `/raporty/settlements` | rozliczenie — podsumowanie |
+| `/raporty/settlements/rotacyjne` | wpłaty rotacyjne (szczegóły) |
+| `/raporty/settlements/portfele` | portfele Maćka/Basi |
+| `/raporty/settlements/pozostale` | grupa „Inne” |
 | `/raporty/settlements/settings` | konfiguracja rozliczenia |
 
 **Legacy redirecty** (stare bookmarki): `/raporty/default/monthly`, `/raporty/analytics/monthly`, `/raporty/common-account`, `/raporty/miesieczny`, `/raporty/domyslne/miesieczny`, `/raporty/konto-wspolne`, `/raporty/konto-wspolne/konfiguracja`.
@@ -48,13 +55,22 @@ frontend/src/domains/home/reports/
 
 ### Nawigacja okresu (UI)
 
-Wspólny komponent [`PeriodNavigator.tsx`](../frontend/src/shared/components/PeriodNavigator.tsx):
+Wspólny komponent [`PeriodNavigator.tsx`](../frontend/src/shared/components/PeriodNavigator.tsx) — używany w **Analizach** i na dashboardzie:
 
-- **Domyślnie:** strzałki ← / → między miesiącami + ikona powrotu do bieżącego miesiąca (stały slot — bez przesuwania layoutu).
-- **Panel „Więcej”** (Analizy, Rozliczenia): prawy sidebar (`?panel=period`) z wyborem roku i miesiąca **albo** zakresem dat Od–Do — ten sam wzorzec co filtry transakcji.
-- **Rozliczenia:** preset „Od początku indeksu” w panelu (zakres od `reindexFromDate` do dziś).
+- **Domyślnie:** strzałki ← / → między miesiącami + ikona powrotu do bieżącego miesiąca.
+- **Panel „Więcej”** (Analizy): prawy sidebar (`?panel=period`) z wyborem roku i miesiąca **albo** zakresem dat Od–Do.
 
-Parametry URL bez zmian: `year`+`month` **albo** `dateFrom`+`dateTo` (nie oba naraz). Dashboard używa `month=YYYY-MM`.
+**Rozliczenia** — filtr okresu (`SettlementDetailPeriodFilter`) na zakładkach raportu:
+
+| Tryb | Zachowanie |
+|------|------------|
+| **Cały zakres** | przełącznik roku rozliczeniowego (← / →) w URL `?settlementYear=2026`; domyślnie bieżący rok |
+| **Miesiące** | strzałki ← / etykieta miesiąca / → + powrót do bieżącego miesiąca (wyrównane do lewej) |
+| **Zakres dat** | pola Od / Do inline |
+
+Stan filtra współdzielony między zakładkami raportu. Zamknięte okresy (po 31.12) tylko do odczytu; odświeżanie wyłączone.
+
+Parametry URL okresu: `year`+`month` **albo** `dateFrom`+`dateTo` — Analizy, dashboard. Rozliczenia: `settlementYear` (rok okresu rozliczeniowego).
 
 ---
 
@@ -117,35 +133,65 @@ stan_basia  = −stan_maciek
   catchUp = (stan < 0) ? (Σ_druga − Σ_anchor) : baseDeposit   // przy remisie: base
   suggested = max(0, catchUp + wallet_balance[anchor] − rotation_prepaid[anchor])
   ```
-- **Podgląd nie-anchor:** `max(0, wallet_balance[osoba] − prepaid)` — bez składnika rotacyjnego.
+- **Podgląd nie-anchor:** `max(0, wallet_balance[osoba] − prepaid)` — bez składnika rotacyjnego (stan obecny).
+- **Symulacja nie-anchor** (`personOutlook[osoba].afterAnchorDepositSimulation`): po hipotetycznej wpłacie kotwicy w wysokości jej `suggestedAmount` — pełna formuła rotacyjna dla drugiej osoby (jak gdyby stała się kotwicą). UI pokazuje symulowaną kwotę jako główną na karcie „Podgląd”.
+- **Kwota bazowa** — `baseDepositAmount` z konfiguracji; składnik catch-up gdy stan kotwicy ≥ 0.
+- **Wyrównanie (catch-up)** — gdy stan kotwicy &lt; 0: `Σ_druga − Σ_kotwica`; gdy stan ≥ 0: równa kwocie bazowej.
 - Fakt portfelowy **nie zmienia** anchor (tylko saldo portfela w kwocie sugerowanej).
 - Wpłata rotacyjna aktualizuje Σ i przelicza anchor (również wpłata „poza kolejką”).
+- **Wkład własny** (`source_exp_deposit`): wydatek ze źródła wpłat (Skąd ∈ `maciekSourcePartyIds` / `basiaSourcePartyIds`) na portfel budżetu domowego, przy `paid_from ≠ settlementPartyId`; Dokąd nieistotne. Efekt w silniku jak `standard_deposit` (Σ + anchor). Szczegóły: ADR-039.
 
 `rotation_prepaid` = wyłącznie **Prepaid Maciek/Basia na start** z konfiguracji. Pole `rotation_carry` w ledgerze deprecated (zawsze 0).
 
-Po deploy Modelu B: **obowiązkowy** `POST /refresh` (migracja czyści ledger i ustawia `needsRefresh`).
+Po deploy zmian w klasyfikacji rozliczeń: **obowiązkowy** `POST /refresh`.
+
+### Okresy rozliczeniowe (roczne)
+
+- Okres = **rok kalendarzowy** (`01.01`–`31.12`), encja `settlement_period`.
+- **Auto-zamknięcie** po 31.12 przy pierwszym żądaniu API w nowym roku: snapshot stanu rotacji/portfeli, otwarcie kolejnego roku ze stanu końcowego (`opening*` + `reindexFromDate` = 1.01).
+- `reindexFromDate` — techniczny start ewidencji (transakcje wcześniejsze pomijane); pierwszy rok okresu = rok tej daty.
+- UI: termin **„okres rozliczeniowy”** zamiast „indeks”; „indeks/ledger” pozostaje w warstwie technicznej.
+
+### API: `GET /api/reports/settlements/periods`
+
+Lista okresów użytkownika: `periods[]` (`year`, `dateFrom`, `dateTo`, `status`, `closedAt`), `currentYear`, `firstYear`.
 
 ### API: `GET /api/reports/settlements`
 
 | Parametr | Wymagany | Opis |
 |----------|----------|------|
-| `year` + `month` | jedna para* | Skrót okresu |
-| `dateFrom` + `dateTo` | alternatywa* | Zakres dat (ma pierwszeństwo w UI gdy oba w URL) |
-| `nextDepositor` | nie | **deprecated** — ignorowany; anchor wynika z indeksu |
+| `settlementYear` | nie* | Rok okresu rozliczeniowego (domyślnie bieżący rok) |
+| `year` + `month` | alternatywa** | Skrót miesiąca (legacy) |
+| `dateFrom` + `dateTo` | alternatywa** | Dowolny zakres (legacy) |
+| `nextDepositor` | nie | **deprecated** |
 | `includePartial` | nie | Uwzględnij `PARTIALLY_CLASSIFIED` (domyślnie false) |
 
-\*Podaj albo `year`+`month`, albo `dateFrom`+`dateTo`.
+\*Domyślnie `settlementYear` = bieżący rok kalendarzowy.  
+\*\*Podaj jeden tryb: `settlementYear` **albo** `year`+`month` **albo** `dateFrom`+`dateTo`.
 
-Odpowiedź (skrót):
+Odpowiedź (skrót) — dodatkowo:
 
-- `walletGroups` — trzy grupy (`maciek`, `basia`, `other`), każda z `expenses`, `incomes` i `net` (net w wybranym okresie)
-- `standardDeposits` — wpłaty rotacyjne na portfel budżetu domowego w wybranym okresie
-- `rotation` — `anchor`, `baseAmount`, `maciekDepositsTotal`, `basiaDepositsTotal`, `stanMaciek`, `stanBasia`, opcjonalnie `asOfDate` (ostatni wpis ledgera — **niezależny od zakresu raportu**)
-- `personOutlook` — per `maciek` / `basia`: `isAnchor`, `suggestedAmount`, `suggestedAmountRaw`, `catchUpAmount`, `walletNetCumulative` (z indeksu), `walletNetInPeriod`, `rotationPrepaid`, `formulaSummary`, `walletBreakdown`
-- `indexState` — `needsRefresh`, `refreshInProgress`, `lastRefreshedAt`, `lastRefreshStats`
-- `warnings`, `excludedItemsCount`
+- `settlementPeriod` — `year`, `dateFrom`, `dateTo`, `status`, `effectiveFrom`, `effectiveTo`
+- `settlementYear` — wybrany rok
 
-**UI raportu (kafelki):** 2× „Wpłata rotacyjna” / „Podgląd” (Maciek/Basia, badge „Wpisuje teraz” u osoby z `isAnchor`) + 2× „Portfele osobiste” (skumulowane + zmiana w okresie). Opis formuły wyłącznie z `formulaSummary` (backend).
+Pozostałe pola bez zmian (`walletGroups`, `rotation`, `personOutlook`, `indexState`, …). Dodatkowo:
+
+- `sourceExpenseDeposits` — wkłady własne (wydatek ze źródła na budżet domowy), per osoba: `{ maciek, basia }` z `total` i `items[]`.
+- `standardDeposits` — wyłącznie przelewy (INCOME na konto rozliczenia).
+- `rotation.maciekDepositsTotal` / `basiaDepositsTotal` — **łączna Σ** (przelewy + wkłady własne, skumulowane).
+- `personOutlook[osoba].afterAnchorDepositSimulation` — tylko dla nie-kotwicy: `anchorPerson`, `anchorPaidAmount`, `suggestedAmount`, `catchUpAmount`, `walletNetCumulative`, `rotationPrepaid`, `formulaSummary`.
+
+Dla **zamkniętego** okresu outlook z `closing_snapshot_json`; dla **otwartego** — ledger / replay.
+
+**UI raportu** — pięć zakładek w górnym pasku (+ Konfiguracja po prawej). Wspólny filtr okresu na wszystkich zakładkach raportu:
+
+1. **Podsumowanie** — kto wpłaca (badge „Teraz wpłaca”), sugerowana kwota / symulacja podglądu, wyliczenie formuły z objaśnieniami, przelewy i wkłady własne w okresie, portfele per osoba (filtrowane lokalnie), data ostatniego odświeżenia, przycisk **Odśwież rozliczenia**.
+2. **Wpłaty rotacyjne** — tabele przelewów Maćka/Basi (INCOME na konto wspólne).
+3. **Portfele** — wydatki/wpływy Maćka/Basi (filtrowane lokalnie).
+4. **Wkłady własne** — wydatki ze źródeł wpłat na budżet domowy (filtrowane lokalnie).
+5. **Pozostałe** — grupa informacyjna „Inne” (filtrowane lokalnie).
+
+Outlook rotacji (`personOutlook`, `rotation`) pochodzi z ledgera i **nie zależy** od lokalnego filtra; filtr wpływa na liczby okresowe (wpłaty, wydatki, wpływy w tabelach).
 
 Grupa **Inne** jest tylko informacyjna i **nie wpływa** na `personOutlook`.
 

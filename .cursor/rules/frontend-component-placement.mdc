@@ -1,0 +1,30 @@
+---
+description: Gdzie umieszczać komponenty współdzielone vs domenowe (shared vs domains)
+globs: frontend/src/**/*.tsx
+alwaysApply: false
+---
+
+# Rozmieszczenie komponentów (frontend)
+
+## `shared/` — generyczne, wielowidokowe
+
+- UI bez logiki domenowej (np. `SidePanelShell`, `ConfirmDialog`, `Pagination`).
+- Hooki i utils używane w ≥2 domenach (np. `useSidePanelWidth`, `urlQuery`).
+- API klienckie (`shared/api/*`).
+
+## `domains/<moduł>/` — logika i UI domenowe
+
+- Formularze, panele i utils specyficzne dla modułu (np. `TransactionEditForm`).
+- Strony i layouty modułu.
+
+## Publiczne API między domenami
+
+Gdy domena A (np. `reports`) używa feature z domeny B (np. transakcje):
+
+- Udostępnij **barrel** `domains/B/<feature>/index.ts` (np. `transactions/panel/index.ts`).
+- Importuj **wyłącznie** przez ten barrel — nie z wnętrza `components/` obcej domeny.
+
+## Unikaj god-componentów
+
+- Nie rozrastaj jednego komponentu o prop `variant` / wiele booleanów ukrywających zakładki.
+- Preferuj **kompozycję**: wspólny shell (`SidePanelShell`) + domenowe zakładki/treść.

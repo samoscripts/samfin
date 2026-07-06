@@ -58,7 +58,7 @@ App\System\               — health
 
 1. Klasa w `Entity/` z atrybutami Doctrine.
 2. `Repository/` extends `ServiceEntityRepository`.
-3. Migracja: `doctrine:migrations:diff` w kontenerze → `make migrate`. Konwencja nazw: [database.md — Reguły nazewnictwa migracji](database.md#reguły-nazewnictwa-migracji) (plik `Version…` + `fk_{tabela}_{kolumna}`).
+3. Migracja: `doctrine:migrations:diff` w kontenerze → `make migrate`. Zasady: [Migracje bazy danych](#migracje-bazy-danych).
 
 ### Import nowego banku
 
@@ -110,6 +110,28 @@ Przy modyfikacji klasyfikacji lub importu sprawdź:
 
 ---
 
+## Migracje bazy danych
+
+Przed utworzeniem lub edycją pliku w `backend/migrations/` — [database.md — Reguły migracji Doctrine](database.md#reguły-migracji-doctrine).
+
+### Checklist (obowiązkowy)
+
+- [ ] Czy plik o tym numerze wersji jest już w `doctrine_migration_versions`? Jeśli **tak** — **nie edytuj**; utwórz nową migrację (`diff` / `generate`).
+- [ ] Nowy plik ma timestamp **wyłącznie** z CLI (`doctrine:migrations:diff` lub `generate`), nie wymyślony ręcznie.
+- [ ] FK w DDL: `fk_{tabela}_{kolumna}`; opcjonalnie `composer check:migration-fk-names`.
+- [ ] `up()` idempotentny przy repair (`hasTable` / `hasColumn` przed DDL).
+- [ ] Po merge: wpis w chronologii `database.md`; w ADR — **właściwy** numer migracji (nie reuse starego).
+- [ ] `make migrate` w kontenerze (`www-data`), nie na hoście.
+- [ ] Wersja nowej migracji **>** `Version20260706140400` (ostatnia w repo po uporządkowaniu 2026-07-06).
+
+### Czego nigdy nie robić
+
+- Edycja treści migracji już wdrożonej na dev lub produkcji (nawet jeśli „tylko dopisuję tabelę”).
+- Ponowne użycie numeru `Version…` pod inną zmianą schematu.
+- Ręczny `ALTER` / `CREATE TABLE` z pominięciem migracji Doctrine.
+
+---
+
 ## Czego nie robić bez potwierdzenia
 
 - Dodawanie encji „budżet”, „cel”, „beneficjent” — brak w modelu
@@ -117,6 +139,7 @@ Przy modyfikacji klasyfikacji lub importu sprawdź:
 - Hardcodowanie nazw kategorii w logice biznesowej
 - Refaktoryzacja `Flow` → `Transaction` w całym FE bez uzgodnienia
 - Zmiana konwencji kwot (float w DB)
+- Edycja plików migracji już zapisanych w `doctrine_migration_versions` (zamiast tego — nowa migracja)
 - Force push / zmiany migracji już wdrożonych na produkcji
 
 ---
@@ -139,7 +162,7 @@ Migracje ręcznie (gdy `make migrate` niedostępne):
 docker compose exec -u www-data -T app php bin/console doctrine:migrations:migrate --no-interaction
 ```
 
-**Nie** uruchamiaj migracji na hoście WSL bez kontenera — brak `pdo_mysql`. Szczegóły: [database.md](database.md), reguła `.cursor/rules/docker-migrations.mdc`.
+**Nie** uruchamiaj migracji na hoście WSL bez kontenera — brak `pdo_mysql`. Szczegóły: [database.md](database.md#reguły-migracji-doctrine), reguła `.cursor/rules/docker-migrations.mdc`.
 
 Health check: `GET http://localhost:3001/api/health` — zwraca m.in. `version`, `build`, `commit` (z `backend/config/build_info.json`, generowany przez `frontend/scripts/generate-build-info.mjs` przy `npm run build`).
 
@@ -151,7 +174,7 @@ Jednorazowo: `make test-db-setup` (baza `samfin_test` + migracje). Potem: `make 
 
 | Katalog | Zakres |
 |---------|--------|
-| `backend/tests/Smoke/` | health, security (publiczne vs chronione endpointy) |
+| `backend/tests/Smoke/` | health; security (publiczne vs chronione GET, logout); authenticated read (kluczowe GET z tokenem); admin (403 dla usera, 200 dla admina) |
 | `backend/tests/Api/` | testy HTTP kontrolerów (`ApiTestCase`): auth, categories, transactions, parties, wallets, concerns, party-bank-accounts, csv-imports, analytics, settlements, classification-rules, transaction-templates, system/backups |
 | `backend/tests/Unit/`, `backend/tests/Home/` | testy jednostkowe serwisów / parserów |
 

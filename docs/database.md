@@ -26,6 +26,7 @@ ORM: Doctrine 3. Migracje w `backend/migrations/` (23 pliki, chronologicznie od 
 | `transaction_template` | `TransactionTemplate` | Szablony klasyfikacji per użytkownik (wpływ/wydatek) |
 | `user_category_pick_event` | `UserCategoryPickEvent` | Log wyborów subkategorii per użytkownik i kierunek (`created_at`; purge po 90 dniach) |
 | `settlement_config` | `SettlementConfig` | Konfiguracja rozliczenia wpłat (per `user_id`) |
+| `settlement_period` | `SettlementPeriod` | Roczne okresy rozliczeniowe (snapshot przy zamknięciu) |
 | `settlement_ledger_entry` | `SettlementLedgerEntry` | Indeks ledger rozliczeń (1 wiersz = 1 `transaction_item`, running state) |
 
 ## Diagram relacji (FK)
@@ -147,7 +148,7 @@ erDiagram
 | Pozostałe FK do `party`, `wallet`, `concern`, `category`, `csv_import*` | SET NULL |
 | `created_by` / `updated_by` → `app_user` | RESTRICT lub SET NULL (zależnie od tabeli) |
 
-Nazwy constraintów FK w migracjach: sekcja [Reguły nazewnictwa migracji](#reguły-nazewnictwa-migracji).
+Nazwy constraintów FK w migracjach: sekcja [Reguły migracji Doctrine](#reguły-migracji-doctrine).
 
 ## Indeksy istotne dla zapytań
 
@@ -196,8 +197,8 @@ Historia: do 2026-06 jeden token w `app_user.api_token` (usunięty w migracji `V
 | `20260615120000` | Reguły klasyfikacji: warunek `direction` na początku `conditions_json` |
 | `20260622120000` | `transaction_template` — szablony klasyfikacji per użytkownik |
 | `20260623120000` | `category`: `direction_expense`, `direction_income` (zastępuje `type`; usunięte w `20260630120000`) |
-| `20260630120000` | (historyczna — wersja w DB; treść zastąpiona przez `20260708120000`) |
-| `20260708120000` | `category`: usunięcie `direction_expense`, `direction_income` (ADR-036) |
+| `20260630120000` | (historyczna — wersja w DB; treść zastąpiona przez `20260706140200`) |
+| `20260706140200` | `category`: usunięcie `direction_expense`, `direction_income` (ADR-036) |
 | `20260624120000` | Backfill `classification_rule.name` i `description` dla reguł z `created_from_transaction_id` |
 | `20260625120000` | `common_account_settlement_config` — konfiguracja rozliczenia (historyczna nazwa) |
 | `20260626120000` | Repair: utworzenie `common_account_settlement_config` jeśli brak (gdy `20260625120000` zapisana bez tabeli) |
@@ -210,8 +211,13 @@ Historia: do 2026-06 jeden token w `app_user.api_token` (usunięty w migracji `V
 | `20260704143000` | Drop `trans_localization`, `csv_import_row.title_localization_raw`; reorder kolumn `transactions` po dropie |
 | `20260705120000` | Multi-token auth: `user_api_token`, migracja z `app_user.api_token` |
 | `20260706120000` | Repair: rename `common_account_settlement_config` → `settlement_config`; ledger + kolumny indeksu jeśli brak |
-| `20260707120000` | `user_category_pick_event` — log wyborów kategorii (najczęściej wybierane, okno 90 dni) |
-| `20260710120000` | `settlement_ledger_entry`: `maciek_deposits_total_minor`, `basia_deposits_total_minor`; rename `next_depositor`→`anchor`; TRUNCATE ledger + `needs_refresh` (Model B rotacji) |
+| `20260706133600` | `settlement_period` — roczne okresy rozliczeniowe ze snapshotem przy zamknięciu (ADR-038) |
+| `20260706140100` | `user_category_pick_event` — log wyborów kategorii (najczęściej wybierane, okno 90 dni) |
+| `20260706140200` | `category`: usunięcie `direction_expense`, `direction_income` (ADR-036) |
+| `20260706140300` | `transactions` / `transaction_template`: `trans_custom_description` |
+| `20260706140400` | `settlement_ledger_entry`: Model B rotacji (`anchor`, Σ wpłat); TRUNCATE ledger + `needs_refresh` |
+
+**Uwaga (2026-07-06):** migracje `07120000`–`10120000` przemianowano na `06140100`–`06140400` (ta sama kolejność DDL, jedna data w nazwie). Na istniejących bazach: `backend/scripts/rename-migrations-20260706.sql` lub deploy (`scripts/deploy.sh` robi UPDATE przed `migrate`).
 
 ## Zapytania diagnostyczne (tylko SELECT)
 
@@ -304,27 +310,79 @@ Brak kolumny `deleted_at` na encjach operacyjnych. Dezaktywacja przez `active = 
 
 Jedyna migracja seedująca dane biznesowe: konto `admin@samfin.local`. Słowniki konfiguracyjne (kategorie, portfele itd.) **nie są seedowane** — użytkownik tworzy je przez UI/API.
 
-## Reguły nazewnictwa migracji
+## Reguły migracji Doctrine
 
-**Jedna konwencja** dla plików w `backend/migrations/` i dla `ADD CONSTRAINT … FOREIGN KEY` w metodzie `up()`. Szczegóły operacyjne (Docker, diff): [`.cursor/rules/docker-migrations.mdc`](../.cursor/rules/docker-migrations.mdc).
+Dwie zasady obowiązkowe przy każdej zmianie schematu. Szczegóły operacyjne (Docker, diff): [`.cursor/rules/docker-migrations.mdc`](../.cursor/rules/docker-migrations.mdc). Checklist dla AI: [`docs/ai-guidelines.md`](../ai-guidelines.md#migracje-bazy-danych).
 
-### Plik migracji
+### Zasada 1 — nie modyfikuj wykonanych migracji
+
+**Migracja zapisana w `doctrine_migration_versions` jest niemodyfikowalna** — na dev, w repo i na produkcji.
+
+Doctrine śledzi migracje wyłącznie po **numerze wersji** (`VersionYYYYMMDDHHMMSS`), nie po treści pliku ani hashu. Jeśli plik w `backend/migrations/` zmienisz po `migrate`, silnik uznaje wersję za wykonaną i **nie uruchomi** nowego SQL.
+
+| ❌ Zabronione | ✅ Zamiast tego |
+|---------------|-----------------|
+| Nadpisanie `up()` / `down()` w istniejącym pliku | **Nowy** plik migracji (`diff` lub `generate`) |
+| Ponowne użycie numeru wersji pod inną treść | Nowy timestamp z CLI |
+| Usunięcie wpisu z `doctrine_migration_versions` i ponowne `migrate` | Idempotentny `up()` w nowej migracji (`if ($schema->hasTable(...)) return;`) |
+| Ręczny `CREATE TABLE` / `ALTER` poza migracją | `doctrine:migrations:diff` → `make migrate` |
+
+**Objawy złamania zasady:** `doctrine:migrations:migrate` zwraca *Already at the latest version*, a aplikacja rzuca `Table '…' doesn't exist` (500).
+
+**Przypadek z projektu (2026-07):** `Version20260706140400` (dawniej `10120000`) była już wykonana (Model B rotacji). Nadpisanie tego pliku treścią `CREATE TABLE settlement_period` nie utworzyło tabeli — poprawka wymagała **osobnej** migracji `Version20260706133600`.
+
+**Jak sprawdzić przed edycją pliku:**
+
+```bash
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:status
+```
+
+```sql
+SELECT version, executed_at
+FROM doctrine_migration_versions
+WHERE version LIKE '%Version20260706140400%';
+```
+
+Jeśli wiersz istnieje — pliku **nie edytuj**; dodaj nową migrację.
+
+**Po każdej nowej migracji:** wpis w [Chronologii migracji](#chronologia-migracji) poniżej oraz w ADR (jeśli dotyczy decyzji architektonicznej).
+
+### Zasada 2 — nazewnictwo migracji
+
+**Jedna konwencja** dla plików w `backend/migrations/` i dla `ADD CONSTRAINT … FOREIGN KEY` w metodzie `up()`.
+
+#### Plik migracji
 
 | Reguła | Opis |
 |--------|------|
-| Format nazwy | `VersionYYYYMMDDHHMMSS.php` — timestamp z generatora Doctrine |
-| Tworzenie | `doctrine:migrations:diff` (po zmianie encji) lub `doctrine:migrations:generate` — **nie** wymyślać wersji ręcznie |
-| Timestamp | Rzeczywista data i czas (np. `Version20260701143022.php`). Bez sztucznych sufiksów (`120000`, „+1 dzień”, stała godzina dla wielu plików tego samego dnia) |
-| Wykonane migracje | **Nie edytować** pliku już zapisanego w `doctrine_migration_versions`. Poprawka schematu → **nowy** plik (repair, idempotentny). Edycja starego pliku nie uruchomi się ponownie i myli historię |
-| Historia | Starsze pliki z sufiksem `120000` zostają; nowe migracje — wyłącznie timestamp z CLI |
+| Format nazwy | `VersionYYYYMMDDHHMMSS.php` — **wyłącznie** timestamp z generatora Doctrine |
+| Tworzenie | `doctrine:migrations:diff` (po zmianie encji) lub `doctrine:migrations:generate` — **nie** wymyślać numeru wersji ręcznie |
+| Timestamp | Rzeczywista data i czas z CLI (np. `Version20260701143022.php`). **Bez** sztucznych sufiksów (`120000`, „+1 dzień”, stała godzina `120000` dla wielu plików tego samego dnia) |
+| Kolejność | Nowa migracja musi mieć wersję **leksykograficznie większą** niż ostatnia w repo (`doctrine:migrations:status` → Latest). Po uporządkowaniu lipca 2026 ostatnia to `Version20260706140400` |
+| Jedna zmiana | Jedna migracja = jeden logiczny krok schematu (nowa tabela, zestaw kolumn, repair). Nie łączyć niezwiązanych zmian w jednym pliku po fakcie |
+| Repair | Poprawka schematu na środowisku z już wykonanymi migracjami → nowy plik z idempotentnym `up()` (sprawdzenie `hasTable` / `hasColumn` przed DDL) |
+| Historia | Starsze pliki z sufiksem `120000` zostają w repo; **nowe** migracje — tylko timestamp z CLI |
+| Ostatnia wersja (2026-07-06) | `Version20260706140400` — kolejne migracje muszą mieć numer **większy** (np. `generate` od 7 lipca 2026: `Version20260707…`) |
 
-### Klucze obce w DDL
+**Przykład poprawnego workflow:**
+
+```bash
+# 1. Zmiana encji w PHP
+# 2. Wygeneruj migrację (w kontenerze, www-data)
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:diff
+# 3. Sprawdź wygenerowany Version20260706143022.php (przykład)
+# 4. Uruchom
+make migrate
+# 5. Uzupełnij chronologię w tym pliku (database.md)
+```
+
+#### Klucze obce w DDL
 
 | Reguła | Opis |
 |--------|------|
-| Nazwa constraintu | `fk_{tabela}_{kolumna}` (np. `fk_settlement_config_settlement_party_id`) |
+| Nazwa constraintu | `fk_{tabela}_{kolumna}` (np. `fk_settlement_period_user`) |
 | Zakres | Obowiązkowe dla migracji od `Version20260607204500` w górę |
-| Walidacja | `docker compose exec -T app composer check:migration-fk-names` — skrypt `backend/bin/check-migration-fk-names.php` |
+| Walidacja | `docker compose exec -T app composer check:migration-fk-names` |
 
 ## Uruchamianie migracji
 

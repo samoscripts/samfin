@@ -10,6 +10,7 @@ import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 import type { Party } from '@/domains/home/configuration/parties/types'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import { getApiErrorMessage } from '@/shared/utils/errors'
+import { SETTLEMENT_SETTINGS_LABELS } from '@/domains/home/reports/settlements/constants'
 
 type Draft = SettlementConfig
 
@@ -246,16 +247,13 @@ export default function SettlementSettings() {
 
       <fieldset className="space-y-3">
         <legend className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          Indeks rozliczeń
+          {SETTLEMENT_SETTINGS_LABELS.ledgerFieldset}
         </legend>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Po zmianie konfiguracji lub transakcji odśwież indeks w zakładce Raport.
-          Transakcje sprzed daty reindeksu nie wchodzą do indeksu. Na start liczą się
-          kolej rotacji, prepaid (ręcznie wpisany) i opcjonalnie salda portfeli.
-          Prepaid nie jest sumowany automatycznie z wpłat — tylko pola poniżej.
+          {SETTLEMENT_SETTINGS_LABELS.ledgerHint}
         </p>
         <label className="block text-sm text-gray-600 dark:text-gray-400">
-          Data początkowa reindeksu
+          {SETTLEMENT_SETTINGS_LABELS.reindexFromDate}
           <input
             type="date"
             className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
@@ -267,7 +265,7 @@ export default function SettlementSettings() {
           />
         </label>
         <label className="block text-sm text-gray-600 dark:text-gray-400">
-          Kolej na start reindeksu
+          {SETTLEMENT_SETTINGS_LABELS.openingNextDepositor}
           <select
             className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
             value={draft.openingNextDepositor}
@@ -313,7 +311,7 @@ export default function SettlementSettings() {
         {nonHomeWallets.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Salda portfeli na start reindeksu (PLN)
+              Salda portfeli na start ewidencji (PLN)
             </p>
             <ul className="space-y-2">
               {nonHomeWallets.map((w) => (
@@ -333,7 +331,7 @@ export default function SettlementSettings() {
         )}
         {draft.needsRefresh && (
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            Indeks wymaga odświeżenia.
+            {SETTLEMENT_SETTINGS_LABELS.needsRefresh}
             {draft.lastRefreshedAt ? ` Ostatnio: ${new Date(draft.lastRefreshedAt).toLocaleString('pl-PL')}.` : ''}
           </p>
         )}

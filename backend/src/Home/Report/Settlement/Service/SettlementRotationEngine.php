@@ -62,7 +62,10 @@ class SettlementRotationEngine
 
     public function applyFact(array $fact): void
     {
-        if ($fact['entryType'] === SettlementItemClassifier::ENTRY_STANDARD_DEPOSIT) {
+        if (
+            $fact['entryType'] === SettlementItemClassifier::ENTRY_STANDARD_DEPOSIT
+            || $fact['entryType'] === SettlementItemClassifier::ENTRY_SOURCE_EXP_DEPOSIT
+        ) {
             $this->applyStandardDeposit($fact['person'], $fact['amountMinor']);
 
             return;
@@ -235,6 +238,36 @@ class SettlementRotationEngine
         $engine->walletBalancesMinor = $normalized;
         $engine->maciekDepositsTotalMinor = (int) ($row['maciek_deposits_total_minor'] ?? 0);
         $engine->basiaDepositsTotalMinor = (int) ($row['basia_deposits_total_minor'] ?? 0);
+        $engine->anchor = $anchor;
+        $engine->previousAnchor = $anchor;
+
+        return $engine;
+    }
+
+    /**
+     * @param array<string, mixed> $snapshot from {@see toSnapshot()}
+     * @param array<string, string> $walletOwners
+     */
+    public static function fromSnapshot(array $snapshot, int $baseDepositMinor, array $walletOwners): self
+    {
+        $balances = $snapshot['walletBalancesMinor'] ?? [];
+        $normalized = [];
+        foreach ($balances as $walletId => $balance) {
+            $normalized[(string) $walletId] = (int) $balance;
+        }
+
+        $anchor = (string) ($snapshot['anchor'] ?? SettlementConfig::DEPOSITOR_MACIEK);
+
+        $engine = new self(
+            $baseDepositMinor,
+            $walletOwners,
+            $anchor,
+            (int) ($snapshot['rotationPrepaidMaciekMinor'] ?? 0),
+            (int) ($snapshot['rotationPrepaidBasiaMinor'] ?? 0),
+            $normalized,
+        );
+        $engine->maciekDepositsTotalMinor = (int) ($snapshot['maciekDepositsTotalMinor'] ?? 0);
+        $engine->basiaDepositsTotalMinor = (int) ($snapshot['basiaDepositsTotalMinor'] ?? 0);
         $engine->anchor = $anchor;
         $engine->previousAnchor = $anchor;
 

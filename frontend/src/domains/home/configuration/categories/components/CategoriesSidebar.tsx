@@ -8,12 +8,9 @@ import {
 import CategorySelect from '@/shared/components/form/CategorySelect'
 import { configSelectCls } from '@/shared/components/form/formClasses'
 import { useIsMobile } from '@/shared/hooks/useIsMobile'
+import SidePanelShell from '@/shared/components/panel/SidePanelShell'
 import { formatCategoryLabel } from '@/shared/utils/categoryOptions'
 import { getApiErrorMessage } from '@/shared/utils/errors'
-import {
-  MAX_PANEL_WIDTH,
-  MIN_PANEL_WIDTH,
-} from '../constants/panelLayout'
 import type { CategoryPanel } from '../types/categoryPanel'
 import { canMoveChildToParent, isMergeTarget } from '../utils/categoryTree'
 import CategoryForm from './CategoryForm'
@@ -138,22 +135,6 @@ export default function CategoriesSidebar({
     } finally {
       setActionSaving(false)
     }
-  }
-
-  const startResize = (e: React.MouseEvent) => {
-    if (!resizable) return
-    e.preventDefault()
-    const startX = e.clientX
-    const startWidth = width
-    const onMouseMove = (mv: MouseEvent) => {
-      onWidthChange(Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, startWidth + (startX - mv.clientX))))
-    }
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
   }
 
   function renderBody() {
@@ -357,37 +338,15 @@ export default function CategoriesSidebar({
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <aside
-        className={[
-          'fixed inset-y-0 right-0 z-50 w-full max-w-2xl flex flex-col',
-          'bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800',
-          'transition-transform duration-300 ease-in-out',
-          open ? 'translate-x-0' : 'translate-x-full',
-        ].join(' ')}
-      >
-        {innerContent}
-      </aside>
-    )
-  }
-
   return (
-    <aside
-      className="relative z-50 h-full flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 transition-[width] duration-300 ease-in-out overflow-hidden"
-      style={{ width: open ? width : 0 }}
+    <SidePanelShell
+      open={open}
+      width={width}
+      resizable={resizable}
+      onWidthChange={onWidthChange}
+      onClose={onClose}
     >
-      {open && resizable && (
-        <div
-          className="absolute left-0 inset-y-0 w-1.5 cursor-col-resize z-10 group"
-          onMouseDown={startResize}
-        >
-          <div className="h-full w-px ml-0.5 bg-transparent group-hover:bg-[#c9a96e]/40 transition-colors" />
-        </div>
-      )}
-      <div className="flex flex-col h-full min-h-0" style={{ width }}>
-        {innerContent}
-      </div>
-    </aside>
+      {innerContent}
+    </SidePanelShell>
   )
 }

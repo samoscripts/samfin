@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Model B rotacji: Σ wpłat, anchor (rename next_depositor), wymuszony rebuild indeksu.
  */
-final class Version20260710120000 extends AbstractMigration
+final class Version20260706140400 extends AbstractMigration
 {
     public function getDescription(): string
     {

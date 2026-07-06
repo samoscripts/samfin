@@ -32,10 +32,20 @@ class SettlementItemQuery
         string $dateTo,
         int $settlementPartyId,
         bool $includePartial,
+        int $homeBudgetWalletId,
+        array $maciekSourcePartyIds,
+        array $basiaSourcePartyIds,
     ): array {
         $statusFilter = $includePartial
             ? "t.status IN ('CLASSIFIED', 'PARTIALLY_CLASSIFIED')"
             : "t.status = 'CLASSIFIED'";
+
+        [$partyFilterSql, $partyFilterParams] = $this->buildPartyFilterSql(
+            $settlementPartyId,
+            $homeBudgetWalletId,
+            $maciekSourcePartyIds,
+            $basiaSourcePartyIds,
+        );
 
         $sql = <<<SQL
             SELECT
@@ -60,18 +70,14 @@ class SettlementItemQuery
             WHERE t.trans_date >= :dateFrom
               AND t.trans_date <= :dateTo
               AND {$statusFilter}
-              AND (
-                  t.paid_from_party_id = :settlementPartyId
-                  OR t.paid_to_party_id = :settlementPartyId
-              )
+              AND ({$partyFilterSql})
             ORDER BY t.trans_date ASC, t.id ASC, ti.id ASC
         SQL;
 
-        $rows = $this->em->getConnection()->fetchAllAssociative($sql, [
-            'dateFrom'           => $dateFrom,
-            'dateTo'             => $dateTo,
-            'settlementPartyId'  => $settlementPartyId,
-        ]);
+        $rows = $this->em->getConnection()->fetchAllAssociative($sql, array_merge([
+            'dateFrom' => $dateFrom,
+            'dateTo'   => $dateTo,
+        ], $partyFilterParams));
 
         return array_map(static function (array $row): array {
             return [
@@ -113,10 +119,20 @@ class SettlementItemQuery
         string $dateFrom,
         int $settlementPartyId,
         bool $includePartial,
+        int $homeBudgetWalletId,
+        array $maciekSourcePartyIds,
+        array $basiaSourcePartyIds,
     ): array {
         $statusFilter = $includePartial
             ? "t.status IN ('CLASSIFIED', 'PARTIALLY_CLASSIFIED')"
             : "t.status = 'CLASSIFIED'";
+
+        [$partyFilterSql, $partyFilterParams] = $this->buildPartyFilterSql(
+            $settlementPartyId,
+            $homeBudgetWalletId,
+            $maciekSourcePartyIds,
+            $basiaSourcePartyIds,
+        );
 
         $sql = <<<SQL
             SELECT
@@ -140,17 +156,13 @@ class SettlementItemQuery
             LEFT JOIN wallet w ON w.id = ti.wallet_id
             WHERE t.trans_date >= :dateFrom
               AND {$statusFilter}
-              AND (
-                  t.paid_from_party_id = :settlementPartyId
-                  OR t.paid_to_party_id = :settlementPartyId
-              )
+              AND ({$partyFilterSql})
             ORDER BY t.trans_date ASC, t.id ASC, ti.id ASC
         SQL;
 
-        $rows = $this->em->getConnection()->fetchAllAssociative($sql, [
-            'dateFrom'          => $dateFrom,
-            'settlementPartyId' => $settlementPartyId,
-        ]);
+        $rows = $this->em->getConnection()->fetchAllAssociative($sql, array_merge([
+            'dateFrom' => $dateFrom,
+        ], $partyFilterParams));
 
         return array_map(static function (array $row): array {
             return [
@@ -228,5 +240,44 @@ class SettlementItemQuery
             'operationDate'   => $row['operationDate'],
             'amountMinor'     => (int) $row['amountMinor'],
         ];
+    }
+
+    /**
+     * @param list<int> $maciekSourcePartyIds
+     * @param list<int> $basiaSourcePartyIds
+     *
+     * @return array{0: string, 1: array<string, int>}
+     */
+    private function buildPartyFilterSql(
+        int $settlementPartyId,
+        int $homeBudgetWalletId,
+        array $maciekSourcePartyIds,
+        array $basiaSourcePartyIds,
+    ): array {
+        $clauses = [
+            't.paid_from_party_id = :settlementPartyId',
+            't.paid_to_party_id = :settlementPartyId',
+        ];
+        $params = ['settlementPartyId' => $settlementPartyId];
+
+        $sourceIds = array_values(array_unique(array_merge($maciekSourcePartyIds, $basiaSourcePartyIds)));
+        if ($sourceIds !== []) {
+            $placeholders = [];
+            foreach ($sourceIds as $i => $id) {
+                $key = 'sourcePartyId' . $i;
+                $placeholders[] = ':' . $key;
+                $params[$key] = $id;
+            }
+            $inList = implode(', ', $placeholders);
+            $clauses[] = <<<SQL
+                (t.direction = 'EXPENSE'
+                 AND ti.wallet_id = :homeBudgetWalletId
+                 AND t.paid_from_party_id IN ({$inList})
+                 AND t.paid_from_party_id != :settlementPartyId)
+            SQL;
+            $params['homeBudgetWalletId'] = $homeBudgetWalletId;
+        }
+
+        return [implode(' OR ', $clauses), $params];
     }
 }
