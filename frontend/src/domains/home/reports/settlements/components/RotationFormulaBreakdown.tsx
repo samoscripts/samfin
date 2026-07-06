@@ -142,8 +142,6 @@ function PersonFormulaBlock({
   const baseAmount = rotation.baseAmount
   const personStan = person === 'maciek' ? rotation.stanMaciek : rotation.stanBasia
 
-  const queueActive = outlook.isAnchor
-
   return (
     <div
       className={[

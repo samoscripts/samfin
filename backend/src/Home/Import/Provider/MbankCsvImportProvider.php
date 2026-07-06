@@ -263,44 +263,14 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 break;
             }
 
-            // #region agent log
-            $mergeCount = 0;
-            // #endregion
             while (!$this->rowBoundary->isCsvRecordComplete($currentLine, self::EXPECTED_DATA_COLUMNS)) {
                 $nextPart = $this->readNextLine($file, $pendingNextLine, $lineNo);
                 if ($nextPart === null) {
                     break;
                 }
                 if ($this->rowBoundary->looksLikeNewDataRowStart($nextPart)) {
-                    // #region agent log
-                    $this->agentDebugLog(
-                        'MbankCsvImportProvider.php:merge-stop',
-                        'Stopped multiline merge — next line looks like new data row',
-                        [
-                            'lineNo' => $lineNo,
-                            'mergeCount' => $mergeCount,
-                            'currentPreview' => substr($currentLine, 0, 120),
-                            'nextPreview' => substr($nextPart, 0, 80),
-                        ],
-                        'B',
-                    );
-                    // #endregion
                     break;
                 }
-                // #region agent log
-                $mergeCount++;
-                $this->agentDebugLog(
-                    'MbankCsvImportProvider.php:merge',
-                    'Merging physical lines due to unclosed CSV quote',
-                    [
-                        'lineNo' => $lineNo,
-                        'mergeCount' => $mergeCount,
-                        'currentPreview' => substr($currentLine, 0, 120),
-                        'nextPreview' => substr($nextPart, 0, 80),
-                    ],
-                    'A',
-                );
-                // #endregion
                 $currentLine .= "\n" . $nextPart;
             }
 
@@ -312,42 +282,12 @@ class MbankCsvImportProvider implements BankImportProviderInterface
                 break;
             }
 
-            $parsedCols = $this->parseCsvLine($currentLine);
-            // #region agent log
-            if ($lineNo >= 1300 && $lineNo <= 1310) {
-                $this->agentDebugLog(
-                    'MbankCsvImportProvider.php:parse-row',
-                    'Parsed data row near known failure line',
-                    [
-                        'lineNo' => $lineNo,
-                        'colCount' => $this->rowBoundary->countNormalizedColumns($parsedCols),
-                        'mergeCount' => $mergeCount,
-                        'isComplete' => $this->rowBoundary->isCsvRecordComplete($currentLine, self::EXPECTED_DATA_COLUMNS),
-                        'preview' => substr($currentLine, 0, 120),
-                    ],
-                    'C',
-                );
-            }
-            // #endregion
-            $rowResult = $mapper->mapDataLine($lineNo, $parsedCols);
+            $rowResult = $mapper->mapDataLine($lineNo, $this->parseCsvLine($currentLine));
             if (!empty($rowResult['stopParsing'])) {
                 break;
             }
 
             if ($rowResult['fatalError'] !== null) {
-                // #region agent log
-                $this->agentDebugLog(
-                    'MbankCsvImportProvider.php:fatal',
-                    'Fatal row parse error',
-                    [
-                        'lineNo' => $lineNo,
-                        'code' => $rowResult['fatalError']->code,
-                        'colCount' => $this->rowBoundary->countNormalizedColumns($parsedCols),
-                        'mergeCount' => $mergeCount,
-                    ],
-                    'D',
-                );
-                // #endregion
                 $errors[] = $rowResult['fatalError'];
                 return [];
             }
@@ -445,23 +385,5 @@ class MbankCsvImportProvider implements BankImportProviderInterface
         }
 
         return preg_replace('/\D+/', '', $raw) ?? '';
-    }
-
-    /** @param array<string, mixed> $data */
-    private function agentDebugLog(string $location, string $message, array $data, string $hypothesisId): void
-    {
-        $logPath = dirname(__DIR__, 5) . '/debug-26fce5.log';
-        $payload = json_encode([
-            'sessionId' => '26fce5',
-            'runId' => 'pre-fix',
-            'hypothesisId' => $hypothesisId,
-            'location' => $location,
-            'message' => $message,
-            'data' => $data,
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_UNICODE);
-        if ($payload !== false) {
-            @file_put_contents($logPath, $payload . "\n", FILE_APPEND);
-        }
     }
 }

@@ -91,10 +91,7 @@ final class MbankCsvRowBoundary
         return $this->looksLikeDataRowStart($firstField);
     }
 
-    /**
-     * @param list<string> $cols
-     */
-    public function countNormalizedColumns(array $cols): int
+    private function countNormalizedColumns(array $cols): int
     {
         while ($cols !== [] && trim($cols[array_key_last($cols)] ?? '') === '') {
             array_pop($cols);
