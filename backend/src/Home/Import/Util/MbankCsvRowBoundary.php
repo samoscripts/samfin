@@ -52,7 +52,7 @@ final class MbankCsvRowBoundary
             || str_contains($normalized, 'art. 7 ustawy');
     }
 
-    public function isCsvRecordComplete(string $line): bool
+    public function isCsvRecordComplete(string $line, ?int $expectedDataColumnCount = null): bool
     {
         $inQuotes = false;
         $length   = strlen($line);
@@ -71,7 +71,47 @@ final class MbankCsvRowBoundary
             $inQuotes = !$inQuotes;
         }
 
-        return !$inQuotes;
+        if (!$inQuotes) {
+            return true;
+        }
+
+        // mBank czasem eksportuje nazwy z cudzysłowem w środku (np. Piekarnia "Jak Dawnie")
+        // bez podwojenia — str_getcsv i tak daje 8 kolumn, ale licznik cudzysłowów zostaje „otwarty”.
+        if ($expectedDataColumnCount !== null && $this->hasExpectedParsedColumnCount($line, $expectedDataColumnCount)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function looksLikeNewDataRowStart(string $line): bool
+    {
+        $firstField = trim(explode(';', trim($line), 2)[0]);
+
+        return $this->looksLikeDataRowStart($firstField);
+    }
+
+    /**
+     * @param list<string> $cols
+     */
+    public function countNormalizedColumns(array $cols): int
+    {
+        while ($cols !== [] && trim($cols[array_key_last($cols)] ?? '') === '') {
+            array_pop($cols);
+        }
+
+        return count($cols);
+    }
+
+    private function hasExpectedParsedColumnCount(string $line, int $expectedColumnCount): bool
+    {
+        $cols = str_getcsv($line, ';', '"');
+
+        if ($this->countNormalizedColumns($cols) < $expectedColumnCount) {
+            return false;
+        }
+
+        return $this->looksLikeDataRowStart(trim($cols[0] ?? ''));
     }
 
     /**
