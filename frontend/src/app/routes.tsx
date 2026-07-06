@@ -7,6 +7,8 @@ import TransactionEditRedirect from '@/domains/home/transactions/pages/Transacti
 import TransactionNewRedirect from '@/domains/home/transactions/pages/TransactionNewRedirect'
 import ReportsLayout from '@/domains/home/reports/pages/ReportsLayout'
 import AnalyticsReport from '@/domains/home/reports/analytics/pages/AnalyticsReport'
+import BreakdownReport from '@/domains/home/reports/breakdown/pages/BreakdownReport'
+import TrendReport from '@/domains/home/reports/trend/pages/TrendReport'
 import SettlementLayout from '@/domains/home/reports/settlements/pages/SettlementLayout'
 import SettlementReportLayout from '@/domains/home/reports/settlements/pages/SettlementReportLayout'
 import SettlementSummary from '@/domains/home/reports/settlements/pages/SettlementSummary'
@@ -58,6 +60,8 @@ export default function AppRoutes() {
         <Route path="raporty" element={<ReportsLayout />}>
           <Route index element={<Navigate to="analytics" replace />} />
           <Route path="analytics" element={<AnalyticsReport />} />
+          <Route path="breakdown" element={<BreakdownReport />} />
+          <Route path="trend" element={<TrendReport />} />
           <Route path="settlements" element={<SettlementLayout />}>
             <Route element={<SettlementReportLayout />}>
               <Route index element={<SettlementSummary />} />

@@ -5,11 +5,11 @@
 Moduł raportów jest **częściowo zaimplementowany**:
 
 1. **Analizy** — `/app/raporty/analytics` z filtrami w URL (`year`, `month`, `walletId`); API `GET /api/reports/analytics`.
-2. **Rozliczenia** — `/app/raporty/settlements` z zakładką konfiguracji; API `GET /api/reports/settlements` oraz `GET/PUT .../config`.
-3. **Podstawowe statystyki transakcji** — endpoint API i dashboard.
-4. **Lista transakcji z filtrami** — eksploracja operacyjna (nie raport formalny).
-
-Folder `mock/` zawiera statyczne prototypy HTML — **nie są podłączone** do aplikacji React.
+2. **Rozbicie** — `/app/raporty/breakdown` — **plansza UI (mock)** z wykresami i filtrami; dane z fixture, backend `GET /api/reports/breakdown` — do implementacji.
+3. **Trend** — `/app/raporty/trend` — **plansza UI (mock)** wykresu miesięcznego; backend `GET /api/reports/trend` — do implementacji.
+4. **Rozliczenia** — `/app/raporty/settlements` z zakładką konfiguracji; API `GET /api/reports/settlements` oraz `GET/PUT .../config`.
+5. **Podstawowe statystyki transakcji** — endpoint API i dashboard.
+6. **Lista transakcji z filtrami** — eksploracja operacyjna (nie raport formalny).
 
 ---
 
@@ -17,6 +17,8 @@ Folder `mock/` zawiera statyczne prototypy HTML — **nie są podłączone** do 
 
 - **Sidebar:** pozycja „Raporty” rozwija podmenu (nie zakładki w treści strony):
   - **Analizy** (`/raporty/analytics`)
+  - **Rozbicie** (`/raporty/breakdown`) — mock UI
+  - **Trend** (`/raporty/trend`) — mock UI
   - **Rozliczenia** (`/raporty/settlements`)
 - **Layout raportów:** [`ReportsLayout.tsx`](../frontend/src/domains/home/reports/pages/ReportsLayout.tsx) — nagłówek + `<Outlet />` (bez poziomego podmenu).
 - **Rozliczenia:** [`SettlementLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementLayout.tsx) — jeden pasek: **Podsumowanie | Wpłaty rotacyjne | Portfele | Pozostałe** (lewa strona) oraz **Konfiguracja** (prawa strona). Filtr okresu w [`SettlementReportLayout.tsx`](../frontend/src/domains/home/reports/settlements/pages/SettlementReportLayout.tsx) — na wszystkich 4 zakładkach raportu, nie na konfiguracji.
@@ -43,6 +45,8 @@ frontend/src/domains/home/reports/
 |-------|------|
 | `/raporty` | redirect → `/raporty/analytics` |
 | `/raporty/analytics` | analizy (obecnie: zestawienie miesięczne) |
+| `/raporty/breakdown` | rozbicie wg kategorii/portfela/obszaru (mock) |
+| `/raporty/trend` | trend miesięczny przychody/wydatki (mock) |
 | `/raporty/settlements` | rozliczenie — podsumowanie |
 | `/raporty/settlements/rotacyjne` | wpłaty rotacyjne (szczegóły) |
 | `/raporty/settlements/portfele` | portfele Maćka/Basi |
@@ -268,6 +272,28 @@ Cztery karty: przychody, wydatki, saldo, niesklasyfikowane. URL: `/?month=YYYY-M
 ## Lista i filtrowanie transakcji (analityka operacyjna)
 
 `GET /api/transactions` — filtry dat, kierunek, status, Skąd/Dokąd, portfel, obszar, kategoria, kwota, opis, sortowanie, paginacja. Stan filtrów w URL (ADR-025).
+
+---
+
+## Plansze UI (mock w React)
+
+Strony prototypowe z **danymi przykładowymi** (fixture w `frontend/src/domains/home/reports/shared/fixtures/`). Banner „Podgląd — dane przykładowe” na górze strony. Po akceptacji UX podłączenie backendu bez zmiany układu.
+
+### Rozbicie (`BreakdownReport.tsx`)
+
+- Filtry w URL (jak transakcje): okres, portfel, kategoria, kierunek, status, kwota, opis, Skąd/Dokąd.
+- Przełącznik grupowania: kategorie główne / podkategorie / portfele / obszary.
+- Kierunek: wydatki / przychody.
+- KPI: suma, liczba pozycji, średnia, kwota bez kategorii.
+- Wykresy (recharts): donut + słupki poziome + tabela z udziałem %.
+- Drill-down: klik kategorii głównej → podkategorie (`groupBy=categorySub` + `categoryId`).
+
+Docelowe API: `GET /api/reports/breakdown` — kształt odpowiedzi w `shared/types/breakdown.ts`.
+
+### Trend (`TrendReport.tsx`)
+
+- Wykres liniowy lub słupkowy: przychody, wydatki, saldo miesiąc po miesiącu (mock 6 miesięcy).
+- Docelowe API: `GET /api/reports/trend`.
 
 ---
 

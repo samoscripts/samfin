@@ -56,6 +56,8 @@ const REPORTS_NAV: NavGroup = {
     {
       items: [
         { to: '/raporty/analytics', label: 'Analizy', end: true },
+        { to: '/raporty/breakdown', label: 'Rozbicie' },
+        { to: '/raporty/trend', label: 'Trend' },
         { to: '/raporty/settlements', label: 'Rozliczenia' },
       ],
     },
