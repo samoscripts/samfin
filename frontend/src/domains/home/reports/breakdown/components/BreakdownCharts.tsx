@@ -4,6 +4,7 @@ import HorizontalBarChart from '@/shared/components/charts/HorizontalBarChart'
 import VerticalBarChart from '@/shared/components/charts/VerticalBarChart'
 import type { ChartStyle } from '@/shared/components/charts/chartStyle'
 import { getSeriesDisplayColor } from '@/shared/components/charts/chartDirectionBarStyle'
+import type { FlowFilters } from '@/domains/home/transactions/types'
 import type {
   BreakdownDirection,
   BreakdownGroup,
@@ -38,6 +39,8 @@ interface BreakdownChartsProps {
   chartStyle: ChartStyle
   dateFrom: string
   dateTo: string
+  reportFilters: FlowFilters
+  onOpenTransaction?: (txId: number) => void
 }
 
 function toChartItems(groups: BreakdownGroup[]) {
@@ -70,6 +73,8 @@ export default function BreakdownCharts({
   chartStyle,
   dateFrom,
   dateTo,
+  reportFilters,
+  onOpenTransaction,
 }: BreakdownChartsProps) {
   const [chartTab, setChartTab] = useState<ChartTab>('vertical')
   const isTableTab = chartTab === 'table'
@@ -198,9 +203,12 @@ export default function BreakdownCharts({
           group={activeGroup}
           groupIndex={activeIndex}
           othersSourceGroups={othersSourceGroups}
+          groupBy={groupBy}
           direction={direction}
           dateFrom={dateFrom}
           dateTo={dateTo}
+          reportFilters={reportFilters}
+          onOpenTransaction={onOpenTransaction}
           onClose={() => onClearSelection?.()}
         />
       </div>

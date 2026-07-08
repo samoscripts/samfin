@@ -34,6 +34,7 @@ import type {
 } from '@/domains/home/reports/shared/types/breakdown'
 import BreakdownCharts from '@/domains/home/reports/breakdown/components/BreakdownCharts'
 import { useChartStyle } from '@/shared/hooks/useChartStyle'
+import { useTransactionPanel, resolveRightPanelOwner } from '@/domains/home/transactions/panel'
 
 const VALID_GROUP_BY = new Set<BreakdownGroupBy>([
   'categoryMain',
@@ -92,11 +93,8 @@ export default function BreakdownReport() {
     fetchCategories().then(setCategories).catch(() => setCategories([]))
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    fetchBreakdownReport({
+  const loadBreakdown = useCallback(() => {
+    return fetchBreakdownReport({
       dateFrom: period.dateFrom,
       dateTo: period.dateTo,
       groupBy,
@@ -110,6 +108,28 @@ export default function BreakdownReport() {
       amountMax: filters.amountMax,
       description: filters.description,
     })
+  }, [period.dateFrom, period.dateTo, groupBy, direction, filters])
+
+  const { openTx: openTxRaw, transactionPanelPortal, confirmDialogs } = useTransactionPanel({
+    onMutated: () => {
+      void loadBreakdown().then(setData).catch(() => {})
+    },
+  })
+  const panelOwner = resolveRightPanelOwner(searchParams)
+
+  const openTx = useCallback(
+    (txId: number) => {
+      closePanel()
+      openTxRaw(txId)
+    },
+    [closePanel, openTxRaw],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    loadBreakdown()
       .then((res) => {
         if (!cancelled) setData(res)
       })
@@ -125,7 +145,7 @@ export default function BreakdownReport() {
     return () => {
       cancelled = true
     }
-  }, [period.dateFrom, period.dateTo, groupBy, direction, filters])
+  }, [loadBreakdown, groupBy, direction])
 
   const chartTop = useMemo(
     () => parseChartTop(searchParams.get('chartTop'), data.groups.length),
@@ -282,6 +302,7 @@ export default function BreakdownReport() {
       : null
 
   return (
+    <>
     <ReportPageShell
       sidebarOpen={sidebarOpen}
       onOpenSidebar={openPanel}
@@ -378,8 +399,13 @@ export default function BreakdownReport() {
           chartStyle={chartStyle}
           dateFrom={period.dateFrom}
           dateTo={period.dateTo}
+          reportFilters={filters}
+          onOpenTransaction={openTx}
         />
       </div>
     </ReportPageShell>
+    {panelOwner === 'transaction' && transactionPanelPortal}
+    {confirmDialogs}
+    </>
   )
 }

@@ -1,10 +1,17 @@
-import { Link } from 'react-router-dom'
-import { ArrowRight, X } from 'lucide-react'
-import type { BreakdownGroup, BreakdownDirection } from '@/domains/home/reports/shared/types/breakdown'
+import { useMemo } from 'react'
+import { X } from 'lucide-react'
+import type { FlowFilters } from '@/domains/home/transactions/types'
+import { FilteredTransactionsTable, flowFiltersToTransactionListHref } from '@/domains/home/transactions/list'
+import type {
+  BreakdownGroup,
+  BreakdownGroupBy,
+  BreakdownDirection,
+} from '@/domains/home/reports/shared/types/breakdown'
+import { breakdownGroupChartId, CHART_OTHERS_ID } from '@/domains/home/reports/shared/utils/chartTopGroups'
 import {
-  breakdownGroupChartId,
-  CHART_OTHERS_ID,
-} from '@/domains/home/reports/shared/utils/chartTopGroups'
+  breakdownDrillDownLimitNote,
+  breakdownGroupToFlowFilters,
+} from '@/domains/home/reports/breakdown/utils/breakdownDrillDownFilters'
 import { formatAmount } from '@/shared/utils/format'
 import { chartColor } from '@/shared/components/charts/chartColors'
 
@@ -12,9 +19,12 @@ interface BreakdownGroupTransactionsProps {
   group: BreakdownGroup | null
   groupIndex: number
   othersSourceGroups?: BreakdownGroup[]
+  groupBy: BreakdownGroupBy
   direction: BreakdownDirection
   dateFrom: string
   dateTo: string
+  reportFilters: FlowFilters
+  onOpenTransaction?: (txId: number) => void
   onClose: () => void
 }
 
@@ -22,12 +32,27 @@ export default function BreakdownGroupTransactions({
   group,
   groupIndex,
   othersSourceGroups = [],
+  groupBy,
   direction,
   dateFrom,
   dateTo,
+  reportFilters,
+  onOpenTransaction,
   onClose,
 }: BreakdownGroupTransactionsProps) {
-  if (!group) {
+  const flowFilters = useMemo(() => {
+    if (!group) return null
+    return breakdownGroupToFlowFilters({
+      group,
+      groupBy,
+      direction,
+      dateFrom,
+      dateTo,
+      reportFilters,
+    })
+  }, [group, groupBy, direction, dateFrom, dateTo, reportFilters])
+
+  if (!group || !flowFilters) {
     return (
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl h-full min-h-[320px] flex flex-col">
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
@@ -44,14 +69,8 @@ export default function BreakdownGroupTransactions({
 
   const groupId = breakdownGroupChartId(group)
   const isOthers = groupId === CHART_OTHERS_ID
-
-  const params = new URLSearchParams({ dateFrom, dateTo, direction })
-  // Pozycje bez kategorii (group.id === null) linkujemy bez categoryId — lista
-  // transakcji nie ma filtra „pozycja bez kategorii” (pełna zgodność w fazie 2).
-  if (!isOthers && group.id !== null && group.id > 0) {
-    params.set('categoryId', String(group.id))
-  }
-  const txLink = `/transactions?${params.toString()}`
+  const txLink = flowFiltersToTransactionListHref(flowFilters)
+  const limitNote = breakdownDrillDownLimitNote(group)
 
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl h-full flex flex-col min-h-[320px]">
@@ -82,17 +101,12 @@ export default function BreakdownGroupTransactions({
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 py-8 text-center">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Zobacz transakcje tej grupy na liście operacji z zastosowanymi filtrami okresu i kierunku.
-        </p>
-        <Link
-          to={txLink}
-          className="inline-flex items-center gap-1 text-sm font-medium text-[#c9a96e] hover:text-[#d4bc8e] transition-colors"
-        >
-          Otwórz w wyszukiwarce transakcji <ArrowRight size={14} />
-        </Link>
-      </div>
+      <FilteredTransactionsTable
+        filters={flowFilters}
+        onOpenTransaction={onOpenTransaction}
+        fullListHref={txLink}
+        limitNote={limitNote}
+      />
     </div>
   )
 }

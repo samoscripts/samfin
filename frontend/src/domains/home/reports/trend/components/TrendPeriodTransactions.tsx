@@ -1,7 +1,11 @@
-import { Link } from 'react-router-dom'
-import { ArrowRight, X } from 'lucide-react'
+import { useMemo } from 'react'
+import { X } from 'lucide-react'
 import type { TrendBarSelection, TrendQueryState } from '@/domains/home/reports/trend/types/trend'
-import { trendTransactionsLink } from '@/domains/home/reports/trend/utils/trendUrl'
+import {
+  trendSelectionToFlowFilters,
+  trendTransactionsLink,
+} from '@/domains/home/reports/trend/utils/trendUrl'
+import { FilteredTransactionsTable } from '@/domains/home/transactions/list'
 import { chartColor } from '@/shared/components/charts/chartColors'
 import { formatAmount } from '@/shared/utils/format'
 import { DIRECTION_LABEL_BY_VALUE } from '@/domains/home/transactions/constants/labels'
@@ -9,15 +13,23 @@ import { DIRECTION_LABEL_BY_VALUE } from '@/domains/home/transactions/constants/
 interface TrendPeriodTransactionsProps {
   selection: TrendBarSelection | null
   query: TrendQueryState
+  onOpenTransaction?: (txId: number) => void
   onClose: () => void
 }
 
 export default function TrendPeriodTransactions({
   selection,
   query,
+  onOpenTransaction,
   onClose,
 }: TrendPeriodTransactionsProps) {
-  if (!selection) {
+  const flowFilters = useMemo(
+    () => (selection ? trendSelectionToFlowFilters(selection, query) : null),
+    [selection, query],
+  )
+  const txLink = selection ? trendTransactionsLink(selection, query) : ''
+
+  if (!selection || !flowFilters) {
     return (
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl flex flex-col min-h-[200px]">
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
@@ -32,10 +44,8 @@ export default function TrendPeriodTransactions({
     )
   }
 
-  const txLink = trendTransactionsLink(selection, query)
-
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl flex flex-col">
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl flex flex-col min-h-[200px]">
       <div className="flex items-start gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <span
           className="w-3 h-3 rounded-full shrink-0 mt-1"
@@ -59,17 +69,11 @@ export default function TrendPeriodTransactions({
         </button>
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-3 px-6 py-8 text-center">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Zobacz transakcje tego okresu i serii na liście operacji z zastosowanymi filtrami.
-        </p>
-        <Link
-          to={txLink}
-          className="inline-flex items-center gap-1 text-sm font-medium text-[#c9a96e] hover:text-[#d4bc8e] transition-colors"
-        >
-          Otwórz w wyszukiwarce transakcji <ArrowRight size={14} />
-        </Link>
-      </div>
+      <FilteredTransactionsTable
+        filters={flowFilters}
+        onOpenTransaction={onOpenTransaction}
+        fullListHref={txLink}
+      />
     </div>
   )
 }

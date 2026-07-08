@@ -1,4 +1,5 @@
 import type { FlowFilters } from '@/domains/home/transactions/types'
+import { flowFiltersToTransactionListHref } from '@/domains/home/transactions/utils/transactionListHref'
 import { isFilterValueActive } from '@/domains/home/transactions/types'
 import { parseReportFlowFilters } from '@/domains/home/reports/shared/components/ReportSidebar'
 import type { ParsedReportPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
@@ -190,29 +191,55 @@ export function trendPeriodDateBounds(period: string): { dateFrom: string; dateT
   return { dateFrom: period, dateTo: period }
 }
 
-/** Link do wyszukiwarki transakcji dla klikniętego słupka (Trend, faza 1). */
+/** Usuwa sufiks kierunku z dataKey wykresu (np. `wal:1_expenses` → `wal:1`). */
+export function trendChartDataKeyToSeriesId(dataKey: string): string {
+  if (dataKey.endsWith('_expenses')) return dataKey.slice(0, -'_expenses'.length)
+  if (dataKey.endsWith('_income')) return dataKey.slice(0, -'_income'.length)
+  return dataKey
+}
+
+function seriesEntityIdFromChartDataKey(dataKey: string, prefix: string): string | undefined {
+  const base = trendChartDataKeyToSeriesId(dataKey)
+  if (!base.startsWith(prefix)) return undefined
+  const id = base.slice(prefix.length)
+  return id.length > 0 ? id : undefined
+}
+
+export function trendSelectionToFlowFilters(
+  selection: TrendBarSelection,
+  query: TrendQueryState,
+): FlowFilters {
+  const { dateFrom, dateTo } = trendPeriodDateBounds(selection.period)
+  const filters: FlowFilters = {
+    dateFrom,
+    dateTo,
+    directions: [selection.direction],
+  }
+
+  if (query.seriesBy === 'description' && selection.seriesName !== 'Razem') {
+    filters.description = selection.seriesName
+  }
+  const categoryId = seriesEntityIdFromChartDataKey(selection.dataKey, 'cat:')
+  if (query.seriesBy === 'category' && categoryId) {
+    filters.categoryId = categoryId
+  }
+  const walletId = seriesEntityIdFromChartDataKey(selection.dataKey, 'wal:')
+  if (query.seriesBy === 'wallet' && walletId) {
+    filters.walletId = walletId
+  }
+  const concernId = seriesEntityIdFromChartDataKey(selection.dataKey, 'con:')
+  if (query.seriesBy === 'concern' && concernId) {
+    filters.concernId = concernId
+  }
+
+  return { ...filters, ...query.narrow }
+}
+
 export function trendTransactionsLink(
   selection: TrendBarSelection,
   query: TrendQueryState,
 ): string {
-  const { dateFrom, dateTo } = trendPeriodDateBounds(selection.period)
-  const params = new URLSearchParams({ dateFrom, dateTo, direction: selection.direction })
-
-  if (query.seriesBy === 'description' && selection.seriesName !== 'Razem') {
-    params.set('description', selection.seriesName)
-  }
-  if (query.seriesBy === 'category' && selection.dataKey.startsWith('cat:')) {
-    params.set('categoryId', selection.dataKey.slice(4))
-  }
-  if (query.seriesBy === 'wallet' && selection.dataKey.startsWith('wal:')) {
-    params.set('walletId', selection.dataKey.slice(4))
-  }
-  if (query.seriesBy === 'concern' && selection.dataKey.startsWith('con:')) {
-    params.set('concernId', selection.dataKey.slice(4))
-  }
-  if (query.narrow.description) params.set('description', query.narrow.description)
-
-  return `/transactions?${params.toString()}`
+  return flowFiltersToTransactionListHref(trendSelectionToFlowFilters(selection, query))
 }
 
 export function countTrendQueryState(state: TrendQueryState): number {

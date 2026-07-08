@@ -334,7 +334,7 @@ Implementacja: [`chartPalettes.ts`](../frontend/src/shared/components/charts/cha
 - KPI: suma, liczba pozycji, średnia, kwota bez kategorii.
 - Wykresy (recharts): donut + słupki poziome + tabela z udziałem %.
 - Drill-down: klik kategorii głównej → podkategorie (`groupBy=categorySub` + `categoryId`).
-- Klik grupy → panel boczny z linkiem do `/transakcje` z filtrami okresu i kierunku (faza 1).
+- Klik grupy → panel z kompaktową tabelą transakcji (`FilteredTransactionsTable` + `useFlowsQuery`), klik wiersza → prawy panel szczegółów/edycji (`useTransactionPanel`); link do pełnej wyszukiwarki w stopce tabeli.
 
 #### API: `GET /api/reports/breakdown`
 
@@ -399,7 +399,7 @@ Odpowiedź (zgodna z `BreakdownReportData` / `shared/types/breakdown.ts`):
 - `direction` w odpowiedzi = echo `reportDirection` z zapytania.
 - `id` grupy: ID encji słownikowej lub `null` dla bucketów „bez wartości”.
 
-**Drill-down transakcji (FE, faza 1):** klik grupy → panel boczny; link do `/transakcje?dateFrom=…&dateTo=…&direction=…` z filtrami grupy. **Uwaga:** raport liczy na pozycjach (`ti.description`, `ABS(ti.amount_minor)`), a lista `/transakcje` filtruje na nagłówkach (`t.amount_minor`, opis bez `ti.description`) — przy filtrach opisu/kwoty wyniki linku mogą się różnić od raportu. Pełną zgodność da **faza 2** (`GET /api/transactions` z filtrami item-level). Pozycje „Bez kategorii” linkują bez `categoryId` (lista nie ma filtra „pozycja bez kategorii”).
+**Drill-down transakcji (FE):** klik grupy → panel z tabelą transakcji pobraną przez `GET /api/transactions` (hook `useFlowsQuery`, filtry `FlowFilters` — ten sam mechanizm co lista `/transakcje`). Mapowanie grupy: [`breakdownDrillDownFilters.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownDrillDownFilters.ts). Klik wiersza otwiera panel transakcji (`useTransactionPanel`). **Uwaga:** raport liczy na pozycjach (`ti.description`, `ABS(ti.amount_minor)`), a lista filtruje na nagłówkach (`t.amount_minor`, opis transakcji) — przy filtrach opisu/kwoty wyniki mogą się różnić od raportu. Pełną zgodność da przyszłe rozszerzenie API o filtry item-level. Grupy „Pozostałe” i „bez wartości” (`id === null`) nie mają dedykowanego filtra — tabela pokazuje okres, kierunek i filtry raportu z komunikatem.
 
 Przykłady URL FE:
 
@@ -419,9 +419,9 @@ Przykłady URL FE:
   - tryb **zakres dat** — Miesięczny \| Kwartalny \| Roczny.
 - **Wykres:** **słupkowy domyślnie** (`?chart=line` dla liniowego); stały panel wartości w prawym górnym rogu wykresu ([`ChartHoverPanel.tsx`](../frontend/src/shared/components/charts/ChartHoverPanel.tsx)) — bez tooltipu zasłaniającego wykres (Trend + Rozbicie).
 - **Schemat kolorów:** globalny `chartStyle` (patrz wyżej); przy obu kierunkach — para słupków wydatek\|wpływ stykająca się.
-- Klik pojedynczego słupka (okres + seria) i panel transakcji **pod** wykresem z linkiem do `/transakcje` (faza 1); wspólny styl słupków ([`chartBarShared.ts`](../frontend/src/shared/components/charts/chartBarShared.ts), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts)).
+- Klik pojedynczego słupka (okres + seria) → panel z tabelą transakcji pod wykresem (ten sam `FilteredTransactionsTable` + `useTransactionPanel` co Rozbicie); wspólny styl słupków ([`chartBarShared.ts`](../frontend/src/shared/components/charts/chartBarShared.ts), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts)).
 
-Typy FE: [`trend/types/trend.ts`](../frontend/src/domains/home/reports/trend/types/trend.ts). Parsowanie URL + link drill-down: [`trend/utils/trendUrl.ts`](../frontend/src/domains/home/reports/trend/utils/trendUrl.ts).
+Typy FE: [`trend/types/trend.ts`](../frontend/src/domains/home/reports/trend/types/trend.ts). Parsowanie URL + filtry drill-down: [`trend/utils/trendUrl.ts`](../frontend/src/domains/home/reports/trend/utils/trendUrl.ts) (`trendSelectionToFlowFilters`).
 
 #### API: `GET /api/reports/trend`
 
@@ -489,7 +489,7 @@ Przykład URL FE: `/app/raporty/trend?dateFrom=2025-01-01&dateTo=2025-12-31&tren
 ## Czego brakuje
 
 - Okresy rozliczeniowe ze snapshotami i zamknięciem okresu (docelowy wariant rozliczeń)
-- Drill-down transakcji faza 2: `GET /api/transactions` z filtrami item-level w panelach Rozbicia/Trendu (obecnie link do wyszukiwarki)
+- Filtry item-level w API transakcji (opis/kwota pozycji) — pełna zgodność drill-down z agregacjami raportów
 - Skróty okresu `year`/`month`/`quarter` w API Rozbicia/Trendu na poziomie UI (backend przyjmuje `year`+`month`)
 - Eksport danych (PDF, CSV)
 - Budżet vs wykonanie

@@ -66,6 +66,7 @@ import { fetchConcerns, type Concern } from '@/shared/api/concerns'
 import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 
 import { useChartStyle } from '@/shared/hooks/useChartStyle'
+import { useTransactionPanel, resolveRightPanelOwner } from '@/domains/home/transactions/panel'
 
 function serializeList(list: string[]): string | undefined {
   return list.length > 0 ? list.join(',') : undefined
@@ -199,11 +200,30 @@ export default function TrendReport() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const loadTrend = useCallback(() => {
+    return fetchTrendReport(buildTrendParams(period.dateFrom, period.dateTo, trendQuery))
+  }, [period.dateFrom, period.dateTo, trendQuery])
+
+  const { openTx: openTxRaw, transactionPanelPortal, confirmDialogs } = useTransactionPanel({
+    onMutated: () => {
+      void loadTrend().then(setData).catch(() => {})
+    },
+  })
+  const panelOwner = resolveRightPanelOwner(searchParams)
+
+  const openTx = useCallback(
+    (txId: number) => {
+      closePanel()
+      openTxRaw(txId)
+    },
+    [closePanel, openTxRaw],
+  )
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchTrendReport(buildTrendParams(period.dateFrom, period.dateTo, trendQuery))
+    loadTrend()
       .then((res) => {
         if (!cancelled) setData(res)
       })
@@ -219,7 +239,7 @@ export default function TrendReport() {
     return () => {
       cancelled = true
     }
-  }, [period.dateFrom, period.dateTo, trendQuery])
+  }, [loadTrend, period.dateFrom, period.dateTo, trendQuery])
 
 
 
@@ -424,6 +444,8 @@ export default function TrendReport() {
 
   return (
 
+    <>
+
     <ReportPageShell
 
       sidebarOpen={sidebarOpen}
@@ -582,6 +604,8 @@ export default function TrendReport() {
 
               query={trendQuery}
 
+              onOpenTransaction={openTx}
+
               onClose={() => setBarSelection(null)}
 
             />
@@ -593,6 +617,12 @@ export default function TrendReport() {
       </div>
 
     </ReportPageShell>
+
+    {panelOwner === 'transaction' && transactionPanelPortal}
+
+    {confirmDialogs}
+
+    </>
 
   )
 
