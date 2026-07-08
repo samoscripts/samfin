@@ -28,7 +28,9 @@ Moduł raportów jest **częściowo zaimplementowany**:
 ```
 frontend/src/domains/home/reports/
 ├── pages/ReportsLayout.tsx
-├── shared/                    # okres, sidebar, kolory wykresów, fixture transakcji
+├── shared/                    # okres, panel prawy, kolory wykresów, fixture transakcji
+│   ├── hooks/useReportRightPanel.tsx   # jeden portal: Filtry | Szczegóły | Edycja
+│   ├── utils/reportPanelUrl.ts         # ?panel=filters, tx, tab
 ├── analytics/pages/AnalyticsReport.tsx
 ├── breakdown/pages/BreakdownReport.tsx
 ├── trend/
@@ -70,7 +72,7 @@ frontend/src/domains/home/reports/
 Wspólny komponent [`PeriodNavigator.tsx`](../frontend/src/shared/components/PeriodNavigator.tsx) — używany w **Analizach** i na dashboardzie:
 
 - **Domyślnie:** strzałki ← / → między miesiącami + ikona powrotu do bieżącego miesiąca.
-- **Panel „Więcej”** (Analizy): prawy sidebar (`?panel=period`) z wyborem roku i miesiąca **albo** zakresem dat Od–Do.
+- **Panel „Więcej”** (Analizy): prawy panel (`?panel=filters`) z wyborem roku i miesiąca **albo** zakresem dat Od–Do — [`useReportRightPanel`](../frontend/src/domains/home/reports/shared/hooks/useReportRightPanel.tsx), zakładka „Okres i portfel”.
 
 **Rozliczenia** — filtr okresu (`SettlementDetailPeriodFilter`) na zakładkach raportu:
 
@@ -83,6 +85,10 @@ Wspólny komponent [`PeriodNavigator.tsx`](../frontend/src/shared/components/Per
 Stan filtra współdzielony między zakładkami raportu. Zamknięte okresy (po 31.12) tylko do odczytu; odświeżanie wyłączone.
 
 Parametry URL okresu: `year`+`month` **albo** `dateFrom`+`dateTo` — Analizy, dashboard. Rozliczenia: `settlementYear` (rok okresu rozliczeniowego).
+
+### Prawy panel raportów (Rozbicie, Trend, Analizy)
+
+Jeden portal (`useReportRightPanel` + `SidePanelShell`): zakładki **Filtry i okres** (w Analizach: **Okres i portfel**) oraz **Szczegóły** po kliknięciu wiersza transakcji w drill-down. Edycja transakcji = trzecia zakładka **Edycja**. URL: `panel=filters` otwiera panel; `tx` + `tab=details` przełącza na szczegóły bez zamykania filtrów. Domyślna szerokość przy otwarciu: 420px (`NARROW_PANEL_WIDTH`), resize + expand w pasku zakładek. Rozliczenia nadal używają osobnego `useTransactionPanel`.
 
 ---
 
@@ -334,7 +340,7 @@ Implementacja: [`chartPalettes.ts`](../frontend/src/shared/components/charts/cha
 - KPI: suma, liczba pozycji, średnia, kwota bez kategorii.
 - Wykresy (recharts): donut + słupki poziome + tabela z udziałem %.
 - Drill-down: klik kategorii głównej → podkategorie (`groupBy=categorySub` + `categoryId`).
-- Klik grupy → panel z kompaktową tabelą transakcji (`FilteredTransactionsTable` + `useFlowsQuery`), klik wiersza → prawy panel szczegółów/edycji (`useTransactionPanel`); link do pełnej wyszukiwarki w stopce tabeli.
+- Klik grupy → panel z kompaktową tabelą transakcji (`FilteredTransactionsTable` + `useFlowsQuery`), klik wiersza → zakładka **Szczegóły** w tym samym prawym panelu (`useReportRightPanel`); link do pełnej wyszukiwarki w stopce tabeli.
 
 #### API: `GET /api/reports/breakdown`
 
@@ -399,7 +405,7 @@ Odpowiedź (zgodna z `BreakdownReportData` / `shared/types/breakdown.ts`):
 - `direction` w odpowiedzi = echo `reportDirection` z zapytania.
 - `id` grupy: ID encji słownikowej lub `null` dla bucketów „bez wartości”.
 
-**Drill-down transakcji (FE):** klik grupy → panel z tabelą transakcji pobraną przez `GET /api/transactions` (hook `useFlowsQuery`, filtry `FlowFilters` — ten sam mechanizm co lista `/transakcje`). Mapowanie grupy: [`breakdownDrillDownFilters.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownDrillDownFilters.ts). Klik wiersza otwiera panel transakcji (`useTransactionPanel`). **Uwaga:** raport liczy na pozycjach (`ti.description`, `ABS(ti.amount_minor)`), a lista filtruje na nagłówkach (`t.amount_minor`, opis transakcji) — przy filtrach opisu/kwoty wyniki mogą się różnić od raportu. Pełną zgodność da przyszłe rozszerzenie API o filtry item-level. Grupy „Pozostałe” i „bez wartości” (`id === null`) nie mają dedykowanego filtra — tabela pokazuje okres, kierunek i filtry raportu z komunikatem.
+**Drill-down transakcji (FE):** klik grupy → panel z tabelą transakcji pobraną przez `GET /api/transactions` (hook `useFlowsQuery`, filtry `FlowFilters` — ten sam mechanizm co lista `/transakcje`). Mapowanie grupy: [`breakdownDrillDownFilters.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownDrillDownFilters.ts). Klik wiersza przełącza prawy panel na zakładkę **Szczegóły** (`useReportRightPanel`, URL: `panel=filters` + `tx` + `tab=details`). **Uwaga:** raport liczy na pozycjach (`ti.description`, `ABS(ti.amount_minor)`), a lista filtruje na nagłówkach (`t.amount_minor`, opis transakcji) — przy filtrach opisu/kwoty wyniki mogą się różnić od raportu. Pełną zgodność da przyszłe rozszerzenie API o filtry item-level. Grupy „Pozostałe” i „bez wartości” (`id === null`) nie mają dedykowanego filtra — tabela pokazuje okres, kierunek i filtry raportu z komunikatem.
 
 Przykłady URL FE:
 
@@ -419,7 +425,7 @@ Przykłady URL FE:
   - tryb **zakres dat** — Miesięczny \| Kwartalny \| Roczny.
 - **Wykres:** **słupkowy domyślnie** (`?chart=line` dla liniowego); stały panel wartości w prawym górnym rogu wykresu ([`ChartHoverPanel.tsx`](../frontend/src/shared/components/charts/ChartHoverPanel.tsx)) — bez tooltipu zasłaniającego wykres (Trend + Rozbicie).
 - **Schemat kolorów:** globalny `chartStyle` (patrz wyżej); przy obu kierunkach — para słupków wydatek\|wpływ stykająca się.
-- Klik pojedynczego słupka (okres + seria) → panel z tabelą transakcji pod wykresem (ten sam `FilteredTransactionsTable` + `useTransactionPanel` co Rozbicie); wspólny styl słupków ([`chartBarShared.ts`](../frontend/src/shared/components/charts/chartBarShared.ts), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts)).
+- Klik pojedynczego słupka (okres + seria) → panel z tabelą transakcji pod wykresem (ten sam `FilteredTransactionsTable` + `useReportRightPanel` co Rozbicie); wspólny styl słupków ([`chartBarShared.ts`](../frontend/src/shared/components/charts/chartBarShared.ts), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts)).
 
 Typy FE: [`trend/types/trend.ts`](../frontend/src/domains/home/reports/trend/types/trend.ts). Parsowanie URL + filtry drill-down: [`trend/utils/trendUrl.ts`](../frontend/src/domains/home/reports/trend/utils/trendUrl.ts) (`trendSelectionToFlowFilters`).
 
@@ -483,6 +489,85 @@ Odpowiedź (zgodna z `TrendReportData`):
 - `totals`: suma wszystkich serii w kubełku (przy `seriesBy=none` — to jedyna seria logiczna).
 
 Przykład URL FE: `/app/raporty/trend?dateFrom=2025-01-01&dateTo=2025-12-31&trendSeriesBy=description&trendTerms=Allegro,Biedronka&trendDirections=EXPENSE`
+
+---
+
+## Zapisane raporty (Trend / Rozbicie)
+
+Parametry raportu można zapisać per użytkownik i typ (`trend` | `breakdown`).
+
+### API
+
+| Metoda | Ścieżka | Opis |
+|--------|---------|------|
+| GET | `/api/report-saved?type=trend\|breakdown` | Lista zapisanych raportów |
+| POST | `/api/report-saved` | Utworzenie — `{ type, name, description?, params }` |
+| PUT | `/api/report-saved/{id}` | Aktualizacja nazwy, opisu i/lub `params` |
+| DELETE | `/api/report-saved/{id}` | Usunięcie |
+
+- Unikalność nazwy: `(user_id, type, name)` — osobno dla Trend i Rozbicie.
+- `description` — opcjonalny (max 2000 znaków).
+- `params` — JSON ze snapshotem parametrów (okres, filtry, grupowanie itd.; bez `chartStyle`, `panel`, `tx`).
+
+#### Kształt `params`
+
+**Rozbicie** (`type: breakdown`):
+
+```json
+{
+  "period": { "mode": "range", "year": 2025, "month": 7, "quarter": 3, "dateFrom": "2025-01-01" },
+  "groupBy": "categoryMain",
+  "reportDirection": "EXPENSE",
+  "chartTop": 8,
+  "filters": { }
+}
+```
+
+- `chartTop` — wartość wybrana przez użytkownika (clamp do liczby grup dotyczy tylko wykresu, nie zapisu).
+- `period.dateFrom` / `dateTo` — tylko przy `mode: "range"` (puste = otwarty zakres, brak klucza).
+
+**Trend** (`type: trend`):
+
+```json
+{
+  "period": { "mode": "range", "year": 2025, "month": 7, "quarter": 3 },
+  "chartType": "line",
+  "granularity": "quarter",
+  "query": { "seriesBy": "none", "directions": ["EXPENSE"], "granularity": "quarter", "terms": [], "categoryIds": [], "walletIds": [], "concernIds": [], "narrow": { } }
+}
+```
+
+- `chartType` — `line` | `bar` (przyciski Liniowy / Słupkowy na stronie raportu).
+- `granularity` — `month` | `quarter` | `year` (przyciski podziału czasu; przy `month`/`quarter` okresu implicit `month`).
+- Stary format `chart: "line"` jest akceptowany przy wczytywaniu (migracja do `chartType`).
+
+#### Załadowany raport (baner „Zaczytany raport”)
+
+- Po wyborze raportu w URL ustawiane są parametry + `reportSavedId` w jednym kroku.
+- Baner i przycisk **Aktualizuj** pozostają aktywne przy dowolnej zmianie parametrów (okres, filtry, typ wykresu, podział czasu) — użytkownik może zapisać zmiany jednym kliknięciem.
+- Odpięcie raportu następuje tylko jawnie: wybór innego z listy, usunięcie, utworzenie nowego (zastępuje `reportSavedId`).
+
+### Frontend
+
+- Sidebar raportów: zakładki **Parametry raportu** | **Zapisane raporty** | **Konfiguracja**.
+- Stopka: **Zastosuj** | **Utwórz raport** | **Aktualizuj** (ostatni aktywny tylko przy załadowanym raporcie).
+- URL załadowanego raportu: `reportSavedId={id}`.
+- Wybór z listy → wypełnienie parametrów + automatyczne ładowanie wykresu.
+
+---
+
+## Otwarte zakresy dat (transakcje i raporty)
+
+W filtrach dat (`dateFrom` / `dateTo`) każde pole może być puste (przycisk X w UI):
+
+| `dateFrom` | `dateTo` | Znaczenie |
+|------------|----------|-----------|
+| ustawione | puste | `>= dateFrom` |
+| puste | ustawione | `<= dateTo` |
+| oba puste (tryb `periodMode=range`) | | brak filtra daty |
+| oba ustawione | | zamknięty zakres (walidacja: from ≤ to) |
+
+Tryby `year` / `quarter` / `month` — bez zmian (zawsze domknięty okres).
 
 ---
 

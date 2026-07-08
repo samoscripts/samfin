@@ -69,6 +69,60 @@ final class TrendApiTest extends ApiTestCase
         self::assertSame(0.0, $mar['totals']['expenses']);
     }
 
+    public function testOpenEndedDateFromOnly(): void
+    {
+        $user = $this->createUser(apiToken: self::TEST_USER_TOKEN);
+        $em   = static::getContainer()->get(EntityManagerInterface::class);
+
+        $txJan = $this->createTransaction($em, $user, '2025-01-10', Transaction::DIRECTION_EXPENSE);
+        $this->addItem($em, $user, $txJan, -10000);
+        $txFeb = $this->createTransaction($em, $user, '2025-02-15', Transaction::DIRECTION_EXPENSE);
+        $this->addItem($em, $user, $txFeb, -5000);
+        $em->flush();
+
+        $this->requestJson(
+            'GET',
+            '/api/reports/trend?periodMode=range&dateFrom=2025-01-01&trendSeriesBy=none&trendDirections=EXPENSE',
+            token: self::TEST_USER_TOKEN,
+        );
+
+        $data = $this->assertJsonResponse(200);
+
+        self::assertSame('2025-01-01', $data['dateFrom']);
+        self::assertNull($data['dateTo']);
+        self::assertCount(2, $data['points']);
+        self::assertSame('2025-01', $data['points'][0]['period']);
+        self::assertSame('2025-02', $data['points'][1]['period']);
+        self::assertSame(100.0, $data['points'][0]['totals']['expenses']);
+        self::assertSame(50.0, $data['points'][1]['totals']['expenses']);
+    }
+
+    public function testOpenEndedDateToOnly(): void
+    {
+        $user = $this->createUser(apiToken: self::TEST_USER_TOKEN);
+        $em   = static::getContainer()->get(EntityManagerInterface::class);
+
+        $txJan = $this->createTransaction($em, $user, '2025-01-10', Transaction::DIRECTION_EXPENSE);
+        $this->addItem($em, $user, $txJan, -10000);
+        $txMar = $this->createTransaction($em, $user, '2025-03-20', Transaction::DIRECTION_EXPENSE);
+        $this->addItem($em, $user, $txMar, -3000);
+        $em->flush();
+
+        $this->requestJson(
+            'GET',
+            '/api/reports/trend?periodMode=range&dateTo=2025-02-28&trendSeriesBy=none&trendDirections=EXPENSE',
+            token: self::TEST_USER_TOKEN,
+        );
+
+        $data = $this->assertJsonResponse(200);
+
+        self::assertNull($data['dateFrom']);
+        self::assertSame('2025-02-28', $data['dateTo']);
+        self::assertCount(2, $data['points']);
+        self::assertSame('2025-01', $data['points'][0]['period']);
+        self::assertSame('2025-02', $data['points'][1]['period']);
+    }
+
     public function testSeriesByCategoryProducesSeries(): void
     {
         $user = $this->createUser(apiToken: self::TEST_USER_TOKEN);

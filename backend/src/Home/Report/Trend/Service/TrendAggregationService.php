@@ -22,14 +22,17 @@ class TrendAggregationService
 
     /**
      * @return array{
-     *   dateFrom: string, dateTo: string, granularity: string, seriesBy: string,
+     *   dateFrom: ?string, dateTo: ?string, granularity: string, seriesBy: string,
      *   points: list<array{period: string, label: string, totals: array{income: float, expenses: float}, series: list<array{id: string, name: string, income: float, expenses: float}>}>
      * }
      */
     public function build(TrendQuery $query): array
     {
         $descriptors = $this->resolveSeriesDescriptors($query);
-        $buckets     = $this->listBuckets($query->dateFrom, $query->dateTo, $query->granularity);
+        $bounds      = $this->resolveBucketBounds($query);
+        $buckets     = $bounds !== null
+            ? $this->listBuckets($bounds[0], $bounds[1], $query->granularity)
+            : [];
 
         // Inicjalizacja: bucket -> seriesId -> [income, expenses]
         $acc = [];
@@ -213,6 +216,79 @@ class TrendAggregationService
             'quarter' => "CONCAT(YEAR(t.trans_date), '-Q', QUARTER(t.trans_date))",
             default   => "DATE_FORMAT(t.trans_date, '%Y-%m')",
         };
+    }
+
+    /**
+     * Uzupełnia brakującą granicę okresu na podstawie MIN/MAX dat transakcji pasujących do filtrów.
+     *
+     * @return array{0: string, 1: string}|null null gdy brak danych do wygenerowania osi czasu
+     */
+    private function resolveBucketBounds(TrendQuery $query): ?array
+    {
+        $from = $query->dateFrom;
+        $to   = $query->dateTo;
+
+        if ($from !== null && $to !== null) {
+            return $from <= $to ? [$from, $to] : null;
+        }
+
+        $dataBounds = $this->fetchTransactionDateBounds($query);
+
+        if ($from === null && $to === null) {
+            if ($dataBounds === null) {
+                return null;
+            }
+
+            return [$dataBounds['min'], $dataBounds['max']];
+        }
+
+        if ($from === null) {
+            $from = $dataBounds['min'] ?? $to;
+        }
+        if ($to === null) {
+            $to = $dataBounds['max'] ?? $from;
+        }
+
+        return $from <= $to ? [$from, $to] : null;
+    }
+
+    /**
+     * @return array{min: string, max: string}|null
+     */
+    private function fetchTransactionDateBounds(TrendQuery $query): ?array
+    {
+        [$conditions, $params] = $this->reportItemQuery->buildConditions($query->narrow);
+
+        $dirPlaceholders = [];
+        foreach ($query->directions as $i => $dir) {
+            $key               = 'dir' . $i;
+            $dirPlaceholders[] = ':' . $key;
+            $params[$key]      = $dir;
+        }
+        $conditions[] = 't.direction IN (' . implode(', ', $dirPlaceholders) . ')';
+
+        $where = implode("\n  AND ", $conditions);
+
+        $row = $this->em->getConnection()->fetchAssociative(
+            <<<SQL
+                SELECT
+                    MIN(t.trans_date) AS min_date,
+                    MAX(t.trans_date) AS max_date
+                FROM transaction_items ti
+                INNER JOIN transactions t ON t.id = ti.transaction_id
+                WHERE {$where}
+            SQL,
+            $params,
+        );
+
+        if ($row === false || $row['min_date'] === null || $row['max_date'] === null) {
+            return null;
+        }
+
+        return [
+            'min' => (string) $row['min_date'],
+            'max' => (string) $row['max_date'],
+        ];
     }
 
     /**

@@ -71,7 +71,10 @@ export function parseReportPeriodState(
   defaults: ReportPeriodDefaults = currentYearMonth(),
 ): ParsedReportPeriodState {
   const modeRaw = searchParams.get('periodMode')
-  const hasRange = Boolean(searchParams.get('dateFrom') && searchParams.get('dateTo'))
+  const dateFromParam = searchParams.get('dateFrom')
+  const dateToParam = searchParams.get('dateTo')
+  const hasPartialDates = Boolean(dateFromParam || dateToParam)
+  const hasRange = modeRaw === 'range' || hasPartialDates
   const mode: ReportPeriodMode =
     modeRaw && VALID_MODES.has(modeRaw as ReportPeriodMode)
       ? (modeRaw as ReportPeriodMode)
@@ -106,6 +109,9 @@ export function parseReportPeriodState(
     dateFrom = bounds.dateFrom
     dateTo = bounds.dateTo
     monthParam = base.monthParam
+  } else {
+    dateFrom = dateFromParam ?? ''
+    dateTo = dateToParam ?? ''
   }
 
   return {
@@ -130,6 +136,9 @@ export function periodNavigatorLabel(state: ParsedReportPeriodState): string {
     case 'month':
       return monthLabel(state.monthParam)
     case 'range':
+      if (!state.dateFrom && !state.dateTo) return 'Cały zakres'
+      if (state.dateFrom && !state.dateTo) return `od ${state.dateFrom}`
+      if (!state.dateFrom && state.dateTo) return `do ${state.dateTo}`
       return `${state.dateFrom} — ${state.dateTo}`
     default:
       return monthLabel(state.monthParam)
@@ -161,8 +170,9 @@ export function serializeReportPeriodState(
     if (state.year !== defaults.year) params.set('year', String(state.year))
     if (state.month !== defaults.month) params.set('month', String(state.month))
   } else {
-    params.set('dateFrom', state.dateFrom)
-    params.set('dateTo', state.dateTo)
+    params.set('periodMode', 'range')
+    if (state.dateFrom) params.set('dateFrom', state.dateFrom)
+    if (state.dateTo) params.set('dateTo', state.dateTo)
   }
 
   return params
@@ -209,6 +219,8 @@ export function switchPeriodMode(
   return {
     ...current,
     mode: 'range',
+    dateFrom: current.dateFrom ?? '',
+    dateTo: current.dateTo ?? '',
     isCustomRange: true,
   }
 }
@@ -250,6 +262,34 @@ export function navigatePeriod(
     }
   }
   return state
+}
+
+export function buildReportPeriodApiParams(
+  period: Pick<ParsedReportPeriodState, 'mode' | 'year' | 'month' | 'quarter' | 'dateFrom' | 'dateTo'>,
+): Record<string, string> {
+  if (period.mode === 'range') {
+    const params: Record<string, string> = { periodMode: 'range' }
+    if (period.dateFrom) params.dateFrom = period.dateFrom
+    if (period.dateTo) params.dateTo = period.dateTo
+    return params
+  }
+
+  return {
+    dateFrom: period.dateFrom,
+    dateTo: period.dateTo,
+  }
+}
+
+export function formatReportPeriodDisplay(
+  period: Pick<ParsedReportPeriodState, 'mode' | 'dateFrom' | 'dateTo' | 'monthParam' | 'year' | 'quarter'>,
+): string {
+  if (period.mode === 'range') {
+    if (!period.dateFrom && !period.dateTo) return 'Cały zakres'
+    if (period.dateFrom && !period.dateTo) return `od ${period.dateFrom}`
+    if (!period.dateFrom && period.dateTo) return `do ${period.dateTo}`
+    return `${period.dateFrom} — ${period.dateTo}`
+  }
+  return periodNavigatorLabel(period as ParsedReportPeriodState)
 }
 
 export function buildCurrentPeriodState(

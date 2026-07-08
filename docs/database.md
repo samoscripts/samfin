@@ -216,6 +216,7 @@ Historia: do 2026-06 jeden token w `app_user.api_token` (usunięty w migracji `V
 | `20260706140200` | `category`: usunięcie `direction_expense`, `direction_income` (ADR-036) |
 | `20260706140300` | `transactions` / `transaction_template`: `trans_custom_description` |
 | `20260706140400` | `settlement_ledger_entry`: Model B rotacji (`anchor`, Σ wpłat); TRUNCATE ledger + `needs_refresh` |
+| `20260708214916` | `report_saved` — zapisane parametry raportów Trend/Rozbicie (nazwa, opis, `params_json`) |
 
 **Uwaga (2026-07-06):** migracje `07120000`–`10120000` przemianowano na `06140100`–`06140400` (ta sama kolejność DDL, jedna data w nazwie). Na istniejących bazach: `backend/scripts/rename-migrations-20260706.sql` lub deploy (`scripts/deploy.sh` robi UPDATE przed `migrate`).
 

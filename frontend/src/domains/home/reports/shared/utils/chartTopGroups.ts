@@ -7,6 +7,13 @@ export const CHART_TOP_MIN = 3
 export const CHART_TOP_MAX = 15
 export const CHART_TOP_DEFAULT = 5
 
+/** Wartość z URL do zapisu raportu (bez clampu do liczby grup). */
+export function parseChartTopRaw(raw: string | null): number {
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN
+  const value = Number.isFinite(parsed) ? parsed : CHART_TOP_DEFAULT
+  return Math.min(CHART_TOP_MAX, Math.max(CHART_TOP_MIN, value))
+}
+
 export function parseChartTop(raw: string | null, groupCount = 0): number {
   const parsed = raw ? Number.parseInt(raw, 10) : NaN
   const value = Number.isFinite(parsed) ? parsed : CHART_TOP_DEFAULT

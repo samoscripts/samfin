@@ -9,23 +9,35 @@ import { currentYearMonth } from '@/shared/utils/periodUrl'
 import ReportStatCard from '@/domains/home/reports/shared/components/ReportStatCard'
 import ReportPageShell from '@/domains/home/reports/shared/components/ReportPageShell'
 import ReportFilterChips from '@/domains/home/reports/shared/components/ReportFilterChips'
-import ReportSidebar, {
+import {
   countReportFilters,
   parseReportFlowFilters,
   serializeReportFlowFilters,
-  useReportSidebar,
 } from '@/domains/home/reports/shared/components/ReportSidebar'
+import ReportFiltersPanelContent, {
+  type ReportSavedPanelProps,
+} from '@/domains/home/reports/shared/components/ReportFiltersPanelContent'
+import { useReportRightPanel } from '@/domains/home/reports/shared/hooks/useReportRightPanel'
+import { preserveReportPanelParams } from '@/domains/home/reports/shared/utils/reportPanelUrl'
+import { useReportSaved } from '@/domains/home/reports/shared/hooks/useReportSaved'
 import ReportChartTopSection from '@/domains/home/reports/shared/components/ReportChartTopSection'
 import { ReportGroupingSection } from '@/domains/home/reports/shared/components/ReportSidebarSections'
-import { parseChartTop, breakdownGroupChartId } from '@/domains/home/reports/shared/utils/chartTopGroups'
+import { parseChartTop, parseChartTopRaw, breakdownGroupChartId } from '@/domains/home/reports/shared/utils/chartTopGroups'
 import { buildCurrentPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
 import {
   navigatePeriod,
   parseReportPeriodState,
   serializeReportPeriodState,
   switchPeriodMode,
+  buildReportPeriodApiParams,
+  formatReportPeriodDisplay,
   type ReportPeriodMode,
 } from '@/domains/home/reports/shared/utils/reportPeriod'
+import {
+  applyBreakdownParams,
+  captureBreakdownParams,
+  REPORT_SAVED_ID_PARAM,
+} from '@/domains/home/reports/shared/utils/reportSavedParams'
 import type {
   BreakdownGroup,
   BreakdownGroupBy,
@@ -34,7 +46,6 @@ import type {
 } from '@/domains/home/reports/shared/types/breakdown'
 import BreakdownCharts from '@/domains/home/reports/breakdown/components/BreakdownCharts'
 import { useChartStyle } from '@/shared/hooks/useChartStyle'
-import { useTransactionPanel, resolveRightPanelOwner } from '@/domains/home/transactions/panel'
 
 const VALID_GROUP_BY = new Set<BreakdownGroupBy>([
   'categoryMain',
@@ -69,7 +80,6 @@ function emptyData(groupBy: BreakdownGroupBy, direction: BreakdownDirection): Br
 
 export default function BreakdownReport() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { open: sidebarOpen, openPanel, closePanel } = useReportSidebar()
   const [chartStyle, setChartStyle] = useChartStyle()
 
   const defaults = useMemo(() => currentYearMonth(), [])
@@ -95,8 +105,7 @@ export default function BreakdownReport() {
 
   const loadBreakdown = useCallback(() => {
     return fetchBreakdownReport({
-      dateFrom: period.dateFrom,
-      dateTo: period.dateTo,
+      ...buildReportPeriodApiParams(period),
       groupBy,
       reportDirection: direction,
       walletId: filters.walletId,
@@ -108,22 +117,7 @@ export default function BreakdownReport() {
       amountMax: filters.amountMax,
       description: filters.description,
     })
-  }, [period.dateFrom, period.dateTo, groupBy, direction, filters])
-
-  const { openTx: openTxRaw, transactionPanelPortal, confirmDialogs } = useTransactionPanel({
-    onMutated: () => {
-      void loadBreakdown().then(setData).catch(() => {})
-    },
-  })
-  const panelOwner = resolveRightPanelOwner(searchParams)
-
-  const openTx = useCallback(
-    (txId: number) => {
-      closePanel()
-      openTxRaw(txId)
-    },
-    [closePanel, openTxRaw],
-  )
+  }, [period, groupBy, direction, filters])
 
   useEffect(() => {
     let cancelled = false
@@ -147,10 +141,56 @@ export default function BreakdownReport() {
     }
   }, [loadBreakdown, groupBy, direction])
 
-  const chartTop = useMemo(
+  const chartTopDisplay = useMemo(
     () => parseChartTop(searchParams.get('chartTop'), data.groups.length),
     [searchParams, data.groups.length],
   )
+
+  const chartTopSaved = useMemo(
+    () => parseChartTopRaw(searchParams.get('chartTop')),
+    [searchParams],
+  )
+
+  const reportSavedId = searchParams.get(REPORT_SAVED_ID_PARAM)
+
+  const applySavedParams = useCallback(
+    (params: Record<string, unknown>, savedId: number) => {
+      const next = preserveReportPanelParams(
+        searchParams,
+        applyBreakdownParams(params, defaults, savedId),
+      )
+      setSearchParams(next, { replace: true })
+    },
+    [setSearchParams, defaults, searchParams],
+  )
+
+  const captureParams = useCallback(
+    () =>
+      captureBreakdownParams(period, groupBy, direction, chartTopSaved, {
+        ...filters,
+        walletId: walletId || undefined,
+      }) as unknown as Record<string, unknown>,
+    [period, groupBy, direction, chartTopSaved, filters, walletId],
+  )
+
+  const reportSaved = useReportSaved({
+    type: 'breakdown',
+    reportSavedId,
+    setSearchParams,
+    captureParams,
+  })
+
+  const savedReportPanel: ReportSavedPanelProps = {
+    loadedReport: reportSaved.loadedReport,
+    listRefreshKey: reportSaved.listRefreshKey,
+    onApplyDraft: () => {},
+    onCreateReport: reportSaved.createReport,
+    onUpdateReport: reportSaved.updateReport,
+    onRenameReport: reportSaved.renameReport,
+    onSelectReport: (item) => reportSaved.selectReport(item, applySavedParams),
+    onDeleteReport: reportSaved.deleteReport,
+    loadReportList: reportSaved.loadList,
+  }
 
   const filterCount = countReportFilters(filters)
 
@@ -301,47 +341,55 @@ export default function BreakdownReport() {
       ? categories.find((c) => String(c.id) === categoryId)?.name
       : null
 
+  const filtersContent = (
+    <ReportFiltersPanelContent
+      period={period}
+      onPeriodModeChange={handlePeriodModeChange}
+      onPeriodNavigate={handlePeriodNavigate}
+      onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
+      onPeriodRangeChange={handlePeriodRangeChange}
+      walletId={walletId}
+      onWalletChange={handleWalletChange}
+      activeFilters={filters}
+      onApplyFilters={applyFilters}
+      reportDirection={direction}
+      chartStyle={chartStyle}
+      onChartStyleChange={setChartStyle}
+      extraSections={
+        <>
+          <ReportGroupingSection
+            groupBy={groupBy}
+            direction={direction}
+            onGroupByChange={handleGroupByChange}
+            onDirectionChange={handleDirectionChange}
+          />
+          <div className="border-t border-gray-100 dark:border-gray-800" />
+          <ReportChartTopSection
+            value={chartTopDisplay}
+            groupCount={data.groups.length}
+            onChange={handleChartTopChange}
+          />
+        </>
+      }
+      savedReport={savedReportPanel}
+    />
+  )
+
+  const { panelOpen, openPanel, closePanel, openTx, panelPortal, confirmDialogs } =
+    useReportRightPanel({
+      onMutated: () => {
+        void loadBreakdown().then(setData).catch(() => {})
+      },
+      filtersContent,
+    })
+
   return (
     <>
     <ReportPageShell
-      sidebarOpen={sidebarOpen}
+      sidebarOpen={panelOpen}
       onOpenSidebar={openPanel}
       onCloseSidebar={closePanel}
       filterCount={filterCount + (walletId ? 1 : 0)}
-      sidebar={
-        <ReportSidebar
-          open={sidebarOpen}
-          onClose={closePanel}
-          period={period}
-          onPeriodModeChange={handlePeriodModeChange}
-          onPeriodNavigate={handlePeriodNavigate}
-          onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
-          onPeriodRangeChange={handlePeriodRangeChange}
-          walletId={walletId}
-          onWalletChange={handleWalletChange}
-          activeFilters={filters}
-          onApplyFilters={applyFilters}
-          reportDirection={direction}
-          chartStyle={chartStyle}
-          onChartStyleChange={setChartStyle}
-          extraSections={
-            <>
-              <ReportGroupingSection
-                groupBy={groupBy}
-                direction={direction}
-                onGroupByChange={handleGroupByChange}
-                onDirectionChange={handleDirectionChange}
-              />
-              <div className="border-t border-gray-100 dark:border-gray-800" />
-              <ReportChartTopSection
-                value={chartTop}
-                groupCount={data.groups.length}
-                onChange={handleChartTopChange}
-              />
-            </>
-          }
-        />
-      }
     >
       <div className="space-y-5">
         {error && (
@@ -354,7 +402,7 @@ export default function BreakdownReport() {
 
         <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <span>
-            Okres: {period.dateFrom} — {period.dateTo}
+            Okres: {formatReportPeriodDisplay(period)}
             {parentCategoryName && (
               <> · Podkategorie: <strong className="font-medium">{parentCategoryName}</strong></>
             )}
@@ -389,7 +437,7 @@ export default function BreakdownReport() {
         <BreakdownCharts
           groups={data.groups}
           groupBy={groupBy}
-          chartTop={chartTop}
+          chartTop={chartTopDisplay}
           activeId={activeChartId}
           onGroupClick={handleGroupSelect}
           onRowSelect={handleRowSelect}
@@ -404,7 +452,7 @@ export default function BreakdownReport() {
         />
       </div>
     </ReportPageShell>
-    {panelOwner === 'transaction' && transactionPanelPortal}
+    {panelPortal}
     {confirmDialogs}
     </>
   )

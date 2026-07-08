@@ -1,5 +1,5 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
-import { inputCls } from '@/shared/components/form/formClasses'
+import ClearableDateInput from '@/shared/components/form/ClearableDateInput'
 import { ReportPeriodModeToggle } from '@/domains/home/reports/shared/components/ReportSidebarSections'
 import type { ReportPeriodMode, ParsedReportPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
 import { periodNavigatorLabel } from '@/domains/home/reports/shared/utils/reportPeriod'
@@ -56,20 +56,18 @@ export default function ReportPeriodSection({
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-gray-500 dark:text-gray-500">
             Od
-            <input
-              type="date"
+            <ClearableDateInput
               value={period.dateFrom}
-              onChange={(e) => onRangeChange(e.target.value, period.dateTo)}
-              className={[inputCls, 'mt-1'].join(' ')}
+              onChange={(dateFrom) => onRangeChange(dateFrom, period.dateTo)}
+              className="mt-1"
             />
           </label>
           <label className="text-xs text-gray-500 dark:text-gray-500">
             Do
-            <input
-              type="date"
+            <ClearableDateInput
               value={period.dateTo}
-              onChange={(e) => onRangeChange(period.dateFrom, e.target.value)}
-              className={[inputCls, 'mt-1'].join(' ')}
+              onChange={(dateTo) => onRangeChange(period.dateFrom, dateTo)}
+              className="mt-1"
             />
           </label>
         </div>

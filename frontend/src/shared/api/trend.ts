@@ -2,8 +2,9 @@ import api from './client'
 import type { TrendReportData } from '@/domains/home/reports/trend/types/trend'
 
 export interface TrendReportParams {
-  dateFrom: string
-  dateTo: string
+  dateFrom?: string
+  dateTo?: string
+  periodMode?: string
   trendSeriesBy?: string
   trendGranularity?: string
   trendTerms?: string

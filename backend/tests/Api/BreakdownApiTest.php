@@ -34,6 +34,21 @@ final class BreakdownApiTest extends ApiTestCase
         $this->assertJsonResponse(422);
     }
 
+    public function testOpenEndedDateFromOnly(): void
+    {
+        $this->createUser(apiToken: self::TEST_USER_TOKEN);
+
+        $this->requestJson(
+            'GET',
+            '/api/reports/breakdown?periodMode=range&dateFrom=2025-01-01&groupBy=categoryMain',
+            token: self::TEST_USER_TOKEN,
+        );
+
+        $body = $this->assertJsonResponse(200);
+        self::assertSame('2025-01-01', $body['dateFrom']);
+        self::assertNull($body['dateTo']);
+    }
+
     public function testInvalidGroupByReturns422(): void
     {
         $this->createUser(apiToken: self::TEST_USER_TOKEN);

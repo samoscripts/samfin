@@ -21,15 +21,18 @@ class ReportItemQuery
      */
     public function buildConditions(ReportItemFilterCriteria $c): array
     {
-        $conditions = [
-            't.trans_date >= :dateFrom',
-            't.trans_date <= :dateTo',
-            self::STATUS_SQL,
-        ];
-        $params = [
-            'dateFrom' => $c->dateFrom,
-            'dateTo'   => $c->dateTo,
-        ];
+        $conditions = [self::STATUS_SQL];
+        $params     = [];
+
+        if ($c->dateFrom !== null && $c->dateFrom !== '') {
+            $conditions[]       = 't.trans_date >= :dateFrom';
+            $params['dateFrom'] = $c->dateFrom;
+        }
+
+        if ($c->dateTo !== null && $c->dateTo !== '') {
+            $conditions[]     = 't.trans_date <= :dateTo';
+            $params['dateTo'] = $c->dateTo;
+        }
 
         if ($c->direction !== null && $c->direction !== '') {
             $conditions[]        = 't.direction = :direction';

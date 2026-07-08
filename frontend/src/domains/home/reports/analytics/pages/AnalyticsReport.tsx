@@ -6,10 +6,12 @@ import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 import { formatAmount } from '@/shared/utils/format'
 import { currentYearMonth } from '@/shared/utils/periodUrl'
 import ReportPageShell from '@/domains/home/reports/shared/components/ReportPageShell'
-import ReportScopeSidebar from '@/domains/home/reports/shared/components/ReportScopeSidebar'
-import { useReportSidebar } from '@/domains/home/reports/shared/components/ReportSidebar'
+import ReportScopePanelContent from '@/domains/home/reports/shared/components/ReportScopePanelContent'
+import { useReportRightPanel } from '@/domains/home/reports/shared/hooks/useReportRightPanel'
 import {
   buildCurrentPeriodState,
+  buildReportPeriodApiParams,
+  formatReportPeriodDisplay,
   navigatePeriod,
   parseReportPeriodState,
   serializeReportPeriodState,
@@ -19,7 +21,6 @@ import {
 
 export default function AnalyticsReport() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { open: sidebarOpen, openPanel, closePanel } = useReportSidebar()
 
   const defaults = useMemo(() => currentYearMonth(), [])
   const period = useMemo(
@@ -102,8 +103,7 @@ export default function AnalyticsReport() {
     setError(null)
 
     fetchAnalyticsReport({
-      dateFrom: period.dateFrom,
-      dateTo: period.dateTo,
+      ...buildReportPeriodApiParams(period),
       walletId: walletId || undefined,
     })
       .then((resp) => {
@@ -121,32 +121,37 @@ export default function AnalyticsReport() {
     return () => {
       cancelled = true
     }
-  }, [period.dateFrom, period.dateTo, walletId])
+  }, [period, walletId])
 
   const walletName = walletId
     ? wallets.find((w) => String(w.id) === walletId)?.name
     : undefined
 
+  const filtersContent = (
+    <ReportScopePanelContent
+      period={period}
+      onPeriodModeChange={handlePeriodModeChange}
+      onPeriodNavigate={handlePeriodNavigate}
+      onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
+      onPeriodRangeChange={handlePeriodRangeChange}
+      walletId={walletId}
+      onWalletChange={handleWalletChange}
+    />
+  )
+
+  const { panelOpen, openPanel, closePanel, panelPortal } = useReportRightPanel({
+    filtersContent,
+    filtersTabLabel: 'Okres i portfel',
+  })
+
   return (
+    <>
     <ReportPageShell
-      sidebarOpen={sidebarOpen}
+      sidebarOpen={panelOpen}
       onOpenSidebar={openPanel}
       onCloseSidebar={closePanel}
       filterCount={walletId ? 1 : 0}
       sidebarButtonLabel="Okres i portfel"
-      sidebar={
-        <ReportScopeSidebar
-          open={sidebarOpen}
-          onClose={closePanel}
-          period={period}
-          onPeriodModeChange={handlePeriodModeChange}
-          onPeriodNavigate={handlePeriodNavigate}
-          onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
-          onPeriodRangeChange={handlePeriodRangeChange}
-          walletId={walletId}
-          onWalletChange={handleWalletChange}
-        />
-      }
     >
       <div className="space-y-6">
         {loading ? (
@@ -158,7 +163,15 @@ export default function AnalyticsReport() {
         ) : data ? (
           <>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Okres: {data.dateFrom} — {data.dateTo}
+              Okres:{' '}
+              {formatReportPeriodDisplay({
+                mode: period.mode,
+                dateFrom: data.dateFrom ?? period.dateFrom,
+                dateTo: data.dateTo ?? period.dateTo,
+                monthParam: period.monthParam,
+                year: period.year,
+                quarter: period.quarter,
+              })}
               {walletName && <> · Portfel: {walletName}</>}
             </p>
 
@@ -200,6 +213,8 @@ export default function AnalyticsReport() {
         ) : null}
       </div>
     </ReportPageShell>
+    {panelPortal}
+    </>
   )
 }
 

@@ -32,6 +32,7 @@ import type {
   TrendReportData,
 } from '@/domains/home/reports/trend/types/trend'
 import { DIRECTION_LABEL_BY_VALUE } from '@/domains/home/transactions/constants/labels'
+import { formatTrendPeriodLabel } from '@/domains/home/reports/trend/utils/trendUrl'
 
 export interface TrendChartLine {
   dataKey: string
@@ -199,6 +200,9 @@ export default function TrendChart({
     )
   }
 
+  const periodDisplayLabel = (row: Record<string, string | number>) =>
+    formatTrendPeriodLabel(String(row.period))
+
   const handleBarClick = (
     row: Record<string, string | number>,
     line: TrendChartLine,
@@ -207,7 +211,7 @@ export default function TrendChart({
     if (!onBarClick || amount <= 0) return
     onBarClick({
       period: String(row.period),
-      periodLabel: String(row.label),
+      periodLabel: periodDisplayLabel(row),
       dataKey: line.dataKey,
       seriesName: line.seriesName,
       direction: line.direction,
@@ -216,18 +220,49 @@ export default function TrendChart({
     })
   }
 
-  const handleBarHover = (
+  const handlePointHover = (
     row: Record<string, string | number>,
     line: TrendChartLine,
   ) => {
     const amount = Number(row[line.dataKey] ?? 0)
-    const cellId = trendBarCellId(String(row.period), line.dataKey)
-    setHoveredCellId(cellId)
+    setHoveredCellId(trendBarCellId(String(row.period), line.dataKey))
     setHoverPayload({
-      label: `${row.label} · ${line.name}`,
+      label: `${periodDisplayLabel(row)} · ${line.name}`,
       value: amount,
     })
   }
+
+  const clearPointHover = () => {
+    setHoveredCellId(null)
+    setHoverPayload(null)
+  }
+
+  const LINE_DOT_HIT_RADIUS = 8
+  const LINE_DOT_VISIBLE_RADIUS = 4
+
+  const renderLineDot =
+    (line: TrendChartLine) =>
+    (props: { cx?: number; cy?: number; payload?: Record<string, string | number> }) => {
+      const { cx, cy, payload } = props
+      if (cx == null || cy == null || !payload) return null
+
+      const cellId = trendBarCellId(String(payload.period), line.dataKey)
+      const isHovered = hoveredCellId === cellId
+
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={isHovered ? LINE_DOT_VISIBLE_RADIUS : LINE_DOT_HIT_RADIUS}
+          fill={isHovered ? theme.tooltipBg : 'transparent'}
+          stroke={isHovered ? line.color : 'transparent'}
+          strokeWidth={isHovered ? 2 : 0}
+          strokeOpacity={isHovered ? line.fillOpacity : 0}
+          onMouseEnter={() => handlePointHover(payload, line)}
+          onMouseLeave={clearPointHover}
+        />
+      )
+    }
 
   const chartContent =
     chartType === 'line' ? (
@@ -247,7 +282,8 @@ export default function TrendChart({
               strokeOpacity={line.fillOpacity}
               strokeWidth={2}
               strokeDasharray={line.strokeDasharray}
-              dot={false}
+              dot={renderLineDot(line)}
+              activeDot={false}
             />
           ))}
         </LineChart>
@@ -276,12 +312,9 @@ export default function TrendChart({
               className={onBarClick ? 'cursor-pointer' : undefined}
               onClick={(row) => handleBarClick(row as Record<string, string | number>, line)}
               onMouseEnter={(row) =>
-                handleBarHover(row as Record<string, string | number>, line)
+                handlePointHover(row as Record<string, string | number>, line)
               }
-              onMouseLeave={() => {
-                setHoveredCellId(null)
-                setHoverPayload(null)
-              }}
+              onMouseLeave={clearPointHover}
             >
               {rows.map((row) => {
                 const cellId = trendBarCellId(String(row.period), line.dataKey)
@@ -309,13 +342,12 @@ export default function TrendChart({
       </ResponsiveContainer>
     )
 
-  if (chartType === 'bar') {
-    return (
-      <ChartHoverPanel payload={hoverPayload} emptyLabel="Najedź na słupek">
-        {chartContent}
-      </ChartHoverPanel>
-    )
-  }
-
-  return chartContent
+  return (
+    <ChartHoverPanel
+      payload={hoverPayload}
+      emptyLabel={chartType === 'line' ? 'Najedź na punkt' : 'Najedź na słupek'}
+    >
+      {chartContent}
+    </ChartHoverPanel>
+  )
 }

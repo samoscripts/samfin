@@ -2,8 +2,9 @@ import api from './client'
 import type { BreakdownReportData } from '@/domains/home/reports/shared/types/breakdown'
 
 export interface BreakdownReportParams {
-  dateFrom: string
-  dateTo: string
+  dateFrom?: string
+  dateTo?: string
+  periodMode?: string
   groupBy?: string
   reportDirection?: string
   walletId?: number | string

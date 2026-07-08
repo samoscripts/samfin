@@ -3,7 +3,8 @@ import { flowFiltersToTransactionListHref } from '@/domains/home/transactions/ut
 import { isFilterValueActive } from '@/domains/home/transactions/types'
 import { parseReportFlowFilters } from '@/domains/home/reports/shared/components/ReportSidebar'
 import type { ParsedReportPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
-import { quarterBounds } from '@/domains/home/reports/shared/utils/reportPeriod'
+import { quarterBounds, quarterLabel } from '@/domains/home/reports/shared/utils/reportPeriod'
+import { monthLabel } from '@/shared/utils/monthQuery'
 import type {
   TrendBarSelection,
   TrendDirection,
@@ -161,6 +162,24 @@ export function serializeTrendQueryState(
   }
 
   return params
+}
+
+/** Etykieta kubełka z pełnym rokiem (do tooltipów i panelu transakcji). */
+export function formatTrendPeriodLabel(period: string): string {
+  const yearMatch = /^(\d{4})$/.exec(period)
+  if (yearMatch) return period
+
+  const quarterMatch = /^(\d{4})-Q([1-4])$/.exec(period)
+  if (quarterMatch) {
+    return quarterLabel(Number(quarterMatch[1]), Number(quarterMatch[2]))
+  }
+
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(period)
+  if (monthMatch) {
+    return monthLabel(period)
+  }
+
+  return period
 }
 
 /** Zakres dat dla identyfikatora kubełka (YYYY-MM | YYYY-Qn | YYYY). */

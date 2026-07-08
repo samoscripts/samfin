@@ -13,8 +13,8 @@ export interface BreakdownGroup {
 }
 
 export interface BreakdownReportData {
-  dateFrom: string
-  dateTo: string
+  dateFrom: string | null
+  dateTo: string | null
   groupBy: BreakdownGroupBy
   direction: BreakdownDirection
   total: number

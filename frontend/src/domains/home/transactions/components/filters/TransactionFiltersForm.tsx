@@ -3,6 +3,7 @@ import type { Concern } from '@/shared/api/concerns'
 import type { Category } from '@/shared/api/categories'
 import type { Party } from '@/domains/home/configuration/parties/types'
 import { inputCls } from '@/shared/components/form/formClasses'
+import ClearableDateInput from '@/shared/components/form/ClearableDateInput'
 import FilterToggleGroup from '@/shared/components/form/FilterToggleGroup'
 import { DIRECTION_PILL, STATUS_PILL } from '@/shared/constants/pillMaps'
 import type { Direction, Status } from '@/shared/types'
@@ -59,19 +60,15 @@ export default function TransactionFiltersForm({
       <Section label="Okres">
         <div className="grid grid-cols-2 gap-2">
           <Field label="Data od">
-            <input
-              type="date"
+            <ClearableDateInput
               value={draft.dateFrom ?? ''}
-              onChange={(e) => onFieldChange('dateFrom', e.target.value)}
-              className={inputCls}
+              onChange={(value) => onFieldChange('dateFrom', value || undefined)}
             />
           </Field>
           <Field label="Data do">
-            <input
-              type="date"
+            <ClearableDateInput
               value={draft.dateTo ?? ''}
-              onChange={(e) => onFieldChange('dateTo', e.target.value)}
-              className={inputCls}
+              onChange={(value) => onFieldChange('dateTo', value || undefined)}
             />
           </Field>
         </div>

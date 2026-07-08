@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export type ReportSidebarTab = 'params' | 'config'
+export type ReportSidebarTab = 'params' | 'saved' | 'config'
 
 interface ReportSidebarTabsProps {
   active: ReportSidebarTab
@@ -44,6 +44,15 @@ export default function ReportSidebarTabs({
         onClick={() => onChange('params')}
       >
         Parametry raportu
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active === 'saved'}
+        className={tabClass(active === 'saved')}
+        onClick={() => onChange('saved')}
+      >
+        Zapisane raporty
       </button>
       <button
         type="button"

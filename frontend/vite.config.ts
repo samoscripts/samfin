@@ -14,6 +14,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // .tsx przed .ts — inaczej import „useReportRightPanel” trafia w nieistniejący .ts (404 w dev)
+    extensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.mts', '.json'],
   },
   server: {
     host: '0.0.0.0',

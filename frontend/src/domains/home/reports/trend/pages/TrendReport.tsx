@@ -8,23 +8,30 @@ import { Loader2 } from 'lucide-react'
 
 import ReportPageShell from '@/domains/home/reports/shared/components/ReportPageShell'
 
-import { useReportSidebar } from '@/domains/home/reports/shared/components/ReportSidebar'
+import { useReportRightPanel } from '@/domains/home/reports/shared/hooks/useReportRightPanel'
+import { preserveReportPanelParams } from '@/domains/home/reports/shared/utils/reportPanelUrl'
+
+import TrendFiltersPanelContent from '@/domains/home/reports/trend/components/TrendFiltersPanelContent'
 
 import { buildCurrentPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
 
 import {
-
   navigatePeriod,
-
   parseReportPeriodState,
-
   serializeReportPeriodState,
-
   switchPeriodMode,
-
+  buildReportPeriodApiParams,
+  formatReportPeriodDisplay,
+  type ParsedReportPeriodState,
   type ReportPeriodMode,
-
 } from '@/domains/home/reports/shared/utils/reportPeriod'
+import { useReportSaved } from '@/domains/home/reports/shared/hooks/useReportSaved'
+import type { ReportSavedPanelProps } from '@/domains/home/reports/shared/components/ReportFiltersPanelContent'
+import {
+  applyTrendParams,
+  captureTrendParams,
+  REPORT_SAVED_ID_PARAM,
+} from '@/domains/home/reports/shared/utils/reportSavedParams'
 
 import TrendChart from '@/domains/home/reports/trend/components/TrendChart'
 
@@ -33,8 +40,6 @@ import TrendFilterChips from '@/domains/home/reports/trend/components/TrendFilte
 import TrendGranularityTabs from '@/domains/home/reports/trend/components/TrendGranularityTabs'
 
 import TrendPeriodTransactions from '@/domains/home/reports/trend/components/TrendPeriodTransactions'
-
-import TrendSidebar from '@/domains/home/reports/trend/components/TrendSidebar'
 
 import { fetchTrendReport, type TrendReportParams } from '@/shared/api/trend'
 
@@ -66,15 +71,14 @@ import { fetchConcerns, type Concern } from '@/shared/api/concerns'
 import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 
 import { useChartStyle } from '@/shared/hooks/useChartStyle'
-import { useTransactionPanel, resolveRightPanelOwner } from '@/domains/home/transactions/panel'
 
 function serializeList(list: string[]): string | undefined {
   return list.length > 0 ? list.join(',') : undefined
 }
 
 function emptyTrendData(
-  dateFrom: string,
-  dateTo: string,
+  dateFrom: string | null,
+  dateTo: string | null,
   query: TrendQueryState,
 ): TrendReportData {
   return {
@@ -87,13 +91,11 @@ function emptyTrendData(
 }
 
 function buildTrendParams(
-  dateFrom: string,
-  dateTo: string,
+  period: ParsedReportPeriodState,
   query: TrendQueryState,
 ): TrendReportParams {
   const params: TrendReportParams = {
-    dateFrom,
-    dateTo,
+    ...buildReportPeriodApiParams(period),
     trendSeriesBy: query.seriesBy,
     trendDirections: query.directions.join(','),
   }
@@ -119,8 +121,6 @@ function buildTrendParams(
 export default function TrendReport() {
 
   const [searchParams, setSearchParams] = useSearchParams()
-
-  const { open: sidebarOpen, openPanel, closePanel } = useReportSidebar()
 
   const [chartStyle, setChartStyle] = useChartStyle()
 
@@ -153,6 +153,44 @@ export default function TrendReport() {
   )
 
   const chartType = searchParams.get('chart') === 'line' ? 'line' : 'bar'
+
+  const reportSavedId = searchParams.get(REPORT_SAVED_ID_PARAM)
+
+  const applySavedParams = useCallback(
+    (params: Record<string, unknown>, savedId: number) => {
+      const next = preserveReportPanelParams(
+        searchParams,
+        applyTrendParams(params, defaults, savedId),
+      )
+      setSearchParams(next, { replace: true })
+    },
+    [setSearchParams, defaults, searchParams],
+  )
+
+  const captureParams = useCallback(
+    () =>
+      captureTrendParams(period, trendQuery, chartType) as unknown as Record<string, unknown>,
+    [period, trendQuery, chartType],
+  )
+
+  const reportSaved = useReportSaved({
+    type: 'trend',
+    reportSavedId,
+    setSearchParams,
+    captureParams,
+  })
+
+  const savedReportPanel: ReportSavedPanelProps = {
+    loadedReport: reportSaved.loadedReport,
+    listRefreshKey: reportSaved.listRefreshKey,
+    onApplyDraft: () => {},
+    onCreateReport: reportSaved.createReport,
+    onUpdateReport: reportSaved.updateReport,
+    onRenameReport: reportSaved.renameReport,
+    onSelectReport: (item) => reportSaved.selectReport(item, applySavedParams),
+    onDeleteReport: reportSaved.deleteReport,
+    loadReportList: reportSaved.loadList,
+  }
 
   const filterCount = countTrendQueryState(trendQuery)
 
@@ -201,23 +239,8 @@ export default function TrendReport() {
   const [error, setError] = useState<string | null>(null)
 
   const loadTrend = useCallback(() => {
-    return fetchTrendReport(buildTrendParams(period.dateFrom, period.dateTo, trendQuery))
-  }, [period.dateFrom, period.dateTo, trendQuery])
-
-  const { openTx: openTxRaw, transactionPanelPortal, confirmDialogs } = useTransactionPanel({
-    onMutated: () => {
-      void loadTrend().then(setData).catch(() => {})
-    },
-  })
-  const panelOwner = resolveRightPanelOwner(searchParams)
-
-  const openTx = useCallback(
-    (txId: number) => {
-      closePanel()
-      openTxRaw(txId)
-    },
-    [closePanel, openTxRaw],
-  )
+    return fetchTrendReport(buildTrendParams(period, trendQuery))
+  }, [period, trendQuery])
 
   useEffect(() => {
     let cancelled = false
@@ -440,7 +463,29 @@ export default function TrendReport() {
 
       : `Porównanie ${trendGranularityLabel(data.granularity).toLowerCase()}`
 
+  const filtersContent = (
+    <TrendFiltersPanelContent
+      period={period}
+      onPeriodModeChange={handlePeriodModeChange}
+      onPeriodNavigate={handlePeriodNavigate}
+      onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
+      onPeriodRangeChange={handlePeriodRangeChange}
+      activeQuery={trendQuery}
+      appliedFilterSignature={trendFilterSignature}
+      onApplyQuery={applyTrendQuery}
+      chartStyle={chartStyle}
+      onChartStyleChange={setChartStyle}
+      savedReport={savedReportPanel}
+    />
+  )
 
+  const { panelOpen, openPanel, closePanel, openTx, panelPortal, confirmDialogs } =
+    useReportRightPanel({
+      onMutated: () => {
+        void loadTrend().then(setData).catch(() => {})
+      },
+      filtersContent,
+    })
 
   return (
 
@@ -448,45 +493,13 @@ export default function TrendReport() {
 
     <ReportPageShell
 
-      sidebarOpen={sidebarOpen}
+      sidebarOpen={panelOpen}
 
       onOpenSidebar={openPanel}
 
       onCloseSidebar={closePanel}
 
       filterCount={filterCount}
-
-      sidebar={
-
-        <TrendSidebar
-
-          open={sidebarOpen}
-
-          onClose={closePanel}
-
-          period={period}
-
-          onPeriodModeChange={handlePeriodModeChange}
-
-          onPeriodNavigate={handlePeriodNavigate}
-
-          onPeriodJumpToCurrent={handlePeriodJumpToCurrent}
-
-          onPeriodRangeChange={handlePeriodRangeChange}
-
-          activeQuery={trendQuery}
-
-          appliedFilterSignature={trendFilterSignature}
-
-          onApplyQuery={applyTrendQuery}
-
-          chartStyle={chartStyle}
-
-          onChartStyleChange={setChartStyle}
-
-        />
-
-      }
 
     >
 
@@ -568,7 +581,7 @@ export default function TrendReport() {
 
         <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
 
-          <span>{subtitle} · {period.dateFrom} — {period.dateTo}</span>
+          <span>{subtitle} · {formatReportPeriodDisplay(period)}</span>
 
           {loading && <Loader2 size={14} className="animate-spin text-gray-400" />}
 
@@ -618,7 +631,7 @@ export default function TrendReport() {
 
     </ReportPageShell>
 
-    {panelOwner === 'transaction' && transactionPanelPortal}
+    {panelPortal}
 
     {confirmDialogs}
 

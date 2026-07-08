@@ -1,4 +1,6 @@
 export const DEFAULT_PANEL_WIDTH = 640
+/** Domyślna wąska szerokość przy pierwszym otwarciu panelu raportów i podobnych. */
+export const NARROW_PANEL_WIDTH = 420
 export const MIN_PANEL_WIDTH = 400
 export const MAX_PANEL_WIDTH = 960
 export const EXPANDED_PANEL_MAX = 1200

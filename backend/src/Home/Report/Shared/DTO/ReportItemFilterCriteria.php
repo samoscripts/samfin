@@ -13,8 +13,8 @@ use Symfony\Component\HttpFoundation\InputBag;
 final readonly class ReportItemFilterCriteria
 {
     public function __construct(
-        public string $dateFrom,
-        public string $dateTo,
+        public ?string $dateFrom,
+        public ?string $dateTo,
         public ?string $direction = null,
         public ?string $walletId = null,
         public ?string $categoryId = null,
@@ -65,8 +65,8 @@ final readonly class ReportItemFilterCriteria
 
     public static function fromInputBag(
         InputBag $query,
-        string $dateFrom,
-        string $dateTo,
+        ?string $dateFrom,
+        ?string $dateTo,
         ?string $direction,
     ): self {
         return new self(

@@ -1,5 +1,5 @@
 ---
-description: Prawy panel boczny — shell, portal, URL, precedencja
+description: Prawy panel boczny — shell, portal, URL, zakładki
 globs: frontend/src/**/*.tsx
 alwaysApply: false
 ---
@@ -10,7 +10,8 @@ alwaysApply: false
 
 - Markup `aside` (desktop resize + mobile slide-over) — **`SidePanelShell`** z `shared/components/panel/SidePanelShell.tsx`.
 - Szerokość i `localStorage` — **`useSidePanelWidth`** z `shared/hooks/useSidePanelWidth.ts`.
-- Stałe szerokości — `shared/components/panel/panelLayout.ts`.
+- Stałe szerokości — `shared/components/panel/panelLayout.ts` (`NARROW_PANEL_WIDTH` = domyślna szerokość przy otwarciu).
+- Pasek zakładek + expand + zamknij — **`SidePanelTabBar`** z `shared/components/panel/SidePanelTabBar.tsx`.
 
 Nie duplikuj `startResize` / markupu `aside` w sidebarach domenowych.
 
@@ -18,15 +19,23 @@ Nie duplikuj `startResize` / markupu `aside` w sidebarach domenowych.
 
 - Jeden slot: **`RightPanelContext`** (`layout/RightPanelContext.tsx`).
 - Render: `createPortal(..., portalRoot)` z `useRightPanelPortal()`.
+- **Nowa funkcja w prawym panelu = nowa zakładka** w tym samym portalu — nie twórz drugiego portalu ani osobnego `aside` obok istniejącego panelu.
 
-## URL i precedencja
+## Raporty (Rozbicie, Trend, Analizy)
+
+- Hook: **`useReportRightPanel`** (`reports/shared/hooks/useReportRightPanel.tsx`).
+- Zakładki: **Filtry i okres** (lub etykieta domenowa, np. „Okres i portfel”) | **Szczegóły** (po kliknięciu wiersza transakcji) | **Edycja** (podczas edycji).
+- Treść filtrów: komponenty `*PanelContent` (bez własnego shell) — np. `ReportFiltersPanelContent`, `TrendFiltersPanelContent`, `ReportScopePanelContent`.
+- URL: `reportPanelUrl.ts` — `panel=filters` otwiera panel; `tx` + `tab=details` przełącza na szczegóły bez zamykania filtrów; zamknięcie czyści `panel`, `tx`, `tab`.
+
+## URL i precedencja (rozliczenia)
 
 - W danym widoku otwarty **co najwyżej jeden** panel treściowy.
-- Precedencja (np. rozliczenia): `tx` (panel transakcji) **>** `panel=period` (wybór okresu).
+- Precedencja (rozliczenia): `tx` (panel transakcji) **>** `panel=period` (wybór okresu).
 - Otwarcie panelu transakcji czyści `panel=period`; otwarcie okresu czyści `tx`/`tab`.
 - Helpery: `transactions/panel/transactionPanelUrl.ts` (`resolveRightPanelOwner`, `mergeTransactionPanelParams`).
 
-## Panel transakcji poza listą
+## Panel transakcji poza raportami
 
-- Import: `@/domains/home/transactions/panel` (`useTransactionPanel`).
+- Import: `@/domains/home/transactions/panel` (`useTransactionPanel` — rozliczenia; `useTransactionPanelState` — logika bez portalu).
 - Szczegóły + edycja pojedynczej transakcji — bez filtrów/bulk/create (te zostają na `/transactions`).

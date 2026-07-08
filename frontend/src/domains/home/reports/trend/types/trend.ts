@@ -21,8 +21,8 @@ export interface TrendPeriodPoint {
 }
 
 export interface TrendReportData {
-  dateFrom: string
-  dateTo: string
+  dateFrom: string | null
+  dateTo: string | null
   granularity: TrendGranularity
   seriesBy: TrendSeriesBy
   points: TrendPeriodPoint[]

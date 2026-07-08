@@ -8,7 +8,7 @@ interface ReportPageShellProps {
   onOpenSidebar: () => void
   onCloseSidebar: () => void
   filterCount: number
-  sidebar: ReactNode
+  sidebar?: ReactNode
   children: ReactNode
   sidebarButtonLabel?: string
 }
@@ -57,7 +57,7 @@ export default function ReportPageShell({
         </div>
       </div>
 
-      {portalRoot && createPortal(sidebar, portalRoot)}
+      {portalRoot && sidebar ? createPortal(sidebar, portalRoot) : null}
     </>
   )
 }

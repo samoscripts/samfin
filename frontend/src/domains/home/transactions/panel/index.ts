@@ -1,4 +1,5 @@
 export { useTransactionPanel } from './useTransactionPanel'
+export { useTransactionPanelState } from './useTransactionPanelState'
 export type { UseTransactionPanelOptions } from './useTransactionPanel'
 export {
   parseTransactionPanelParams,

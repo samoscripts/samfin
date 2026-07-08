@@ -22,6 +22,12 @@ import ChartStyleSection from '@/domains/home/reports/shared/components/ChartSty
 import ReportSidebarTabs, {
   useReportSidebarTab,
 } from '@/domains/home/reports/shared/components/ReportSidebarTabs'
+import {
+  closeReportPanelParams,
+  isReportPanelOpen,
+  openReportPanelParams,
+} from '@/domains/home/reports/shared/utils/reportPanelUrl'
+import { searchParamsEqual } from '@/shared/utils/urlQuery'
 
 const PANEL_WIDTH = 420
 
@@ -288,23 +294,21 @@ export default function ReportSidebar({
 
 export function useReportSidebar() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const open = searchParams.get('panel') === 'filters'
+  const open = isReportPanelOpen(searchParams)
 
   const openPanel = useCallback(() => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev)
-      params.set('panel', 'filters')
-      return params
-    }, { replace: true })
-  }, [setSearchParams])
+    const next = openReportPanelParams(searchParams)
+    if (!searchParamsEqual(searchParams, next)) {
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const closePanel = useCallback(() => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev)
-      params.delete('panel')
-      return params
-    }, { replace: true })
-  }, [setSearchParams])
+    const next = closeReportPanelParams(searchParams)
+    if (!searchParamsEqual(searchParams, next)) {
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   return { open, openPanel, closePanel }
 }
