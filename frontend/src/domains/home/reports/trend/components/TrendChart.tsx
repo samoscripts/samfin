@@ -244,7 +244,9 @@ export default function TrendChart({
     (line: TrendChartLine) =>
     (props: { cx?: number; cy?: number; payload?: Record<string, string | number> }) => {
       const { cx, cy, payload } = props
-      if (cx == null || cy == null || !payload) return null
+      if (cx == null || cy == null || !payload) {
+        return <circle cx={0} cy={0} r={0} fill="transparent" aria-hidden />
+      }
 
       const cellId = trendBarCellId(String(payload.period), line.dataKey)
       const isHovered = hoveredCellId === cellId
