@@ -21,6 +21,7 @@ import {
 } from '../utils/bulkSelection'
 import { useFlowsQuery } from '../hooks/useFlowsQuery'
 import { useTransactionListUrl } from '../hooks/useTransactionListUrl'
+import { useTransactionFilterSaved } from '../hooks/useTransactionFilterSaved'
 import { isPanelOpenFromUrl } from '../utils/transactionUrlParams'
 import {
   computeExpandedPanelWidth,
@@ -64,7 +65,9 @@ export default function Transactions() {
     tx: urlTxId,
     tab: urlTab,
     createPrefill,
+    filterSavedId,
     applyUrl,
+    setSearchParams,
     setSort,
     setPagination,
     openTx,
@@ -108,7 +111,7 @@ export default function Transactions() {
 
   const { data, isLoading, isRefreshing, meta } = useFlowsQuery(activeFilters, sort, pagination, refreshKey)
 
-  const panelOpen = isPanelOpenFromUrl({ filters: activeFilters, sort, pagination, tx: urlTxId, tab: urlTab, createPrefill }) || isEditing
+  const panelOpen = isPanelOpenFromUrl({ filters: activeFilters, sort, pagination, tx: urlTxId, tab: urlTab, createPrefill, filterSavedId }) || isEditing
   const activeTab: SidebarTab = isEditing
     ? (editMode === 'create' ? 'create' : 'edit')
     : (urlTab ?? (urlTxId ? 'details' : 'filters'))
@@ -206,6 +209,46 @@ export default function Transactions() {
     },
     [applyUrl, pagination],
   )
+
+  const applySavedFilterState = useCallback(
+    (patch: {
+      filters: FlowFilters
+      sort: SortState
+      pagination: typeof pagination
+      filterSavedId: number | null
+    }) => {
+      applyUrl(patch)
+      setRefreshKey((k) => k + 1)
+    },
+    [applyUrl],
+  )
+
+  const getFilterCaptureState = useCallback(
+    () => ({
+      filters: activeFilters,
+      sort,
+      perPage: pagination.perPage,
+    }),
+    [activeFilters, sort, pagination.perPage],
+  )
+
+  const transactionFilterSaved = useTransactionFilterSaved({
+    filterSavedId,
+    setSearchParams,
+    applySavedState: applySavedFilterState,
+    getCaptureState: getFilterCaptureState,
+  })
+
+  const savedFilterPanel = {
+    loadedFilter: transactionFilterSaved.loadedFilter,
+    listRefreshKey: transactionFilterSaved.listRefreshKey,
+    onCreateFilter: transactionFilterSaved.createFilter,
+    onUpdateFilter: transactionFilterSaved.updateFilter,
+    onRenameFilter: transactionFilterSaved.renameFilter,
+    onSelectFilter: transactionFilterSaved.selectFilter,
+    onDeleteFilter: transactionFilterSaved.deleteFilter,
+    loadFilterList: transactionFilterSaved.loadList,
+  }
 
   const handleSortColumn = (field: SortableCol) => {
     setSort(
@@ -832,6 +875,7 @@ export default function Transactions() {
             onApplyRules={openApplyRulesSelection}
             onApplyRulesToFilter={openApplyRulesFilter}
             onCreateRule={handleCreateRule}
+            savedFilter={savedFilterPanel}
           />,
           portalRoot,
         )}

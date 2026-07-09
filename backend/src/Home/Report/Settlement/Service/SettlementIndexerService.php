@@ -2,7 +2,7 @@
 
 namespace App\Home\Report\Settlement\Service;
 
-use App\Home\Configuration\Entity\Wallet;
+use App\Home\Configuration\General\Entity\Wallet;
 use App\Home\Report\Settlement\Entity\SettlementConfig;
 use App\Home\Report\Settlement\Entity\SettlementLedgerEntry;
 use App\Home\Report\Settlement\Repository\SettlementItemQuery;

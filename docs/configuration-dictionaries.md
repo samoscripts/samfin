@@ -6,11 +6,11 @@ W SamFin dane referencyjne używane przy klasyfikacji transakcji są **konfiguro
 
 | Słownik | Tabela | API | UI |
 |---------|--------|-----|-----|
-| Podmioty | `party` | `/api/parties` | Konfiguracja → Podmioty |
+| Podmioty | `party` | `/api/parties` | Konfiguracja → Ogólne → Podmioty |
 | Rachunki bankowe | `party_bank_account` | `/api/party-bank-accounts` | Pod sekcją podmiotu |
-| Portfele | `wallet` | `/api/wallets` | Konfiguracja → Portfele |
-| Obszary (Dotyczy) | `concern` | `/api/concerns` | Konfiguracja → Dotyczy |
-| Kategorie | `category` | `/api/categories` | Konfiguracja → Kategorie |
+| Portfele | `wallet` | `/api/wallets` | Konfiguracja → Ogólne → Portfele |
+| Obszary (Dotyczy) | `concern` | `/api/concerns` | Konfiguracja → Ogólne → Dotyczy |
+| Kategorie | `category` | `/api/categories` | Konfiguracja → Ogólne → Kategorie |
 
 Wszystkie słowniki wspierają **dezaktywację** (`active = false`) zamiast fizycznego usuwania. **Wyjątki (kategorie):** dezaktywacja blokowana przy użyciu (ADR-027); **hard delete** tylko dla nieaktywnych kategorii bez użyć i bez subkategorii (ADR-035) — patrz sekcja Kategorie poniżej.
 

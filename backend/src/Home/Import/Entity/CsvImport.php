@@ -2,8 +2,8 @@
 
 namespace App\Home\Import\Entity;
 
-use App\Home\Configuration\Entity\Party;
-use App\Home\Configuration\Entity\PartyBankAccount;
+use App\Home\Configuration\General\Entity\Party;
+use App\Home\Configuration\General\Entity\PartyBankAccount;
 use App\Home\Import\Repository\CsvImportRepository;
 use App\Identity\Entity\User;
 use Doctrine\ORM\Mapping as ORM;

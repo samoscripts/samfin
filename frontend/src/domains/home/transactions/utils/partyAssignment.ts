@@ -1,5 +1,5 @@
 import type { Transaction } from '@/shared/types'
-import type { Party } from '@/domains/home/configuration/parties/types'
+import type { Party } from '@/domains/home/configuration/general/parties/types'
 
 export type PartyField = 'paidFrom' | 'paidTo'
 

@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
@@ -17,8 +18,11 @@ export default defineConfig({
     // .tsx przed .ts — inaczej import „useReportRightPanel” trafia w nieistniejący .ts (404 w dev)
     extensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.mts', '.json'],
   },
-  server: {
-    host: '0.0.0.0',
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+  },
+  server: {    host: '0.0.0.0',
     port: 5173,
     proxy: {
       '/api': {

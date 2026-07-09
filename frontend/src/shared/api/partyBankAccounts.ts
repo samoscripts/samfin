@@ -1,5 +1,5 @@
 import api from './client'
-import type { PartyBankAccount, PartyBankAccountPayload } from '@/domains/home/configuration/parties/types'
+import type { PartyBankAccount, PartyBankAccountPayload } from '@/domains/home/configuration/general/parties/types'
 
 export async function fetchPartyBankAccounts(partyId?: number): Promise<PartyBankAccount[]> {
   const params = partyId !== undefined ? `?partyId=${partyId}` : ''

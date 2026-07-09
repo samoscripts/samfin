@@ -2,7 +2,7 @@
 
 namespace App\Home\Transaction\Service;
 
-use App\Home\Configuration\Entity\Party;
+use App\Home\Configuration\General\Entity\Party;
 use App\Home\Transaction\Entity\Transaction;
 
 /**

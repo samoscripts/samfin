@@ -11,11 +11,58 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-export function breakdownGroupTurnover(group: BreakdownGroup): number {
-  if (group.expenses != null || group.income != null) {
-    return (group.expenses ?? 0) + (group.income ?? 0)
+export interface ChartRankedItem {
+  amount: number
+  expenses?: number
+  income?: number
+}
+
+export interface LimitedChartItems<T> {
+  displayItems: T[]
+  othersSourceItems: T[]
+}
+
+export interface LimitedChartGroups {
+  displayGroups: BreakdownGroup[]
+  othersSourceGroups: BreakdownGroup[]
+}
+
+export function itemChartTurnover(item: ChartRankedItem): number {
+  if (item.expenses != null || item.income != null) {
+    return (item.expenses ?? 0) + (item.income ?? 0)
   }
-  return group.amount
+  return item.amount
+}
+
+/** Alias dla BreakdownGroup — patrz itemChartTurnover. */
+export function breakdownGroupTurnover(group: BreakdownGroup): number {
+  return itemChartTurnover(group)
+}
+
+export function limitItemsForChart<T extends ChartRankedItem>(
+  items: T[],
+  topN: number,
+  buildOthers: (tail: T[], allItems: T[]) => T,
+): LimitedChartItems<T> {
+  if (items.length === 0) {
+    return { displayItems: [], othersSourceItems: [] }
+  }
+
+  const sorted = [...items].sort((a, b) => itemChartTurnover(b) - itemChartTurnover(a))
+
+  if (sorted.length <= topN) {
+    return { displayItems: sorted, othersSourceItems: [] }
+  }
+
+  const headCount = topN - 1
+  const head = sorted.slice(0, headCount)
+  const tail = sorted.slice(headCount)
+  const others = buildOthers(tail, items)
+
+  return {
+    displayItems: [...head, others],
+    othersSourceItems: tail,
+  }
 }
 
 /** Wartość z URL do zapisu raportu (bez clampu do liczby grup). */
@@ -37,66 +84,49 @@ export function breakdownGroupChartId(group: BreakdownGroup): string {
   return group.id === null ? 'null' : String(group.id)
 }
 
-export interface LimitedChartGroups {
-  displayGroups: BreakdownGroup[]
-  othersSourceGroups: BreakdownGroup[]
-}
-
 export function limitGroupsForChart(groups: BreakdownGroup[], topN: number): LimitedChartGroups {
-  if (groups.length === 0) {
-    return { displayGroups: [], othersSourceGroups: [] }
-  }
-
   const hasDirectionSplit = groups.some((group) => group.expenses != null || group.income != null)
-  const sorted = [...groups].sort((a, b) => breakdownGroupTurnover(b) - breakdownGroupTurnover(a))
 
-  if (sorted.length <= topN) {
-    return { displayGroups: sorted, othersSourceGroups: [] }
-  }
+  const result = limitItemsForChart(groups, topN, (tail, allItems) => {
+    if (hasDirectionSplit) {
+      const othersExpenses = roundMoney(tail.reduce((sum, group) => sum + (group.expenses ?? 0), 0))
+      const othersIncome = roundMoney(tail.reduce((sum, group) => sum + (group.income ?? 0), 0))
+      const othersAmount = roundMoney(othersExpenses + othersIncome)
+      const expenseTotal = allItems.reduce((sum, group) => sum + (group.expenses ?? 0), 0)
+      const incomeTotal = allItems.reduce((sum, group) => sum + (group.income ?? 0), 0)
 
-  const headCount = topN - 1
-  const head = sorted.slice(0, headCount)
-  const tail = sorted.slice(headCount)
+      const othersGroup: BreakdownGroup = {
+        id: CHART_OTHERS_GROUP_ID,
+        name: 'Pozostałe',
+        amount: othersAmount,
+        expenses: othersExpenses,
+        income: othersIncome,
+        share: expenseTotal > 0 ? roundMoney((othersExpenses / expenseTotal) * 1000) / 10 : 0,
+        shareIncome: incomeTotal > 0 ? roundMoney((othersIncome / incomeTotal) * 1000) / 10 : 0,
+        itemCount: tail.reduce((sum, group) => sum + group.itemCount, 0),
+      }
 
-  if (hasDirectionSplit) {
-    const othersExpenses = roundMoney(tail.reduce((sum, group) => sum + (group.expenses ?? 0), 0))
-    const othersIncome = roundMoney(tail.reduce((sum, group) => sum + (group.income ?? 0), 0))
-    const othersAmount = roundMoney(othersExpenses + othersIncome)
-    const expenseTotal = groups.reduce((sum, group) => sum + (group.expenses ?? 0), 0)
-    const incomeTotal = groups.reduce((sum, group) => sum + (group.income ?? 0), 0)
+      return othersGroup
+    }
+
+    const totalAmount = allItems.reduce((sum, group) => sum + group.amount, 0)
+    const othersAmount = roundMoney(tail.reduce((sum, group) => sum + group.amount, 0))
+    const othersItemCount = tail.reduce((sum, group) => sum + group.itemCount, 0)
+    const othersShare = totalAmount > 0 ? roundMoney((othersAmount / totalAmount) * 1000) / 10 : 0
 
     const othersGroup: BreakdownGroup = {
       id: CHART_OTHERS_GROUP_ID,
       name: 'Pozostałe',
       amount: othersAmount,
-      expenses: othersExpenses,
-      income: othersIncome,
-      share: expenseTotal > 0 ? roundMoney((othersExpenses / expenseTotal) * 1000) / 10 : 0,
-      shareIncome: incomeTotal > 0 ? roundMoney((othersIncome / incomeTotal) * 1000) / 10 : 0,
-      itemCount: tail.reduce((sum, group) => sum + group.itemCount, 0),
+      share: othersShare,
+      itemCount: othersItemCount,
     }
 
-    return {
-      displayGroups: [...head, othersGroup],
-      othersSourceGroups: tail,
-    }
-  }
-
-  const totalAmount = groups.reduce((sum, group) => sum + group.amount, 0)
-  const othersAmount = roundMoney(tail.reduce((sum, group) => sum + group.amount, 0))
-  const othersItemCount = tail.reduce((sum, group) => sum + group.itemCount, 0)
-  const othersShare = totalAmount > 0 ? roundMoney((othersAmount / totalAmount) * 1000) / 10 : 0
-
-  const othersGroup: BreakdownGroup = {
-    id: CHART_OTHERS_GROUP_ID,
-    name: 'Pozostałe',
-    amount: othersAmount,
-    share: othersShare,
-    itemCount: othersItemCount,
-  }
+    return othersGroup
+  })
 
   return {
-    displayGroups: [...head, othersGroup],
-    othersSourceGroups: tail,
+    displayGroups: result.displayItems,
+    othersSourceGroups: result.othersSourceItems,
   }
 }

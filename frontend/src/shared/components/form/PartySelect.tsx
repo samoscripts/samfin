@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ChevronDown, X } from 'lucide-react'
-import type { Party, PartyType, OwnershipType } from '@/domains/home/configuration/parties/types'
+import type { Party, PartyType, OwnershipType } from '@/domains/home/configuration/general/parties/types'
 import PartyPickerContent from '@/shared/components/form/PartyPickerContent'
 import PickerOverlay from '@/shared/components/form/PickerOverlay'
 import { selectCls } from '@/shared/components/form/formClasses'

@@ -1,5 +1,5 @@
 import api from './client'
-import type { Party, PartyPayload } from '@/domains/home/configuration/parties/types'
+import type { Party, PartyPayload } from '@/domains/home/configuration/general/parties/types'
 
 export async function fetchParties(): Promise<Party[]> {
   const res = await api.get<Party[]>('/parties')

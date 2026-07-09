@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Party, PartyType, OwnershipType } from '@/domains/home/configuration/parties/types'
+import type { Party, PartyType, OwnershipType } from '@/domains/home/configuration/general/parties/types'
 import {
   OWNERSHIP_TYPE_LABELS,
   PARTY_TYPE_LABELS,
-} from '@/domains/home/configuration/parties/types'
+} from '@/domains/home/configuration/general/parties/types'
 import { createParty } from '@/shared/api/parties'
 import Select from '@/shared/components/form/Select'
 import { btnSecondary, configInputCls, configSelectCls } from '@/shared/components/form/formClasses'

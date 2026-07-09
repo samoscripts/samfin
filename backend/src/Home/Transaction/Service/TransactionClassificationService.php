@@ -2,10 +2,10 @@
 
 namespace App\Home\Transaction\Service;
 
-use App\Home\Configuration\Entity\Category;
-use App\Home\Configuration\Entity\Concern;
-use App\Home\Configuration\Entity\Party;
-use App\Home\Configuration\Entity\Wallet;
+use App\Home\Configuration\General\Entity\Category;
+use App\Home\Configuration\General\Entity\Concern;
+use App\Home\Configuration\General\Entity\Party;
+use App\Home\Configuration\General\Entity\Wallet;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Entity\TransactionItem;
 use App\Identity\Entity\User;

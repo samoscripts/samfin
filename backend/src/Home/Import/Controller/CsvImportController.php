@@ -13,7 +13,7 @@ use App\Home\Import\DTO\ImportIngestionMode;
 use App\Home\Import\Entity\CsvImport;
 use App\Home\Import\Exception\CsvImportDuplicateRowException;
 use App\Home\Import\Service\CsvImportService;
-use App\Home\Transaction\ClassificationRule\Exception\ClassificationRuleApplicationException;
+use App\Home\Configuration\Rules\Exception\ClassificationRuleApplicationException;
 use App\Home\Transaction\Service\TransactionIngestionService;
 use App\Identity\Entity\User;
 use App\Shared\DTO\QueryValidationErrors;

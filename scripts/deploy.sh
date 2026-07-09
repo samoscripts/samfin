@@ -127,6 +127,8 @@ NPM_EXEC_ENV=(-e HOME=/app -e NPM_CONFIG_CACHE=/app/.npm-cache)
 build_frontend() {
     log "Building frontend..."
     docker compose -f "$COMPOSE_FILE" exec -T "${NPM_EXEC_ENV[@]}" frontend npm ci
+    log "Running frontend tests (Vitest)..."
+    docker compose -f "$COMPOSE_FILE" exec -T -e HOME=/app frontend npm run test
     docker compose -f "$COMPOSE_FILE" exec -T -e HOME=/app frontend npm run build
 }
 

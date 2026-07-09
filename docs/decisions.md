@@ -224,13 +224,13 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 | Moduł | Layout | Przykłady |
 |-------|--------|-----------|
-| Konfiguracja | `Configuration` | `/app/konfiguracja/podmioty`, `/app/konfiguracja/portfele` |
+| Konfiguracja | `ConfigurationLayout` + `GeneralLayout` (zakładki Ogólne) | `/app/konfiguracja/ogolne/podmioty`, `/app/konfiguracja/reguly`, `/app/konfiguracja/dashboard` |
 | Import CSV | `ImportLayout` | `/app/import/nowy`, `/app/import/historia` |
 | Ustawienia | `Settings` | `/app/ustawienia/uzytkownicy`, `/app/ustawienia/system` |
 
 **Zasada:** Nowe moduły z zakładkami stosują ten sam wzorzec — bez wyjątków. Zakładki wewnętrzne (np. panel boczny transakcji) mogą pozostać w stanie lokalnym, jeśli nie są główną nawigacją modułu.
 
-**Pliki:** `routes.tsx`, layouty z `<Outlet />` (`Configuration.tsx`, `ImportLayout.tsx`, `Settings.tsx`).
+**Pliki:** `routes.tsx`, layouty z `<Outlet />` (`ConfigurationLayout.tsx`, `GeneralLayout.tsx`, `ImportLayout.tsx`, `Settings.tsx`).
 
 ---
 
@@ -635,6 +635,25 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-040: Podmenu Konfiguracji i struktura katalogów = rozkład funkcjonalny
+
+**Kontekst:** Moduł Konfiguracja urósł (słowniki, reguły, planowany dashboard). Płaski pasek zakładek i płaski katalog `configuration/parties`, `classification-rules` nie odzwierciedlały podziału funkcjonalnego. Raporty już stosują wzorzec: submenu w sidebarze + podkatalogi per raport (`reports/analytics`, `reports/breakdown`, …).
+
+**Decyzja:**
+
+- **Sidebar:** rozwijana grupa „Konfiguracja” z pozycjami: **Ogólne**, **Reguły**, **Dashboard** (jak `REPORTS_NAV`).
+- **Ogólne:** poziome zakładki w treści (Podmioty, Portfele, Dotyczy, Kategorie); URL `/konfiguracja/ogolne/*`.
+- **Reguły:** `/konfiguracja/reguly/*` (bez zmiany ścieżek API).
+- **Dashboard:** placeholder `/konfiguracja/dashboard` (implementacja w osobnym zadaniu).
+- **Katalogi FE** (angielskie nazwy folderów, polskie segmenty URL): `configuration/general/`, `configuration/rules/`, `configuration/dashboard/`.
+- **Katalogi BE:** `Configuration/General/` (słowniki), `Configuration/Rules/` (przeniesione z `Transaction/ClassificationRule/`). Ścieżki API i schemat DB bez zmian.
+- **Zasada:** nowe funkcje trafiają do podkatalogu odpowiadającego podmenu (np. Raporty nie lądują w `general/`). Zależności między modułami (np. `Rules → Transaction`) są dopuszczalne — lokalizacja odzwierciedla **menu użytkownika**, nie wyłącznie graf zależności technicznych.
+- **Kompatybilność URL:** redirecty `/konfiguracja/podmioty` → `/konfiguracja/ogolne/podmioty` (i analogicznie portfele, dotyczy, kategorie).
+
+**Pliki:** `Sidebar.tsx`, `SidebarNavGroup.tsx`, `ConfigurationLayout.tsx`, `GeneralLayout.tsx`, `routes.tsx`, `Home/Configuration/General/*`, `Home/Configuration/Rules/*`.
+
+---
+
 ## Historia dokumentu
 
 | Data | Zmiana |
@@ -659,3 +678,4 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-07-02 | ADR-037: rozliczenia — Model B rotacji (stan + anchor), zastąpienie Modelu A |
 | 2026-07-06 | ADR-038: rozliczenia — roczne okresy rozliczeniowe, snapshot przy zamknięciu, `settlementYear` w API |
 | 2026-07-06 | ADR-039: rozliczenia — wkłady własne (`source_exp_deposit`), Σ rotacji bez modelu kredytu |
+| 2026-07-10 | ADR-040: podmenu Konfiguracji (Ogólne / Reguły / Dashboard), katalogi `general/` + `rules/` |

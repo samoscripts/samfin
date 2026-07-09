@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Api;
 
-use App\Home\Configuration\Entity\Party;
+use App\Home\Configuration\General\Entity\Party;
 use App\Tests\Support\ApiTestCase;
 
 final class ClassificationRuleApiTest extends ApiTestCase

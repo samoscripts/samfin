@@ -2,7 +2,7 @@
 
 namespace App\Home\Transaction\Controller;
 
-use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleApplyService;
+use App\Home\Configuration\Rules\Service\ClassificationRuleApplyService;
 use App\Home\Transaction\DTO\TransactionFilterCriteria;
 use App\Home\Transaction\DTO\TransactionListQuery;
 use App\Home\Transaction\DTO\TransactionStatsQuery;

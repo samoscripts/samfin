@@ -14,6 +14,7 @@ import {
   parseTransactionNewSearchParams,
   type TransactionNewUrlPrefill,
 } from './transactionNewUrlParams'
+import { FILTER_SAVED_ID_PARAM, parseFilterSavedId } from './transactionFilterSavedParams'
 
 export const DEFAULT_SORT: SortState = { field: 'date', direction: 'desc' }
 export const DEFAULT_PAGINATION: PaginationState = { page: 1, perPage: 25 }
@@ -25,6 +26,7 @@ export interface TransactionUrlState {
   tx: number | null
   tab: SidebarTab | null
   createPrefill: TransactionNewUrlPrefill
+  filterSavedId: number | null
 }
 
 const VALID_TABS: SidebarTab[] = ['filters', 'details', 'edit', 'create']
@@ -110,11 +112,13 @@ export function parseTransactionSearchParams(params: URLSearchParams): Transacti
 
   const createPrefill = tab === 'create' ? parseTransactionNewSearchParams(params) : {}
 
-  return { filters, sort, pagination, tx, tab, createPrefill }
+  const filterSavedId = parseFilterSavedId(params)
+
+  return { filters, sort, pagination, tx, tab, createPrefill, filterSavedId }
 }
 
 export function serializeTransactionSearchParams(state: TransactionUrlState): URLSearchParams {
-  const { filters, sort, pagination, tx, tab, createPrefill } = state
+  const { filters, sort, pagination, tx, tab, createPrefill, filterSavedId } = state
 
   const month =
     filters.dateFrom &&
@@ -154,6 +158,7 @@ export function serializeTransactionSearchParams(state: TransactionUrlState): UR
       categoryId: createPrefill.categoryId,
     })
     prefillParams.forEach((value, key) => base.set(key, value))
+    if (filterSavedId != null) base.set(FILTER_SAVED_ID_PARAM, String(filterSavedId))
     return base
   }
 
@@ -169,6 +174,7 @@ export function serializeTransactionSearchParams(state: TransactionUrlState): UR
     tab: tab ?? undefined,
   })
   listParams.forEach((value, key) => base.set(key, value))
+  if (filterSavedId != null) base.set(FILTER_SAVED_ID_PARAM, String(filterSavedId))
   return base
 }
 

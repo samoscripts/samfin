@@ -7,7 +7,7 @@ import {
 } from '@/shared/api/settlements'
 import { fetchParties } from '@/shared/api/parties'
 import { fetchWallets, type Wallet } from '@/shared/api/wallets'
-import type { Party } from '@/domains/home/configuration/parties/types'
+import type { Party } from '@/domains/home/configuration/general/parties/types'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import { getApiErrorMessage } from '@/shared/utils/errors'
 import { SETTLEMENT_SETTINGS_LABELS } from '@/domains/home/reports/settlements/constants'

@@ -1,7 +1,7 @@
 import type { Wallet } from '@/shared/api/wallets'
 import type { Concern } from '@/shared/api/concerns'
 import type { Category } from '@/shared/api/categories'
-import type { Party } from '@/domains/home/configuration/parties/types'
+import type { Party } from '@/domains/home/configuration/general/parties/types'
 import { inputCls } from '@/shared/components/form/formClasses'
 import ClearableDateInput from '@/shared/components/form/ClearableDateInput'
 import FilterToggleGroup from '@/shared/components/form/FilterToggleGroup'

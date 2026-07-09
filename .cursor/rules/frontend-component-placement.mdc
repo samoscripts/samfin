@@ -16,6 +16,7 @@ alwaysApply: false
 
 - Formularze, panele i utils specyficzne dla modułu (np. `TransactionEditForm`).
 - Strony i layouty modułu.
+- Podkatalogi odzwierciedlają podmenu (np. `configuration/general/parties/`, `configuration/rules/` — nie `configuration/parties/` obok raportów). Zasada: ADR-040, `docs/ai-guidelines.md`.
 
 ## Publiczne API między domenami
 

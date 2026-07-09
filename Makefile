@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-all deploy-full-rsync git-deploy-alias mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-build-i mobile-copy-apk mobile-install-apk mobile-icons test test-db-setup test-db-migrate
+.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-all deploy-full-rsync git-deploy-alias mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-build-i mobile-copy-apk mobile-install-apk mobile-icons test test-fe test-all test-db-setup test-db-migrate
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
@@ -24,13 +24,16 @@ help:
 	@echo "  make cc              cache:clear"
 	@echo "  make routes          debug:router"
 	@echo "  make test            PHPUnit (APP_ENV=test, w kontenerze)"
+	@echo "  make test-fe         Vitest (frontend, w kontenerze)"
+	@echo "  make test-all        PHPUnit + Vitest"
 	@echo "  make test-db-migrate migracje na bazie samfin_test"
 	@echo "  make test-db-setup   utwórz samfin_test + migracje (jednorazowo)"
 	@echo "  (CI: .github/workflows/tests.yml — push/PR na main)"
 	@echo ""
 	@echo "Frontend:"
 	@echo "  make npm CMD=...     npm w kontenerze frontend"
-	@echo "  make build-frontend-prod  build produkcyjny frontendu"
+	@echo "  make test-fe         Vitest (npm run test)"
+	@echo "  make build-frontend-prod  test + build produkcyjny frontendu"
 	@echo "  make build-info      generuj build_info.json"
 	@echo ""
 	@echo "Deploy:"
@@ -107,6 +110,11 @@ test-db-migrate:
 test:
 	docker compose exec -e APP_ENV=test -u www-data -T app vendor/bin/phpunit
 
+test-fe:
+	docker compose exec -T -e HOME=/app -e NPM_CONFIG_CACHE=/app/.npm-cache frontend npm run test
+
+test-all: test test-fe
+
 # ── Frontend ──────────────────────────────────────────────────────────────────
 
 shell-frontend:
@@ -121,6 +129,7 @@ build-info:
 # Production frontend build (same env as deploy); run after: docker compose up -d
 build-frontend-prod:
 	docker compose exec -T -e HOME=/app -e NPM_CONFIG_CACHE=/app/.npm-cache frontend npm ci
+	docker compose exec -T -e HOME=/app frontend npm run test
 	docker compose exec -T -e HOME=/app frontend npm run build
 
 # One-time fix when frontend_node_modules volume was created as root (EACCES on npm install)

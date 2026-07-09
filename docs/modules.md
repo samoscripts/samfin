@@ -33,16 +33,23 @@ Konwencje warstw i reguły kodu: [`architecture-rules.md`](architecture-rules.md
 
 ### Home — Configuration
 
+Podmoduły (struktura katalogów = podział funkcjonalny menu):
+
+| Podmoduł | Ścieżka BE | Zawartość |
+|----------|------------|-----------|
+| **General** | `Configuration/General/*` | Słowniki: Party, Wallet, Concern, Category, PartyBankAccount, CategoryPickEvent |
+| **Rules** | `Configuration/Rules/*` | Reguły auto-klasyfikacji (`ClassificationRule` + silnik/applier) |
+
 | Kontroler | Route base | Encja |
 |-----------|------------|-------|
-| `PartyController` | `/api/parties` | Party |
-| `ClassificationRuleController` | `/api/parties/{partyId}/classification-rules` | ClassificationRule (CRUD per podmiot) |
-| `ClassificationRulesController` | `GET /api/classification-rules` | Lista wszystkich aktywnych reguł (wszystkie podmioty) |
-| `PartyBankAccountController` | `/api/party-bank-accounts` | PartyBankAccount |
-| `WalletController` | `/api/wallets` | Wallet |
-| `ConcernController` | `/api/concerns` | Concern |
-| `CategoryController` | `/api/categories` | Category |
-| `CategoryPickEventController` | `GET /api/category-pick-events/frequent`, `POST /api/category-pick-events` | Log wyborów kategorii — najczęściej wybierane (okno 90 dni, sync per user) |
+| `General/PartyController` | `/api/parties` | Party |
+| `Rules/ClassificationRuleController` | `/api/parties/{partyId}/classification-rules` | ClassificationRule (CRUD per podmiot) |
+| `Rules/ClassificationRulesController` | `GET /api/classification-rules` | Lista wszystkich aktywnych reguł (wszystkie podmioty) |
+| `General/PartyBankAccountController` | `/api/party-bank-accounts` | PartyBankAccount |
+| `General/WalletController` | `/api/wallets` | Wallet |
+| `General/ConcernController` | `/api/concerns` | Concern |
+| `General/CategoryController` | `/api/categories` | Category |
+| `General/CategoryPickEventController` | `GET /api/category-pick-events/frequent`, `POST /api/category-pick-events` | Log wyborów kategorii — najczęściej wybierane (okno 90 dni, sync per user) |
 
 Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false` (wyjątek: **kategorie** — `DELETE` na nieaktywnej kategorii usuwa rekord z bazy, ADR-035).
 
@@ -62,6 +69,8 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 |------|------|
 | `Transaction/Controller/TransactionController.php` | Lista, tworzenie ręczne, stats, klasyfikacja, bulk update, historia, apply reguł, **usuwanie** |
 | `Transaction/Controller/TransactionTemplateController.php` | `GET/POST/DELETE /api/transaction-templates` — szablony klasyfikacji per użytkownik (`?direction=INCOME\|EXPENSE`) |
+| `Transaction/FilterSaved/Controller/TransactionFilterSavedController.php` | `GET/POST/PUT/DELETE /api/transaction-filter-saved` — zapisane presety filtrów listy transakcji |
+| `Transaction/FilterSaved/Entity/TransactionFilterSaved.php` | Encja `transaction_filter_saved` (nazwa unikalna per użytkownik) |
 | `Transaction/Service/TransactionClassificationService.php` | Klasyfikacja pojedynczej transakcji |
 | `Transaction/Service/TransactionBulkUpdateService.php` | Masowa aktualizacja pól |
 | `Transaction/Service/TransactionCreateService.php` | Tworzenie transakcji ręcznych (`source: MANUAL`) |
@@ -70,7 +79,7 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 | `Transaction/Service/TransactionStatusCalculator.php` | Wspólna logika statusu klasyfikacji |
 | `Transaction/Service/TransactionPartyAssignmentValidator.php` | Walidacja Skąd/Dokąd wg reguł kontekstowych (ADR-017) |
 | `Transaction/Service/TransactionSnapshotLogService.php` | Snapshoty i historia |
-| `Transaction/ClassificationRule/*` | Reguły auto-klasyfikacji per party |
+| `Configuration/Rules/*` | Reguły auto-klasyfikacji per party (silnik, applier, CRUD) |
 | `Transaction/Repository/TransactionRepository.php` | `findPaged`, `getPeriodStats`, `findDuplicate` |
 
 **Tworzenie ręczne (ADR-019):** `POST /api/transactions` — `TransactionCreateService`; wymagane: `direction`, `transDate`, `amount`, `transDescription`; opcjonalne: `transCustomDescription`, `transTitle`, `paidFromPartyId`, `paidToPartyId`, `items[]`. UI w sidebarze listy (`?tab=create`, prefill z query); legacy `/transactions/new` → redirect.
@@ -140,7 +149,19 @@ Kontrolery dekodują JSON inline (`json_decode($request->getContent())`) i walid
 | dashboard | `dashboard/pages/Dashboard.tsx` | Karty statystyk, ostatnie transakcje |
 | transactions | `transactions/` | `Transactions.tsx`, sidebar (filtry/szczegóły/edycja/tworzenie), redirecty legacy URL |
 | import | `import/pages/` | Upload, historia, szczegóły, błędy, wiersze |
-| configuration | `configuration/` | Podmioty, portfele, dotyczy, kategorie, reguły klasyfikacji |
+| configuration | `configuration/` | Submenu: Ogólne (`general/`), Reguły (`rules/`), Dashboard (`dashboard/`) |
+
+Struktura katalogów konfiguracji (FE):
+
+```
+frontend/src/domains/home/configuration/
+├── pages/ConfigurationLayout.tsx
+├── general/
+│   ├── pages/GeneralLayout.tsx      # zakładki: Podmioty, Portfele, Dotyczy, Kategorie
+│   ├── parties/, wallets/, concerns/, categories/
+├── rules/                           # reguły klasyfikacji
+└── dashboard/pages/                 # placeholder
+```
 
 ### `domains/settings/` — ustawienia
 
@@ -307,9 +328,9 @@ Brak body. Wymaga nagłówka `Authorization: Bearer <token>`. Usuwa tylko ten to
 
 ## Moduł reguł klasyfikacji (frontend)
 
-Ścieżka: `domains/home/configuration/classification-rules/`.
+Ścieżka: `domains/home/configuration/rules/`.
 
-Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i komponenty domenowe (wzorzec jak `parties/`).
+Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i komponenty domenowe (wzorzec jak `general/parties/`).
 
 | Plik | Odpowiedzialność |
 |------|------------------|
@@ -371,7 +392,8 @@ Strona reguł została podzielona z monolitu (~637 linii) na cienką stronę i k
 | Komponent | Rola |
 |-----------|------|
 | `Transactions.tsx` | Tabela, selekcja, orchestracja panelu, nawigacja do edycji / tworzenia reguły |
-| `TransactionsSidebar` | Zakładki Filtry / Szczegóły / Edycja (bulk) |
+| `TransactionsSidebar` | Zakładki Filtry / Szczegóły / Edycja (bulk); w Filtry: podzakładki Filtry / Zapisane filtry, zapis presetu (`filterSavedId` w URL) |
+| `TransactionFiltersPanelContent` | Formularz filtrów, lista zapisanych, stopka Zapisz/Aktualizuj |
 | `TransactionDetailsPanel` | Szczegóły pojedynczej transakcji; przyciski Edytuj i Utwórz regułę |
 | `TransactionSummaryCard` | Karta transakcji (szczegóły + formularz reguły z transakcji) |
 | `TransactionEditForm.tsx` / `TransactionCreateForm.tsx` | Edycja i tworzenie w sidebarze (`?tab=edit&tx=`, `?tab=create`); szablony klasyfikacji (`TransactionTemplateBar`) |

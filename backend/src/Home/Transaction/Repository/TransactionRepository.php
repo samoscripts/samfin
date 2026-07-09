@@ -2,7 +2,7 @@
 
 namespace App\Home\Transaction\Repository;
 
-use App\Home\Configuration\Entity\Party;
+use App\Home\Configuration\General\Entity\Party;
 use App\Home\Import\Entity\CsvImportRow;
 use App\Home\Transaction\Entity\Transaction;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;

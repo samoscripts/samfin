@@ -91,6 +91,36 @@ export function getDonutSlicePaint(
   return getPaletteBarPaint(chartStyle, direction, colorIndex, fillOpacity)
 }
 
+const HEATMAP_MIN_OPACITY = 0.12
+const HEATMAP_MAX_OPACITY = 0.95
+
+/** Intensywność komórki heatmapy na bazie koloru kierunku (nie palety kategorycznej). */
+export function getHeatmapCellPaint(
+  value: number,
+  maxValue: number,
+  direction: 'INCOME' | 'EXPENSE',
+  chartStyle: ChartStyle,
+  colorIndex = 0,
+): { fill: string; fillOpacity: number } {
+  const base = getSeriesDisplayColor(chartStyle, direction, colorIndex)
+  if (maxValue <= 0 || value <= 0) {
+    return { fill: base.fill, fillOpacity: HEATMAP_MIN_OPACITY }
+  }
+  const ratio = Math.min(1, value / maxValue)
+  const fillOpacity = HEATMAP_MIN_OPACITY + ratio * (HEATMAP_MAX_OPACITY - HEATMAP_MIN_OPACITY)
+  return { fill: base.fill, fillOpacity }
+}
+
+/** Kolor słupka bilansu wg znaku netto. */
+export function getBalanceCellPaint(
+  net: number,
+  chartStyle: ChartStyle,
+  colorIndex = 0,
+): { fill: string; fillOpacity: number } {
+  const direction: 'INCOME' | 'EXPENSE' = net >= 0 ? 'INCOME' : 'EXPENSE'
+  return getSeriesDisplayColor(chartStyle, direction, colorIndex)
+}
+
 /** Zaokrąglenie tylko na zewnętrznej krawędzi pary wydatek|wpływ — wizualnie bliżej siebie. */
 export function getPairedBarRadius(
   direction: 'INCOME' | 'EXPENSE',

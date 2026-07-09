@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Api;
 
-use App\Home\Configuration\Entity\Category;
-use App\Home\Configuration\Entity\Wallet;
+use App\Home\Configuration\General\Entity\Category;
+use App\Home\Configuration\General\Entity\Wallet;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Entity\TransactionItem;
 use App\Identity\Entity\User;

@@ -2,9 +2,9 @@
 
 namespace App\Home\Transaction\Entity;
 
-use App\Home\Configuration\Entity\Category;
-use App\Home\Configuration\Entity\Concern;
-use App\Home\Configuration\Entity\Wallet;
+use App\Home\Configuration\General\Entity\Category;
+use App\Home\Configuration\General\Entity\Concern;
+use App\Home\Configuration\General\Entity\Wallet;
 use App\Home\Transaction\Repository\TransactionItemRepository;
 use App\Identity\Entity\User;
 use Doctrine\ORM\Mapping as ORM;

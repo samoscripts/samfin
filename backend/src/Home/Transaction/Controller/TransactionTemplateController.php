@@ -2,14 +2,14 @@
 
 namespace App\Home\Transaction\Controller;
 
-use App\Home\Configuration\Entity\Category;
-use App\Home\Configuration\Entity\Concern;
-use App\Home\Configuration\Entity\Party;
-use App\Home\Configuration\Entity\Wallet;
-use App\Home\Configuration\Repository\CategoryRepository;
-use App\Home\Configuration\Repository\ConcernRepository;
-use App\Home\Configuration\Repository\PartyRepository;
-use App\Home\Configuration\Repository\WalletRepository;
+use App\Home\Configuration\General\Entity\Category;
+use App\Home\Configuration\General\Entity\Concern;
+use App\Home\Configuration\General\Entity\Party;
+use App\Home\Configuration\General\Entity\Wallet;
+use App\Home\Configuration\General\Repository\CategoryRepository;
+use App\Home\Configuration\General\Repository\ConcernRepository;
+use App\Home\Configuration\General\Repository\PartyRepository;
+use App\Home\Configuration\General\Repository\WalletRepository;
 use App\Home\Transaction\Entity\Transaction;
 use App\Home\Transaction\Entity\TransactionTemplate;
 use App\Home\Transaction\Repository\TransactionTemplateRepository;

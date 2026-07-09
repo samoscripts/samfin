@@ -8,14 +8,16 @@ import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 import { fetchConcerns, type Concern } from '@/shared/api/concerns'
 import { fetchCategories, type Category } from '@/shared/api/categories'
 import { fetchParties, fetchPartiesForClassificationRules } from '@/shared/api/parties'
-import type { Party } from '@/domains/home/configuration/parties/types'
-import { canCreateRuleFromTransaction } from '@/domains/home/configuration/classification-rules/utils/ruleFromTransaction'
+import type { Party } from '@/domains/home/configuration/general/parties/types'
+import { canCreateRuleFromTransaction } from '@/domains/home/configuration/rules/utils/ruleFromTransaction'
 import type { TransactionNewUrlPrefill } from '../utils/transactionNewUrlParams'
 import SidePanelShell from '@/shared/components/panel/SidePanelShell'
 import EditBulkPanel from './EditBulkPanel'
 import TransactionDetailsPanel from './TransactionDetailsPanel'
 import TransactionMultiDetailsPanel from './TransactionMultiDetailsPanel'
-import TransactionFiltersForm from './filters/TransactionFiltersForm'
+import TransactionFiltersPanelContent, {
+  type TransactionFilterSavedPanelProps,
+} from './filters/TransactionFiltersPanelContent'
 import TransactionEditForm from './TransactionEditForm'
 import TransactionCreateForm from './TransactionCreateForm'
 import { filterPartiesForFilterPanel } from '../utils/partyAssignment'
@@ -61,6 +63,7 @@ export interface TransactionsSidebarProps {
   onApplyRules: () => void
   onApplyRulesToFilter: () => void
   onCreateRule: (tx: Transaction) => void
+  savedFilter: TransactionFilterSavedPanelProps
 }
 
 function editTabLabel(editMode: EditMode): string {
@@ -102,6 +105,7 @@ export default function TransactionsSidebar({
   onApplyRules,
   onApplyRulesToFilter,
   onCreateRule,
+  savedFilter,
 }: TransactionsSidebarProps) {
   const isMobile = useIsMobile()
   const [draft, setDraft] = useState<FlowFilters>(EMPTY_FILTERS)
@@ -238,43 +242,20 @@ export default function TransactionsSidebar({
   )
 
   const filtersContent = (
-    <>
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <TransactionFiltersForm
-          draft={draft}
-          onFieldChange={setField}
-          wallets={wallets}
-          concerns={concerns}
-          categories={categories}
-          paidFromParties={paidFromParties}
-          paidToParties={paidToParties}
-        />
-      </div>
-      <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0 flex gap-2">
-        <button
-          onClick={handleClear}
-          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          Wyczyść filtry
-        </button>
-        <button
-          onClick={handleApply}
-          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: '#1c4230' }}
-        >
-          Zastosuj filtry
-        </button>
-      </div>
-      <div className="px-5 pb-4 shrink-0">
-        <button
-          type="button"
-          onClick={onApplyRulesToFilter}
-          className="w-full px-4 py-2 rounded-lg text-sm font-medium border border-[#c9a96e]/50 text-[#8a7340] dark:text-[#c9a96e] hover:bg-[#c9a96e]/10 transition-colors"
-        >
-          Zastosuj reguły do filtra
-        </button>
-      </div>
-    </>
+    <TransactionFiltersPanelContent
+      panelOpen={open}
+      draft={draft}
+      onFieldChange={setField}
+      onApply={handleApply}
+      onClear={handleClear}
+      onApplyRulesToFilter={onApplyRulesToFilter}
+      wallets={wallets}
+      concerns={concerns}
+      categories={categories}
+      paidFromParties={paidFromParties}
+      paidToParties={paidToParties}
+      savedFilter={savedFilter}
+    />
   )
 
   const detailsList =

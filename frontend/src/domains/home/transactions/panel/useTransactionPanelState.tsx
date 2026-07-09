@@ -10,8 +10,8 @@ import { fetchWallets, type Wallet } from '@/shared/api/wallets'
 import { fetchConcerns, type Concern } from '@/shared/api/concerns'
 import { fetchCategories, type Category } from '@/shared/api/categories'
 import { fetchParties, fetchPartiesForClassificationRules } from '@/shared/api/parties'
-import type { Party } from '@/domains/home/configuration/parties/types'
-import { canCreateRuleFromTransaction } from '@/domains/home/configuration/classification-rules/utils/ruleFromTransaction'
+import type { Party } from '@/domains/home/configuration/general/parties/types'
+import { canCreateRuleFromTransaction } from '@/domains/home/configuration/rules/utils/ruleFromTransaction'
 import type { TransactionPanelTab } from './transactionPanelUrl'
 
 export interface UseTransactionPanelStateOptions {

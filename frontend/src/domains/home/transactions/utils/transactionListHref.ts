@@ -13,6 +13,7 @@ export function flowFiltersToTransactionListHref(filters: FlowFilters): string {
     tx: null,
     tab: null,
     createPrefill: {},
+    filterSavedId: null,
   })
   return `/transactions?${params.toString()}`
 }

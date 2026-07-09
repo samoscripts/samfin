@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { Party, PartyType, OwnershipType } from '@/domains/home/configuration/parties/types'
+import type { Party, PartyType, OwnershipType } from '@/domains/home/configuration/general/parties/types'
 import PartyQuickAddForm from '@/shared/components/form/PartyQuickAddForm'
 import PickerSearchField from '@/shared/components/form/PickerSearchField'
 import { btnSecondary } from '@/shared/components/form/formClasses'

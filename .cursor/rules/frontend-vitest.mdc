@@ -1,0 +1,40 @@
+---
+description: Testy Vitest frontendu (SamFin) — uruchamianie i konwencje
+alwaysApply: true
+---
+
+# Testy Vitest (frontend)
+
+Frontend ma testy jednostkowe **Vitest** (`frontend/`, pliki `src/**/*.test.ts`).
+
+## Uruchamianie
+
+Zawsze w kontenerze **`frontend`** (Node ≥ 20):
+
+```bash
+make test-fe
+# lub: make npm CMD="run test"
+```
+
+Przed deployem / po zmianach w utils migracji zapisów raportów:
+
+```bash
+make test-all    # PHPUnit + Vitest
+```
+
+**Nie** uruchamiaj `npm run test` na hoście bez Node 20 — użyj Dockera.
+
+## Kiedy uruchomić testy
+
+- Zmiana `reportSavedParams.ts`, `breakdownUrl.ts`, `trendUrl.ts` lub innej logiki serializacji URL / zapisów raportów.
+- Nowy lub zmieniony plik `*.test.ts`.
+- Przed `make deploy` / `make build-frontend-prod` (deploy uruchamia Vitest automatycznie).
+
+## Konwencje
+
+- Pliki testów: obok modułu, sufiks `.test.ts` (np. `reportSavedParams.test.ts`).
+- Środowisko: `node` (bez jsdom), konfiguracja w `vite.config.ts` → `test`.
+- `tsconfig.json` wyklucza `*.test.ts` z `tsc -b` — typy Vitest tylko w testach.
+- Nowe testy utils: import z `vitest` (`describe`, `it`, `expect`), bez DOM.
+
+Szczegóły: [`docs/ai-guidelines.md`](../docs/ai-guidelines.md#testy-vitest-frontend).

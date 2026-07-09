@@ -15,6 +15,9 @@ interface ReportSavedFormModalProps {
   initialName?: string
   initialDescription?: string
   submitLabel: string
+  nameLabel?: string
+  nameRequiredMessage?: string
+  saveErrorMessage?: string
   onSubmit: (values: ReportSavedFormValues) => Promise<void>
   onClose: () => void
 }
@@ -25,6 +28,9 @@ export default function ReportSavedFormModal({
   initialName = '',
   initialDescription = '',
   submitLabel,
+  nameLabel = 'Nazwa raportu',
+  nameRequiredMessage = 'Podaj nazwę raportu.',
+  saveErrorMessage = 'Nie udało się zapisać raportu.',
   onSubmit,
   onClose,
 }: ReportSavedFormModalProps) {
@@ -43,7 +49,7 @@ export default function ReportSavedFormModal({
   async function handleSubmit() {
     const trimmedName = name.trim()
     if (!trimmedName) {
-      setError('Podaj nazwę raportu.')
+      setError(nameRequiredMessage)
       return
     }
 
@@ -56,8 +62,8 @@ export default function ReportSavedFormModal({
       const message =
         err && typeof err === 'object' && 'response' in err
           ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message ??
-            'Nie udało się zapisać raportu.')
-          : 'Nie udało się zapisać raportu.'
+            saveErrorMessage)
+          : saveErrorMessage
       setError(message)
     } finally {
       setSaving(false)
@@ -68,7 +74,7 @@ export default function ReportSavedFormModal({
     <Modal open={open} onClose={onClose} title={title} size="md" closeDisabled={saving}>
       <div className="space-y-4">
         <label className="block text-xs text-gray-500 dark:text-gray-400">
-          Nazwa raportu
+          {nameLabel}
           <input
             type="text"
             className={[inputCls, 'mt-1'].join(' ')}

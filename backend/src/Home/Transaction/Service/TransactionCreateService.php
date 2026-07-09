@@ -74,14 +74,14 @@ class TransactionCreateService
         $paidToParty   = null;
 
         if ($paidFromPartyId !== null) {
-            $paidFromParty = $this->em->find(\App\Home\Configuration\Entity\Party::class, $paidFromPartyId);
+            $paidFromParty = $this->em->find(\App\Home\Configuration\General\Entity\Party::class, $paidFromPartyId);
             if (!$paidFromParty) {
                 throw new \InvalidArgumentException("Nie znaleziono podmiotu paidFrom id={$paidFromPartyId}.");
             }
         }
 
         if ($paidToPartyId !== null) {
-            $paidToParty = $this->em->find(\App\Home\Configuration\Entity\Party::class, $paidToPartyId);
+            $paidToParty = $this->em->find(\App\Home\Configuration\General\Entity\Party::class, $paidToPartyId);
             if (!$paidToParty) {
                 throw new \InvalidArgumentException("Nie znaleziono podmiotu paidTo id={$paidToPartyId}.");
             }

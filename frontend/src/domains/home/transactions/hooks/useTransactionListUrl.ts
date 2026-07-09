@@ -104,6 +104,7 @@ export function useTransactionListUrl() {
 
   return {
     ...urlState,
+    setSearchParams,
     applyUrl,
     setFilters,
     setSort,

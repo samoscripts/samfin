@@ -2,7 +2,7 @@
 
 namespace App\Home\Import\Service;
 
-use App\Home\Configuration\Repository\PartyBankAccountRepository;
+use App\Home\Configuration\General\Repository\PartyBankAccountRepository;
 use App\Home\Import\DTO\ImportErrorData;
 use App\Home\Import\DTO\NormalizedImportRow;
 use App\Home\Import\Entity\CsvImport;

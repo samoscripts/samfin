@@ -6,7 +6,7 @@ namespace App\Home\Transaction\Service;
 
 
 
-use App\Home\Configuration\Entity\Party;
+use App\Home\Configuration\General\Entity\Party;
 
 use App\Home\Import\DTO\ImportIngestionMode;
 
@@ -20,9 +20,9 @@ use App\Home\Import\Exception\CsvImportDuplicateRowException;
 
 use App\Home\Import\Repository\CsvImportRowRepository;
 
-use App\Home\Transaction\ClassificationRule\Service\ClassificationRuleEngine;
+use App\Home\Configuration\Rules\Service\ClassificationRuleEngine;
 
-use App\Home\Transaction\ClassificationRule\ValueObject\PreparedClassificationRules;
+use App\Home\Configuration\Rules\ValueObject\PreparedClassificationRules;
 
 use App\Home\Transaction\Entity\Transaction;
 

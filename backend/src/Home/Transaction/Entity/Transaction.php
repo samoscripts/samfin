@@ -6,7 +6,7 @@ namespace App\Home\Transaction\Entity;
 
 
 
-use App\Home\Configuration\Entity\Party;
+use App\Home\Configuration\General\Entity\Party;
 
 use App\Home\Import\Entity\CsvImport;
 

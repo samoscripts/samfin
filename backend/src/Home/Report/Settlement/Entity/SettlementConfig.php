@@ -2,8 +2,8 @@
 
 namespace App\Home\Report\Settlement\Entity;
 
-use App\Home\Configuration\Entity\Party;
-use App\Home\Configuration\Entity\Wallet;
+use App\Home\Configuration\General\Entity\Party;
+use App\Home\Configuration\General\Entity\Wallet;
 use App\Home\Report\Settlement\Repository\SettlementConfigRepository;
 use App\Identity\Entity\User;
 use Doctrine\ORM\Mapping as ORM;

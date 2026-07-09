@@ -332,6 +332,23 @@ Persystencja: `localStorage` (`fin.chartStyle`). Priorytet: URL → localStorage
 
 Implementacja: [`chartPalettes.ts`](../frontend/src/shared/components/charts/chartPalettes.ts), [`chartStyle.ts`](../frontend/src/shared/components/charts/chartStyle.ts), [`useChartStyle.ts`](../frontend/src/shared/hooks/useChartStyle.ts), [`ChartStyleSection.tsx`](../frontend/src/domains/home/reports/shared/components/ChartStyleSection.tsx).
 
+### Wspólne komponenty wykresów kierunkowych (Faza 2)
+
+Reużywalne komponenty w `frontend/src/shared/components/charts/` — fundament pod nowe typy wykresów w Trendzie (Faza 3) i Rozbiciu (Faza 4):
+
+| Komponent | Plik | Opis |
+|-----------|------|------|
+| Skojarzony (para wydatek\|wpływ) | `DirectionGroupedBarChart.tsx` | `getPairedBarRadius`, `CHART_PAIRED_BAR_GAP` |
+| Skumulowany | `DirectionStackedBarChart.tsx` | `stackId` — wydatek dół, wpływ góra |
+| Zwierciadlany | `DirectionDivergingBarChart.tsx` | Wydatek ujemny, wpływ dodatni |
+| Bilans | `DirectionBalanceBarChart.tsx` | `net = income − expenses`, kolor wg znaku |
+| Obszarowy | `DirectionAreaChart.tsx` | `AreaChart` z seriami per kierunek |
+| Heatmapa | `ChartHeatmap.tsx` | Siatka seria × okres (HTML table) |
+
+Helpery: [`buildDirectionChartSeries.ts`](../frontend/src/shared/components/charts/buildDirectionChartSeries.ts) (mapowanie Trend/Rozbicie → serie Recharts), [`directionChartTypes.ts`](../frontend/src/shared/components/charts/directionChartTypes.ts) (`DirectionChartSelection`), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts) (`getHeatmapCellPaint`, `getBalanceCellPaint`). Limit Top N: uogólnione [`limitItemsForChart`](../frontend/src/domains/home/reports/shared/utils/chartTopGroups.ts).
+
+Testy Vitest: `chartDirectionBarStyle.test.ts`, `buildDirectionChartSeries.test.ts`, `chartTopGroups.test.ts`.
+
 ### Rozbicie (`BreakdownReport.tsx`)
 
 - Filtry w URL (jak transakcje): okres, portfel, kategoria, kierunek, kwota, opis, Skąd/Dokąd (UI nie udostępnia filtra statusu).
@@ -530,7 +547,7 @@ Parametry raportu można zapisać per użytkownik i typ (`trend` | `breakdown`).
 }
 ```
 
-- `reportDirections` — tablica `EXPENSE` \| `INCOME` (zapis nowy). Stary klucz `reportDirection` (string) jest akceptowany przy wczytywaniu — migracja w [`reportSavedParams.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.ts).
+- `reportDirections` — tablica `EXPENSE` \| `INCOME` (zapis nowy). Stary klucz `reportDirection` (string) jest akceptowany przy wczytywaniu — migracja w [`reportSavedParams.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.ts). Testy: [`reportSavedParams.test.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.test.ts) (`make test-fe`).
 
 - `chartTop` — wartość wybrana przez użytkownika (clamp do liczby grup dotyczy tylko wykresu, nie zapisu).
 - `period.dateFrom` / `dateTo` — tylko przy `mode: "range"` (puste = otwarty zakres, brak klucza).

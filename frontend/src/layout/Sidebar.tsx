@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -10,7 +9,6 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   X,
   LogOut,
 } from 'lucide-react'
@@ -18,6 +16,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { useAppInfo } from '@/shared/hooks/useAppInfo'
 import AvatarDisplay from '@/shared/components/AvatarDisplay'
 import { getSidebarShellClass } from '@/shared/utils/environmentDisplay'
+import SidebarNavGroup, { type NavGroupConfig } from '@/layout/SidebarNavGroup'
 
 interface NavItem {
   to: string
@@ -26,27 +25,7 @@ interface NavItem {
   end?: boolean
 }
 
-interface NavChild {
-  to: string
-  label: string
-  end?: boolean
-}
-
-interface NavSection {
-  label?: string
-  items: NavChild[]
-}
-
-interface NavGroup {
-  id: string
-  label: string
-  icon: React.ReactNode
-  basePath: string
-  defaultTo: string
-  sections: NavSection[]
-}
-
-const REPORTS_NAV: NavGroup = {
+const REPORTS_NAV: NavGroupConfig = {
   id: 'reports',
   label: 'Raporty',
   icon: <BarChart2 size={18} />,
@@ -64,6 +43,35 @@ const REPORTS_NAV: NavGroup = {
   ],
 }
 
+const CONFIG_NAV: NavGroupConfig = {
+  id: 'config',
+  label: 'Konfiguracja',
+  icon: <SlidersHorizontal size={18} />,
+  basePath: '/konfiguracja',
+  defaultTo: '/konfiguracja/ogolne/podmioty',
+  sections: [
+    {
+      items: [
+        {
+          to: '/konfiguracja/ogolne/podmioty',
+          label: 'Ogólne',
+          isActive: (pathname) => pathname.startsWith('/konfiguracja/ogolne'),
+        },
+        {
+          to: '/konfiguracja/reguly',
+          label: 'Reguły',
+          isActive: (pathname) => pathname.startsWith('/konfiguracja/reguly'),
+        },
+        {
+          to: '/konfiguracja/dashboard',
+          label: 'Dashboard',
+          end: true,
+        },
+      ],
+    },
+  ],
+}
+
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
   { to: '/transactions', label: 'Transactions', icon: <ArrowLeftRight size={18} /> },
@@ -72,7 +80,6 @@ const NAV_ITEMS: NavItem[] = [
 
 const NAV_AFTER: NavItem[] = [
   { to: '/o-aplikacji', label: 'O aplikacji', icon: <BookOpen size={18} /> },
-  { to: '/konfiguracja', label: 'Konfiguracja', icon: <SlidersHorizontal size={18} /> },
 ]
 
 interface SidebarProps {
@@ -94,17 +101,8 @@ function SidebarNav({
   isMobile?: boolean
 }) {
   const { user, logout } = useAuth()
-  const location = useLocation()
-  const navigate = useNavigate()
   const navCollapsed = isMobile ? false : collapsed
   const isAdmin = user?.role === 'ADMIN'
-
-  const reportsActive = location.pathname.startsWith(REPORTS_NAV.basePath)
-  const [reportsOpen, setReportsOpen] = useState(reportsActive)
-
-  useEffect(() => {
-    if (reportsActive) setReportsOpen(true)
-  }, [reportsActive])
 
   const linkCls = (isActive: boolean) =>
     [
@@ -123,6 +121,14 @@ function SidebarNav({
         ? 'text-[#c9a96e] font-medium'
         : 'text-white/50 hover:text-white/80 hover:bg-white/5',
     ].join(' ')
+
+  const navGroupProps = {
+    collapsed: navCollapsed,
+    isMobile,
+    onMobileClose,
+    linkCls,
+    childLinkCls,
+  }
 
   return (
     <>
@@ -169,70 +175,8 @@ function SidebarNav({
           </NavLink>
         ))}
 
-        {/* Reports — expandable group */}
-        <div>
-          <button
-            type="button"
-            title={navCollapsed ? REPORTS_NAV.label : undefined}
-            onClick={() => {
-              if (navCollapsed) {
-                navigate(REPORTS_NAV.defaultTo)
-                if (isMobile) onMobileClose?.()
-                return
-              }
-              setReportsOpen((v) => !v)
-            }}
-            className={[
-              linkCls(reportsActive),
-              'w-full',
-              navCollapsed ? '' : 'justify-between',
-            ].join(' ')}
-            aria-expanded={reportsOpen}
-          >
-            <span className={['shrink-0 flex items-center', navCollapsed ? '' : 'gap-3'].join(' ')}>
-              <span className={reportsActive ? 'text-[#c9a96e]' : 'text-white/50'}>
-                {REPORTS_NAV.icon}
-              </span>
-              {!navCollapsed && <span className="truncate">{REPORTS_NAV.label}</span>}
-            </span>
-            {!navCollapsed && (
-              <ChevronDown
-                size={14}
-                className={[
-                  'shrink-0 text-white/40 transition-transform',
-                  reportsOpen ? 'rotate-0' : '-rotate-90',
-                ].join(' ')}
-              />
-            )}
-          </button>
-
-          {reportsOpen && !navCollapsed && (
-            <div className="mt-0.5 space-y-1">
-              {REPORTS_NAV.sections.map((section, sIdx) => (
-                <div key={sIdx}>
-                  {section.label && (
-                    <p className="pl-9 pt-1 text-[10px] uppercase tracking-wide text-white/30 font-medium">
-                      {section.label}
-                    </p>
-                  )}
-                  <div className="space-y-0.5">
-                    {section.items.map((child) => (
-                      <NavLink
-                        key={child.to}
-                        to={child.to}
-                        end={child.end}
-                        onClick={isMobile ? onMobileClose : undefined}
-                        className={({ isActive }) => childLinkCls(isActive)}
-                      >
-                        {child.label}
-                      </NavLink>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <SidebarNavGroup group={REPORTS_NAV} {...navGroupProps} />
+        <SidebarNavGroup group={CONFIG_NAV} {...navGroupProps} />
 
         {NAV_AFTER.map((item) => (
           <NavLink

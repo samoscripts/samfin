@@ -22,13 +22,16 @@ import UsersPage    from '@/domains/settings/users/pages/Users'
 import SystemSettings from '@/domains/settings/system/pages/SystemSettings'
 import BackupsSettings from '@/domains/settings/backups/pages/BackupsSettings'
 import MyAccount    from '@/domains/settings/pages/MyAccount'
-import Configuration from '@/domains/home/configuration/pages/Configuration'
-import Parties      from '@/domains/home/configuration/parties/pages/Parties'
-import Wallets      from '@/domains/home/configuration/wallets/pages/Wallets'
-import Concerns     from '@/domains/home/configuration/concerns/pages/Concerns'
-import Categories   from '@/domains/home/configuration/categories/pages/Categories'
-import { CategoriesCreateRedirect, CategoriesEditRedirect } from '@/domains/home/configuration/categories/pages/CategoriesLegacyRedirect'
-import ClassificationRules from '@/domains/home/configuration/classification-rules/pages/ClassificationRules'
+import ConfigurationLayout from '@/domains/home/configuration/pages/ConfigurationLayout'
+import { LegacyGeneralConfigRedirect } from '@/domains/home/configuration/pages/LegacyGeneralConfigRedirect'
+import GeneralLayout from '@/domains/home/configuration/general/pages/GeneralLayout'
+import Parties from '@/domains/home/configuration/general/parties/pages/Parties'
+import Wallets from '@/domains/home/configuration/general/wallets/pages/Wallets'
+import Concerns from '@/domains/home/configuration/general/concerns/pages/Concerns'
+import Categories from '@/domains/home/configuration/general/categories/pages/Categories'
+import { CategoriesCreateRedirect, CategoriesEditRedirect } from '@/domains/home/configuration/general/categories/pages/CategoriesLegacyRedirect'
+import ClassificationRules from '@/domains/home/configuration/rules/pages/ClassificationRules'
+import ConfigurationDashboard from '@/domains/home/configuration/dashboard/pages/ConfigurationDashboard'
 import ImportLayout    from '@/domains/home/import/pages/ImportLayout'
 import ImportNowy      from '@/domains/home/import/pages/ImportNowy'
 import ImportHistoria  from '@/domains/home/import/pages/ImportHistoria'
@@ -83,33 +86,42 @@ export default function AppRoutes() {
           <Route path="konto-wspolne/konfiguracja" element={<Navigate to="/raporty/settlements/settings" replace />} />
         </Route>
 
-        <Route path="konfiguracja" element={<Configuration />}>
-          <Route index element={<Navigate to="podmioty" replace />} />
-          <Route path="podmioty">
-            <Route index element={<Parties />} />
-            <Route path="nowy" element={<Parties />} />
-            <Route path=":entityId/edycja" element={<Parties />} />
-          </Route>
-          <Route path="portfele">
-            <Route index element={<Wallets />} />
-            <Route path="nowy" element={<Wallets />} />
-            <Route path=":entityId/edycja" element={<Wallets />} />
-          </Route>
-          <Route path="dotyczy">
-            <Route index element={<Concerns />} />
-            <Route path="nowy" element={<Concerns />} />
-            <Route path=":entityId/edycja" element={<Concerns />} />
-          </Route>
-          <Route path="kategorie">
-            <Route index element={<Categories />} />
-            <Route path="nowy" element={<CategoriesCreateRedirect />} />
-            <Route path=":entityId/edycja" element={<CategoriesEditRedirect />} />
+        <Route path="konfiguracja" element={<ConfigurationLayout />}>
+          <Route index element={<Navigate to="ogolne/podmioty" replace />} />
+          <Route path="ogolne" element={<GeneralLayout />}>
+            <Route index element={<Navigate to="podmioty" replace />} />
+            <Route path="podmioty">
+              <Route index element={<Parties />} />
+              <Route path="nowy" element={<Parties />} />
+              <Route path=":entityId/edycja" element={<Parties />} />
+            </Route>
+            <Route path="portfele">
+              <Route index element={<Wallets />} />
+              <Route path="nowy" element={<Wallets />} />
+              <Route path=":entityId/edycja" element={<Wallets />} />
+            </Route>
+            <Route path="dotyczy">
+              <Route index element={<Concerns />} />
+              <Route path="nowy" element={<Concerns />} />
+              <Route path=":entityId/edycja" element={<Concerns />} />
+            </Route>
+            <Route path="kategorie">
+              <Route index element={<Categories />} />
+              <Route path="nowy" element={<CategoriesCreateRedirect />} />
+              <Route path=":entityId/edycja" element={<CategoriesEditRedirect />} />
+            </Route>
           </Route>
           <Route path="reguly">
             <Route index element={<ClassificationRules />} />
             <Route path="nowy" element={<ClassificationRules />} />
             <Route path=":entityId/edycja" element={<ClassificationRules />} />
           </Route>
+          <Route path="dashboard" element={<ConfigurationDashboard />} />
+          {/* legacy redirects — słowniki przeniesione pod /ogolne */}
+          <Route path="podmioty/*" element={<LegacyGeneralConfigRedirect />} />
+          <Route path="portfele/*" element={<LegacyGeneralConfigRedirect />} />
+          <Route path="dotyczy/*" element={<LegacyGeneralConfigRedirect />} />
+          <Route path="kategorie/*" element={<LegacyGeneralConfigRedirect />} />
         </Route>
 
         <Route path="moje-konto" element={<MyAccount />} />

@@ -4,17 +4,19 @@ interface LoadedReportBannerProps {
   name: string
   description: string | null
   onRename: () => void
+  label?: string
 }
 
 export default function LoadedReportBanner({
   name,
   description,
   onRename,
+  label = 'Zaczytany raport',
 }: LoadedReportBannerProps) {
   return (
     <div className="rounded-lg border border-[#c9a96e]/40 bg-[#c9a96e]/5 px-3 py-3 space-y-2">
       <p className="text-xs font-semibold text-[#c9a96e] uppercase tracking-wide">
-        Zaczytany raport
+        {label}
       </p>
       <div className="flex gap-2 items-start">
         <input
