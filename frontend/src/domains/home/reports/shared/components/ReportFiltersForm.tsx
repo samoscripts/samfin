@@ -6,6 +6,7 @@ import type { FlowFilters } from '@/domains/home/transactions/types'
 import { FILTER_EMPTY_LABEL } from '@/domains/home/transactions/constants/labels'
 import DictionarySelect from '@/shared/components/form/DictionarySelect'
 import CategorySelect from '@/shared/components/form/CategorySelect'
+import type { BreakdownDirections } from '@/domains/home/reports/shared/types/breakdown'
 import { FieldRow, SectionLabel } from '@/shared/components/form/FormSection'
 
 export interface ReportFiltersFormProps {
@@ -15,7 +16,8 @@ export interface ReportFiltersFormProps {
   categories: Category[]
   paidFromParties: Party[]
   paidToParties: Party[]
-  reportDirection?: 'EXPENSE' | 'INCOME'
+  reportDirections?: BreakdownDirections
+  categorySelectDirection?: 'EXPENSE' | 'INCOME' | ''
 }
 
 export default function ReportFiltersForm({
@@ -25,7 +27,8 @@ export default function ReportFiltersForm({
   categories,
   paidFromParties,
   paidToParties,
-  reportDirection,
+  reportDirections,
+  categorySelectDirection,
 }: ReportFiltersFormProps) {
   const activeOnly = <T extends { active?: boolean }>(item: T) => item.active !== false
 
@@ -87,7 +90,7 @@ export default function ReportFiltersForm({
               onChange={(v) => onFieldChange('categoryId', (v as string) ?? '')}
               emptyLabel={FILTER_EMPTY_LABEL}
               valueType="string"
-              direction={reportDirection ?? ''}
+              direction={categorySelectDirection ?? reportDirections?.[0] ?? ''}
             />
           </FieldRow>
         </div>

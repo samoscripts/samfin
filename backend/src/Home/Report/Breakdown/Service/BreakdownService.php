@@ -4,7 +4,6 @@ namespace App\Home\Report\Breakdown\Service;
 
 use App\Home\Report\Breakdown\DTO\BreakdownQuery;
 use App\Home\Report\Shared\Repository\ReportItemQuery;
-use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -26,21 +25,29 @@ class BreakdownService
     ) {}
 
     /**
-     * @return array{
-     *   dateFrom: string, dateTo: string, groupBy: string, direction: string,
-     *   total: float, itemCount: int, averageAmount: float, unclassifiedAmount: float,
-     *   groups: list<array{id: ?int, name: string, amount: float, share: float, itemCount: int}>
-     * }
+     * @return array<string, mixed>
      */
     public function build(BreakdownQuery $query): array
     {
+        if ($query->hasBothDirections()) {
+            return $this->buildBothDirections($query);
+        }
+
+        return $this->buildSingleDirection($query);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSingleDirection(BreakdownQuery $query): array
+    {
         $conn = $this->em->getConnection();
-        [$conditions, $params] = $this->reportItemQuery->buildConditions($query->filters);
+        [$conditions, $params, $types] = $this->reportItemQuery->buildConditions($query->filters);
         [$join, $groupIdExpr, $groupNameExpr] = $this->groupingFor($query);
 
         if ($query->groupBy === 'categorySub' && $query->subCategoryParentId !== null) {
-            $conditions[]     = 'cat.parent_id = :subParent';
-            $params['subParent'] = (int) $query->subCategoryParentId;
+            $conditions[]          = 'cat.parent_id = :subParent';
+            $params['subParent']   = (int) $query->subCategoryParentId;
         }
 
         $where = implode("\n  AND ", $conditions);
@@ -56,7 +63,7 @@ class BreakdownService
             WHERE {$where}
         SQL;
 
-        $totals = $conn->fetchAssociative($totalsSql, $params) ?: [
+        $totals = $conn->fetchAssociative($totalsSql, $params, $types) ?: [
             'total_minor' => 0, 'item_count' => 0, 'unclassified_minor' => 0,
         ];
 
@@ -78,9 +85,8 @@ class BreakdownService
             ORDER BY amount_minor DESC
         SQL;
 
-        $rows = $conn->fetchAllAssociative($groupsSql, $params);
+        $rows = $conn->fetchAllAssociative($groupsSql, $params, $types);
 
-        $total    = self::toPln($totalMinor);
         $nullName = self::NULL_LABEL[$query->groupBy];
 
         $groups = array_map(function (array $row) use ($totalMinor, $nullName): array {
@@ -96,15 +102,116 @@ class BreakdownService
             ];
         }, $rows);
 
+        $total = self::toPln($totalMinor);
+
         return [
             'dateFrom'           => $query->dateFrom,
             'dateTo'             => $query->dateTo,
             'groupBy'            => $query->groupBy,
-            'direction'          => $query->direction,
+            'direction'          => $query->legacyDirection(),
+            'directions'         => $query->directions,
             'total'              => $total,
             'itemCount'          => $itemCount,
             'averageAmount'      => $itemCount > 0 ? round($totalMinor / $itemCount / 100, 2) : 0.0,
             'unclassifiedAmount' => self::toPln($unclassifiedMinor),
+            'groups'             => $groups,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildBothDirections(BreakdownQuery $query): array
+    {
+        $conn = $this->em->getConnection();
+        [$conditions, $params, $types] = $this->reportItemQuery->buildConditions($query->filters);
+        [$join, $groupIdExpr, $groupNameExpr] = $this->groupingFor($query);
+
+        if ($query->groupBy === 'categorySub' && $query->subCategoryParentId !== null) {
+            $conditions[]        = 'cat.parent_id = :subParent';
+            $params['subParent'] = (int) $query->subCategoryParentId;
+        }
+
+        $where = implode("\n  AND ", $conditions);
+
+        $totalsSql = <<<SQL
+            SELECT
+                COALESCE(SUM(CASE WHEN t.direction = 'EXPENSE' THEN ABS(ti.amount_minor) ELSE 0 END), 0) AS expense_minor,
+                COALESCE(SUM(CASE WHEN t.direction = 'INCOME' THEN ABS(ti.amount_minor) ELSE 0 END), 0) AS income_minor,
+                COUNT(*) AS item_count,
+                COALESCE(SUM(CASE WHEN ti.category_id IS NULL AND t.direction = 'EXPENSE' THEN ABS(ti.amount_minor) ELSE 0 END), 0) AS unclassified_minor
+            FROM transaction_items ti
+            INNER JOIN transactions t ON t.id = ti.transaction_id
+            {$join}
+            WHERE {$where}
+        SQL;
+
+        $totals = $conn->fetchAssociative($totalsSql, $params, $types) ?: [
+            'expense_minor' => 0, 'income_minor' => 0, 'item_count' => 0, 'unclassified_minor' => 0,
+        ];
+
+        $expenseMinor      = (int) $totals['expense_minor'];
+        $incomeMinor       = (int) $totals['income_minor'];
+        $itemCount         = (int) $totals['item_count'];
+        $unclassifiedMinor = (int) $totals['unclassified_minor'];
+
+        $groupsSql = <<<SQL
+            SELECT
+                {$groupIdExpr} AS group_id,
+                {$groupNameExpr} AS group_name,
+                COALESCE(SUM(CASE WHEN t.direction = 'EXPENSE' THEN ABS(ti.amount_minor) ELSE 0 END), 0) AS expense_minor,
+                COALESCE(SUM(CASE WHEN t.direction = 'INCOME' THEN ABS(ti.amount_minor) ELSE 0 END), 0) AS income_minor,
+                COUNT(*) AS item_count
+            FROM transaction_items ti
+            INNER JOIN transactions t ON t.id = ti.transaction_id
+            {$join}
+            WHERE {$where}
+            GROUP BY {$groupIdExpr}, {$groupNameExpr}
+            ORDER BY (
+                COALESCE(SUM(CASE WHEN t.direction = 'EXPENSE' THEN ABS(ti.amount_minor) ELSE 0 END), 0)
+                + COALESCE(SUM(CASE WHEN t.direction = 'INCOME' THEN ABS(ti.amount_minor) ELSE 0 END), 0)
+            ) DESC
+        SQL;
+
+        $rows     = $conn->fetchAllAssociative($groupsSql, $params, $types);
+        $nullName = self::NULL_LABEL[$query->groupBy];
+
+        $groups = array_map(function (array $row) use ($expenseMinor, $incomeMinor, $nullName): array {
+            $groupId       = $row['group_id'] !== null ? (int) $row['group_id'] : null;
+            $expenseMinorG = (int) $row['expense_minor'];
+            $incomeMinorG  = (int) $row['income_minor'];
+            $turnoverMinor = $expenseMinorG + $incomeMinorG;
+
+            return [
+                'id'          => $groupId,
+                'name'        => $groupId === null ? $nullName : (string) ($row['group_name'] ?? $nullName),
+                'expenses'    => self::toPln($expenseMinorG),
+                'income'      => self::toPln($incomeMinorG),
+                'amount'      => self::toPln($turnoverMinor),
+                'share'       => $expenseMinor > 0 ? round($expenseMinorG / $expenseMinor * 100, 1) : 0.0,
+                'shareIncome' => $incomeMinor > 0 ? round($incomeMinorG / $incomeMinor * 100, 1) : 0.0,
+                'itemCount'   => (int) $row['item_count'],
+            ];
+        }, $rows);
+
+        $expensesTotal = self::toPln($expenseMinor);
+        $incomeTotal   = self::toPln($incomeMinor);
+
+        return [
+            'dateFrom'           => $query->dateFrom,
+            'dateTo'             => $query->dateTo,
+            'groupBy'            => $query->groupBy,
+            'direction'          => $query->legacyDirection(),
+            'directions'         => $query->directions,
+            'total'              => $expensesTotal,
+            'itemCount'          => $itemCount,
+            'averageAmount'      => $itemCount > 0 ? round(($expenseMinor + $incomeMinor) / $itemCount / 100, 2) : 0.0,
+            'unclassifiedAmount' => self::toPln($unclassifiedMinor),
+            'totals'             => [
+                'expenses' => $expensesTotal,
+                'income'   => $incomeTotal,
+                'net'      => round($incomeTotal - $expensesTotal, 2),
+            ],
             'groups'             => $groups,
         ];
     }

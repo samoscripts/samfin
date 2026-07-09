@@ -25,6 +25,9 @@ class TrendController extends AbstractController
             return $this->json($query->toArray(), 422);
         }
 
-        return $this->json($this->trendService->build($query));
+        return $this->json(
+            $this->trendService->build($query),
+            context: ['json_encode_options' => \JSON_PRESERVE_ZERO_FRACTION],
+        );
     }
 }

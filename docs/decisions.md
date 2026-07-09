@@ -356,6 +356,22 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ---
 
+### ADR-P09: Rozbicie — wiele kierunków (Wpływ + Wydatek)
+
+**Status:** Przyjęte (2026-07-10) — backend + FE (Faza 1: multi-toggle, URL, zapis, KPI, tabela, drill-down).
+
+**Decyzja:** `GET /api/reports/breakdown` przyjmuje `reportDirections` (CSV), analogicznie do `trendDirections` w Trendzie. Zachowana kompatybilność: `reportDirection` (pojedynczy) i brak parametru → jeden kierunek `EXPENSE`.
+
+**Ustalenia:**
+- Przy obu kierunkach agregacja pivot (`expenses` / `income` per grupa); sortowanie grup po obrocie (`expenses + income`).
+- `share` i `shareIncome` liczone osobno względem sum wydatków i wpływów.
+- Skalar `total` w odpowiedzi przy obu kierunkach = suma wydatków (`totals.expenses`).
+- FE: multi-toggle w sidebarze, URL `reportDirections`, migracja zapisów `reportDirection` → `reportDirections`; nowe typy wykresów — Faza 4 planu.
+
+**Powód:** Porównanie wpływów i wydatków w jednym okresie bez dwóch osobnych raportów.
+
+---
+
 ### ADR-P07: Encja Budget z limitami
 
 **Propozycja:** Rozdzielić `concern` (obszar) od `budget` (kwota + okres).

@@ -41,9 +41,14 @@ import {
 import type {
   BreakdownGroup,
   BreakdownGroupBy,
-  BreakdownDirection,
+  BreakdownDirections,
   BreakdownReportData,
 } from '@/domains/home/reports/shared/types/breakdown'
+import {
+  hasBothBreakdownDirections,
+  parseBreakdownDirections,
+  serializeBreakdownDirections,
+} from '@/domains/home/reports/breakdown/utils/breakdownUrl'
 import BreakdownCharts from '@/domains/home/reports/breakdown/components/BreakdownCharts'
 import { useChartStyle } from '@/shared/hooks/useChartStyle'
 
@@ -59,23 +64,26 @@ function parseGroupBy(raw: string | null): BreakdownGroupBy {
   return 'categoryMain'
 }
 
-function parseDirection(raw: string | null): BreakdownDirection {
-  if (raw === 'INCOME' || raw === 'EXPENSE') return raw
-  return 'EXPENSE'
-}
-
-function emptyData(groupBy: BreakdownGroupBy, direction: BreakdownDirection): BreakdownReportData {
+function emptyData(groupBy: BreakdownGroupBy, directions: BreakdownDirections): BreakdownReportData {
   return {
     dateFrom: '',
     dateTo: '',
     groupBy,
-    direction,
+    direction: directions[0] ?? 'EXPENSE',
+    directions,
     total: 0,
     itemCount: 0,
     averageAmount: 0,
     unclassifiedAmount: 0,
     groups: [],
   }
+}
+
+function buildBreakdownApiDirectionParams(directions: BreakdownDirections) {
+  if (hasBothBreakdownDirections(directions)) {
+    return { reportDirections: directions.join(',') }
+  }
+  return { reportDirection: directions[0] ?? 'EXPENSE' }
 }
 
 export default function BreakdownReport() {
@@ -89,13 +97,14 @@ export default function BreakdownReport() {
   )
   const filters = useMemo(() => parseReportFlowFilters(searchParams), [searchParams])
   const groupBy = parseGroupBy(searchParams.get('groupBy'))
-  const direction = parseDirection(searchParams.get('reportDirection'))
+  const directions = useMemo(() => parseBreakdownDirections(searchParams), [searchParams])
+  const bothDirections = hasBothBreakdownDirections(directions)
   const walletId = filters.walletId ?? ''
   const categoryId = filters.categoryId ?? ''
 
   const [categories, setCategories] = useState<Category[]>([])
   const [activeChartId, setActiveChartId] = useState<string | null>(null)
-  const [data, setData] = useState<BreakdownReportData>(() => emptyData(groupBy, direction))
+  const [data, setData] = useState<BreakdownReportData>(() => emptyData(groupBy, directions))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -107,7 +116,7 @@ export default function BreakdownReport() {
     return fetchBreakdownReport({
       ...buildReportPeriodApiParams(period),
       groupBy,
-      reportDirection: direction,
+      ...buildBreakdownApiDirectionParams(directions),
       walletId: filters.walletId,
       categoryId: filters.categoryId,
       concernId: filters.concernId,
@@ -117,7 +126,7 @@ export default function BreakdownReport() {
       amountMax: filters.amountMax,
       description: filters.description,
     })
-  }, [period, groupBy, direction, filters])
+  }, [period, groupBy, directions, filters])
 
   useEffect(() => {
     let cancelled = false
@@ -130,7 +139,7 @@ export default function BreakdownReport() {
       .catch(() => {
         if (!cancelled) {
           setError('Nie udało się załadować raportu.')
-          setData(emptyData(groupBy, direction))
+          setData(emptyData(groupBy, directions))
         }
       })
       .finally(() => {
@@ -139,7 +148,7 @@ export default function BreakdownReport() {
     return () => {
       cancelled = true
     }
-  }, [loadBreakdown, groupBy, direction])
+  }, [loadBreakdown, groupBy, directions])
 
   const chartTopDisplay = useMemo(
     () => parseChartTop(searchParams.get('chartTop'), data.groups.length),
@@ -166,11 +175,11 @@ export default function BreakdownReport() {
 
   const captureParams = useCallback(
     () =>
-      captureBreakdownParams(period, groupBy, direction, chartTopSaved, {
+      captureBreakdownParams(period, groupBy, directions, chartTopSaved, {
         ...filters,
         walletId: walletId || undefined,
       }) as unknown as Record<string, unknown>,
-    [period, groupBy, direction, chartTopSaved, filters, walletId],
+    [period, groupBy, directions, chartTopSaved, filters, walletId],
   )
 
   const reportSaved = useReportSaved({
@@ -294,11 +303,14 @@ export default function BreakdownReport() {
     [patchParams, categoryId],
   )
 
-  const handleDirectionChange = useCallback(
-    (value: BreakdownDirection) => {
-      patchParams({ reportDirection: value })
+  const handleDirectionsChange = useCallback(
+    (nextDirections: BreakdownDirections) => {
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev)
+        return serializeBreakdownDirections(nextDirections, params)
+      }, { replace: true })
     },
-    [patchParams],
+    [setSearchParams],
   )
 
   const handleGroupSelect = useCallback((id: string) => {
@@ -352,16 +364,16 @@ export default function BreakdownReport() {
       onWalletChange={handleWalletChange}
       activeFilters={filters}
       onApplyFilters={applyFilters}
-      reportDirection={direction}
+      reportDirections={directions}
       chartStyle={chartStyle}
       onChartStyleChange={setChartStyle}
       extraSections={
         <>
           <ReportGroupingSection
             groupBy={groupBy}
-            direction={direction}
+            directions={directions}
             onGroupByChange={handleGroupByChange}
-            onDirectionChange={handleDirectionChange}
+            onDirectionsChange={handleDirectionsChange}
           />
           <div className="border-t border-gray-100 dark:border-gray-800" />
           <ReportChartTopSection
@@ -411,27 +423,54 @@ export default function BreakdownReport() {
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <ReportStatCard
-            label="Suma"
-            value={formatAmount(data.total)}
-            valueColor={
-              direction === 'INCOME'
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : 'text-red-600 dark:text-red-400'
-            }
-          />
-          <ReportStatCard label="Pozycji" value={String(data.itemCount)} />
-          <ReportStatCard label="Średnia" value={formatAmount(data.averageAmount)} />
-          <ReportStatCard
-            label="Bez kategorii"
-            value={formatAmount(data.unclassifiedAmount)}
-            sub={data.unclassifiedAmount > 0 ? 'Wymaga klasyfikacji' : undefined}
-            valueColor={
-              data.unclassifiedAmount > 0
-                ? 'text-amber-600 dark:text-amber-400'
-                : undefined
-            }
-          />
+          {bothDirections && data.totals ? (
+            <>
+              <ReportStatCard
+                label="Wydatki"
+                value={formatAmount(data.totals.expenses)}
+                valueColor="text-red-600 dark:text-red-400"
+              />
+              <ReportStatCard
+                label="Wpływy"
+                value={formatAmount(data.totals.income)}
+                valueColor="text-emerald-600 dark:text-emerald-400"
+              />
+              <ReportStatCard
+                label="Bilans"
+                value={formatAmount(data.totals.net)}
+                valueColor={
+                  data.totals.net >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-red-600 dark:text-red-400'
+                }
+              />
+              <ReportStatCard label="Pozycji" value={String(data.itemCount)} />
+            </>
+          ) : (
+            <>
+              <ReportStatCard
+                label="Suma"
+                value={formatAmount(data.total)}
+                valueColor={
+                  directions[0] === 'INCOME'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-red-600 dark:text-red-400'
+                }
+              />
+              <ReportStatCard label="Pozycji" value={String(data.itemCount)} />
+              <ReportStatCard label="Średnia" value={formatAmount(data.averageAmount)} />
+              <ReportStatCard
+                label="Bez kategorii"
+                value={formatAmount(data.unclassifiedAmount)}
+                sub={data.unclassifiedAmount > 0 ? 'Wymaga klasyfikacji' : undefined}
+                valueColor={
+                  data.unclassifiedAmount > 0
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : undefined
+                }
+              />
+            </>
+          )}
         </div>
 
         <BreakdownCharts
@@ -443,7 +482,7 @@ export default function BreakdownReport() {
           onRowSelect={handleRowSelect}
           onDrillDown={handleDrillDown}
           onClearSelection={handleClearChartSelection}
-          direction={direction}
+          directions={directions}
           chartStyle={chartStyle}
           dateFrom={period.dateFrom}
           dateTo={period.dateTo}

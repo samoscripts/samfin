@@ -1,6 +1,4 @@
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
   Calendar,
   CalendarDays,
   CalendarRange,
@@ -11,9 +9,14 @@ import {
   Wallet,
 } from 'lucide-react'
 import FilterSingleToggleGroup from '@/shared/components/form/FilterSingleToggleGroup'
+import FilterToggleGroup from '@/shared/components/form/FilterToggleGroup'
 import { DIRECTION_PILL } from '@/shared/constants/pillMaps'
 import type { Direction } from '@/shared/types'
-import type { BreakdownDirection, BreakdownGroupBy } from '@/domains/home/reports/shared/types/breakdown'
+import type {
+  BreakdownDirections,
+  BreakdownGroupBy,
+} from '@/domains/home/reports/shared/types/breakdown'
+import { DIRECTION_OPTIONS } from '@/domains/home/transactions/constants/labels'
 
 const PERIOD_MODE_OPTIONS = [
   { value: 'year', label: 'Roczny', icon: Calendar },
@@ -29,10 +32,10 @@ const GROUP_BY_OPTIONS = [
   { value: 'concern', label: 'Obszary', icon: Target },
 ] as const
 
-const DIRECTION_OPTIONS = [
-  { value: 'EXPENSE', label: 'Wydatki', icon: ArrowUpRight },
-  { value: 'INCOME', label: 'Przychody', icon: ArrowDownLeft },
-] as const
+const DIRECTION_OPTIONS_BREAKDOWN = DIRECTION_OPTIONS.map((option) => ({
+  ...option,
+  label: option.value === 'EXPENSE' ? 'Wydatki' : 'Przychody',
+}))
 
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -66,14 +69,14 @@ export function ReportPeriodModeToggle({
 
 export function ReportGroupingSection({
   groupBy,
-  direction,
+  directions,
   onGroupByChange,
-  onDirectionChange,
+  onDirectionsChange,
 }: {
   groupBy: BreakdownGroupBy
-  direction: BreakdownDirection
+  directions: BreakdownDirections
   onGroupByChange: (value: BreakdownGroupBy) => void
-  onDirectionChange: (value: BreakdownDirection) => void
+  onDirectionsChange: (value: BreakdownDirections) => void
 }) {
   return (
     <div className="space-y-5">
@@ -89,13 +92,15 @@ export function ReportGroupingSection({
       </SidebarSection>
 
       <SidebarSection label="Kierunek">
-        <FilterSingleToggleGroup
-          options={DIRECTION_OPTIONS}
-          value={direction}
-          onChange={(v) => onDirectionChange(v as BreakdownDirection)}
+        <FilterToggleGroup
+          options={DIRECTION_OPTIONS_BREAKDOWN}
+          value={directions}
+          onChange={(next) => {
+            if (next.length === 0) return
+            onDirectionsChange(next as BreakdownDirections)
+          }}
           variantForValue={(v) => DIRECTION_PILL[v as Direction]}
           ariaLabel="Kierunek operacji"
-          mobileIconsOnly
         />
       </SidebarSection>
     </div>

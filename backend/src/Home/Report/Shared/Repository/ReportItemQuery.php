@@ -3,6 +3,7 @@
 namespace App\Home\Report\Shared\Repository;
 
 use App\Home\Report\Shared\DTO\ReportItemFilterCriteria;
+use Doctrine\DBAL\ArrayParameterType;
 
 /**
  * Buduje wspólną część zapytań SQL agregujących pozycje transakcji
@@ -17,12 +18,13 @@ class ReportItemQuery
     private const STATUS_SQL = "t.status IN ('CLASSIFIED', 'PARTIALLY_CLASSIFIED')";
 
     /**
-     * @return array{0: list<string>, 1: array<string, mixed>}
+     * @return array{0: list<string>, 1: array<string, mixed>, 2: array<string, int|string>}
      */
     public function buildConditions(ReportItemFilterCriteria $c): array
     {
         $conditions = [self::STATUS_SQL];
         $params     = [];
+        $types      = [];
 
         if ($c->dateFrom !== null && $c->dateFrom !== '') {
             $conditions[]       = 't.trans_date >= :dateFrom';
@@ -34,7 +36,16 @@ class ReportItemQuery
             $params['dateTo'] = $c->dateTo;
         }
 
-        if ($c->direction !== null && $c->direction !== '') {
+        if ($c->directions !== null && $c->directions !== []) {
+            if (count($c->directions) === 1) {
+                $conditions[]        = 't.direction = :direction';
+                $params['direction'] = $c->directions[0];
+            } else {
+                $conditions[]         = 't.direction IN (:directions)';
+                $params['directions'] = array_values($c->directions);
+                $types['directions']  = ArrayParameterType::STRING;
+            }
+        } elseif ($c->direction !== null && $c->direction !== '') {
             $conditions[]        = 't.direction = :direction';
             $params['direction'] = $c->direction;
         }
@@ -81,7 +92,7 @@ class ReportItemQuery
             $params['description'] = '%' . trim($c->description) . '%';
         }
 
-        return [$conditions, $params];
+        return [$conditions, $params, $types];
     }
 
     private static function toMinor(string $plnValue): int

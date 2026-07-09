@@ -12,10 +12,14 @@ use Symfony\Component\HttpFoundation\InputBag;
  */
 final readonly class ReportItemFilterCriteria
 {
+    /**
+     * @param list<string>|null $directions Gdy ustawione — filtr `t.direction IN (...)` (Rozbicie).
+     */
     public function __construct(
         public ?string $dateFrom,
         public ?string $dateTo,
         public ?string $direction = null,
+        public ?array $directions = null,
         public ?string $walletId = null,
         public ?string $categoryId = null,
         public ?string $concernId = null,
@@ -68,11 +72,13 @@ final readonly class ReportItemFilterCriteria
         ?string $dateFrom,
         ?string $dateTo,
         ?string $direction,
+        ?array $directions = null,
     ): self {
         return new self(
             dateFrom: $dateFrom,
             dateTo: $dateTo,
             direction: $direction,
+            directions: $directions,
             walletId: QueryParams::nullableString($query->get('walletId')),
             categoryId: QueryParams::nullableString($query->get('categoryId')),
             concernId: QueryParams::nullableString($query->get('concernId')),

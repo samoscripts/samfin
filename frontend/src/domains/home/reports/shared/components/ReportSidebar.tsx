@@ -14,7 +14,8 @@ import ReportPeriodSection from '@/domains/home/reports/shared/components/Report
 import ReportWalletSection from '@/domains/home/reports/shared/components/ReportWalletSection'
 import type { ParsedReportPeriodState, ReportPeriodMode } from '@/domains/home/reports/shared/utils/reportPeriod'
 import { parseOptionalString } from '@/shared/utils/urlQuery'
-import type { BreakdownDirection } from '@/domains/home/reports/shared/types/breakdown'
+import type { BreakdownDirections } from '@/domains/home/reports/shared/types/breakdown'
+import { hasBothBreakdownDirections } from '@/domains/home/reports/breakdown/utils/breakdownUrl'
 import { countActiveReportFilterChips } from '@/domains/home/reports/shared/components/ReportFilterChips'
 import { useSidebarDraftSync } from '@/shared/hooks/useSidebarDraftSync'
 import type { ChartStyle } from '@/shared/components/charts/chartStyle'
@@ -105,7 +106,7 @@ interface ReportSidebarProps {
   onWalletChange: (walletId: string) => void
   activeFilters: FlowFilters
   onApplyFilters: (filters: FlowFilters) => void
-  reportDirection?: BreakdownDirection
+  reportDirections?: BreakdownDirections
   chartStyle: ChartStyle
   onChartStyleChange: (style: ChartStyle) => void
   extraSections?: ReactNode
@@ -123,7 +124,7 @@ export default function ReportSidebar({
   onWalletChange,
   activeFilters,
   onApplyFilters,
-  reportDirection,
+  reportDirections,
   chartStyle,
   onChartStyleChange,
   extraSections,
@@ -238,7 +239,12 @@ export default function ReportSidebar({
         categories={categories}
         paidFromParties={paidFromParties}
         paidToParties={paidToParties}
-        reportDirection={reportDirection}
+        reportDirections={reportDirections}
+        categorySelectDirection={
+          reportDirections && !hasBothBreakdownDirections(reportDirections)
+            ? reportDirections[0]
+            : ''
+        }
       />
     </div>
   )

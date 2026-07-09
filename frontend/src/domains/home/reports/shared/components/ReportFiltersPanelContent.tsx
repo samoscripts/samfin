@@ -11,7 +11,8 @@ import { filterPartiesForFilterPanel } from '@/domains/home/transactions/utils/p
 import ReportPeriodSection from '@/domains/home/reports/shared/components/ReportPeriodSection'
 import ReportWalletSection from '@/domains/home/reports/shared/components/ReportWalletSection'
 import type { ParsedReportPeriodState, ReportPeriodMode } from '@/domains/home/reports/shared/utils/reportPeriod'
-import type { BreakdownDirection } from '@/domains/home/reports/shared/types/breakdown'
+import type { BreakdownDirections } from '@/domains/home/reports/shared/types/breakdown'
+import { hasBothBreakdownDirections } from '@/domains/home/reports/breakdown/utils/breakdownUrl'
 import { useSidebarDraftSync } from '@/shared/hooks/useSidebarDraftSync'
 import type { ChartStyle } from '@/shared/components/charts/chartStyle'
 import ChartStyleSection from '@/domains/home/reports/shared/components/ChartStyleSection'
@@ -49,7 +50,7 @@ export interface ReportFiltersPanelContentProps {
   onWalletChange: (walletId: string) => void
   activeFilters: FlowFilters
   onApplyFilters: (filters: FlowFilters) => void
-  reportDirection?: BreakdownDirection
+  reportDirections?: BreakdownDirections
   chartStyle: ChartStyle
   onChartStyleChange: (style: ChartStyle) => void
   extraSections?: ReactNode
@@ -66,7 +67,7 @@ export default function ReportFiltersPanelContent({
   onWalletChange,
   activeFilters,
   onApplyFilters,
-  reportDirection,
+  reportDirections,
   chartStyle,
   onChartStyleChange,
   extraSections,
@@ -183,7 +184,12 @@ export default function ReportFiltersPanelContent({
         categories={categories}
         paidFromParties={paidFromParties}
         paidToParties={paidToParties}
-        reportDirection={reportDirection}
+        reportDirections={reportDirections}
+        categorySelectDirection={
+          reportDirections && !hasBothBreakdownDirections(reportDirections)
+            ? reportDirections[0]
+            : ''
+        }
       />
     </div>
   )

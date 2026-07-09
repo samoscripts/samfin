@@ -2,14 +2,14 @@ import type { FlowFilters } from '@/domains/home/transactions/types'
 import type {
   BreakdownGroup,
   BreakdownGroupBy,
-  BreakdownDirection,
+  BreakdownDirections,
 } from '@/domains/home/reports/shared/types/breakdown'
 import { CHART_OTHERS_GROUP_ID } from '@/domains/home/reports/shared/utils/chartTopGroups'
 
 export interface BreakdownDrillDownFiltersInput {
   group: BreakdownGroup
   groupBy: BreakdownGroupBy
-  direction: BreakdownDirection
+  directions: BreakdownDirections
   dateFrom: string
   dateTo: string
   reportFilters?: FlowFilters
@@ -18,7 +18,7 @@ export interface BreakdownDrillDownFiltersInput {
 export function breakdownGroupToFlowFilters({
   group,
   groupBy,
-  direction,
+  directions,
   dateFrom,
   dateTo,
   reportFilters = {},
@@ -27,7 +27,7 @@ export function breakdownGroupToFlowFilters({
     ...reportFilters,
     dateFrom,
     dateTo,
-    directions: [direction],
+    directions: [...directions],
   }
 
   const isOthers = group.id === CHART_OTHERS_GROUP_ID

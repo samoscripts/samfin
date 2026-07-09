@@ -4,7 +4,8 @@ import type { ParsedReportPeriodState } from '@/domains/home/reports/shared/util
 
 import { serializeReportPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
 
-import type { BreakdownDirection, BreakdownGroupBy } from '@/domains/home/reports/shared/types/breakdown'
+import type { BreakdownDirection, BreakdownDirections, BreakdownGroupBy } from '@/domains/home/reports/shared/types/breakdown'
+import { normalizeBreakdownDirections, serializeBreakdownDirections } from '@/domains/home/reports/breakdown/utils/breakdownUrl'
 
 import type { TrendGranularity, TrendQueryState } from '@/domains/home/reports/trend/types/trend'
 
@@ -48,7 +49,7 @@ export interface BreakdownSavedParams {
 
   groupBy: BreakdownGroupBy
 
-  reportDirection: BreakdownDirection
+  reportDirections: BreakdownDirections
 
   chartTop: number
 
@@ -128,7 +129,11 @@ export function normalizeBreakdownParams(
 
 ): BreakdownSavedParams {
 
-  const p = raw as BreakdownSavedParams
+  const p = raw as BreakdownSavedParams & { reportDirection?: BreakdownDirection }
+
+  const reportDirections = normalizeBreakdownDirections(
+    p.reportDirections ?? p.reportDirection ?? 'EXPENSE',
+  )
 
   return {
 
@@ -136,7 +141,7 @@ export function normalizeBreakdownParams(
 
     groupBy: p.groupBy ?? 'categoryMain',
 
-    reportDirection: p.reportDirection === 'INCOME' ? 'INCOME' : 'EXPENSE',
+    reportDirections,
 
     chartTop: p.chartTop ?? 5,
 
@@ -283,7 +288,7 @@ export function captureBreakdownParams(
 
   groupBy: BreakdownGroupBy,
 
-  reportDirection: BreakdownDirection,
+  reportDirections: BreakdownDirections,
 
   chartTop: number,
 
@@ -297,7 +302,7 @@ export function captureBreakdownParams(
 
     groupBy,
 
-    reportDirection,
+    reportDirections,
 
     chartTop,
 
@@ -327,7 +332,7 @@ export function applyBreakdownParams(
 
   url.set('groupBy', normalized.groupBy)
 
-  url.set('reportDirection', normalized.reportDirection)
+  serializeBreakdownDirections(normalized.reportDirections, url)
 
   url.set('chartTop', String(normalized.chartTop))
 

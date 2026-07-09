@@ -336,11 +336,12 @@ Implementacja: [`chartPalettes.ts`](../frontend/src/shared/components/charts/cha
 
 - Filtry w URL (jak transakcje): okres, portfel, kategoria, kierunek, kwota, opis, Skąd/Dokąd (UI nie udostępnia filtra statusu).
 - Przełącznik grupowania: kategorie główne / podkategorie / portfele / obszary.
-- Kierunek: wydatki / przychody.
-- KPI: suma, liczba pozycji, średnia, kwota bez kategorii.
-- Wykresy (recharts): donut + słupki poziome + tabela z udziałem %.
+- **Kierunek:** multi-toggle Wydatki / Przychody (`reportDirections` w URL; domyślnie tylko Wydatek — brak parametru). Parsowanie: [`breakdownUrl.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownUrl.ts).
+- **KPI:** przy jednym kierunku — suma, liczba pozycji, średnia, kwota bez kategorii; przy obu kierunkach — Wydatki, Wpływy, Bilans, liczba pozycji.
+- Wykresy (recharts): słupki pionowe/poziome + tabela; przy obu kierunkach wykresy pokazują **wydatki** per grupa (sortowanie po obrocie), zakładka kołowa ukryta.
+- Tabela przy obu kierunkach: kolumny Wydatek \| Wpływ \| Bilans (bez udziału %).
 - Drill-down: klik kategorii głównej → podkategorie (`groupBy=categorySub` + `categoryId`).
-- Klik grupy → panel z kompaktową tabelą transakcji (`FilteredTransactionsTable` + `useFlowsQuery`), klik wiersza → zakładka **Szczegóły** w tym samym prawym panelu (`useReportRightPanel`); link do pełnej wyszukiwarki w stopce tabeli.
+- Klik grupy → panel z kompaktową tabelą transakcji (`FilteredTransactionsTable` + `useFlowsQuery`), klik wiersza → zakładka **Szczegóły** w tym samym prawym panelu (`useReportRightPanel`); link do pełnej wyszukiwarki w stopce tabeli. Filtr kierunku w drill-down: `directions` w `FlowFilters` (oba kierunki gdy zaznaczone oba).
 
 #### API: `GET /api/reports/breakdown`
 
@@ -355,7 +356,8 @@ Parametry query:
 | `dateFrom` + `dateTo` | tak* | Zakres dat raportu (`t.trans_date`) |
 | `year` + `month` | alternatywa* | Skrót okresu — backend normalizuje do `dateFrom`/`dateTo` (jak Analytics) |
 | `groupBy` | nie | `categoryMain` (domyślnie), `categorySub`, `wallet`, `concern` |
-| `reportDirection` | nie | `EXPENSE` (domyślnie) lub `INCOME` — filtr `t.direction` |
+| `reportDirection` | nie | `EXPENSE` (domyślnie) lub `INCOME` — filtr `t.direction` (jeden kierunek; kompatybilność wsteczna) |
+| `reportDirections` | nie | CSV: `EXPENSE`, `INCOME` lub oba (np. `EXPENSE,INCOME`); ma pierwszeństwo nad `reportDirection` gdy ustawione |
 | `walletId` | nie | Zawężenie pozycji do portfela (`ti.wallet_id`) |
 | `categoryId` | nie | Przy `groupBy=categorySub` — tylko podkategorie tej kategorii głównej; przy innych `groupBy` — zawężenie pozycji do kategorii |
 | `concernId` | nie | Zawężenie Dotyczy (`ti.concern_id`) |
@@ -372,7 +374,9 @@ Parametry query:
 Reguły agregacji:
 
 - Źródło: `transaction_items ti` JOIN `transactions t` (+ słowniki wg `groupBy`).
-- Kwota pozycji: `ABS(ti.amount_minor) / 100` (2 miejsca); tylko transakcje o kierunku `reportDirection`.
+- Kwota pozycji: `ABS(ti.amount_minor) / 100` (2 miejsca); filtr kierunku z `reportDirection` lub `reportDirections`.
+- **Jeden kierunek:** zachowanie jak dotychczas (`amount`, `share` względem sumy tego kierunku).
+- **Oba kierunki (`reportDirections=EXPENSE,INCOME`):** pivot na grupę — `expenses`, `income`, `share` (udział wydatków), `shareIncome` (udział wpływów); `amount` = obrót grupy (`expenses + income`) do sortowania; `totals: { expenses, income, net }`; skalar `total` = `totals.expenses` (kompatybilność wsteczna KPI wydatków).
 - **`groupBy=categoryMain`:** grupuj po kategorii głównej — `COALESCE(category.parent_id, category.id)`; nazwa = nazwa kategorii głównej.
 - **`groupBy=categorySub`:** grupuj po `ti.category_id`. Gdy `categoryId` ustawione — tylko dzieci tej kategorii; bez `categoryId` — wszystkie podkategorie w okresie.
 - **`groupBy=wallet`:** grupuj po `ti.wallet_id`; `id=null` → „Bez portfela”.
@@ -402,16 +406,19 @@ Odpowiedź (zgodna z `BreakdownReportData` / `shared/types/breakdown.ts`):
 }
 ```
 
-- `direction` w odpowiedzi = echo `reportDirection` z zapytania.
+- `direction` w odpowiedzi = echo pierwszego kierunku z zapytania (kompatybilność wsteczna).
+- `directions` w odpowiedzi = lista kierunków z zapytania.
+- Przy obu kierunkach dodatkowo: `totals`, pola `expenses`/`income`/`shareIncome` na grupach.
 - `id` grupy: ID encji słownikowej lub `null` dla bucketów „bez wartości”.
 
 **Drill-down transakcji (FE):** klik grupy → panel z tabelą transakcji pobraną przez `GET /api/transactions` (hook `useFlowsQuery`, filtry `FlowFilters` — ten sam mechanizm co lista `/transakcje`). Mapowanie grupy: [`breakdownDrillDownFilters.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownDrillDownFilters.ts). Klik wiersza przełącza prawy panel na zakładkę **Szczegóły** (`useReportRightPanel`, URL: `panel=filters` + `tx` + `tab=details`). **Uwaga:** raport liczy na pozycjach (`ti.description`, `ABS(ti.amount_minor)`), a lista filtruje na nagłówkach (`t.amount_minor`, opis transakcji) — przy filtrach opisu/kwoty wyniki mogą się różnić od raportu. Pełną zgodność da przyszłe rozszerzenie API o filtry item-level. Grupy „Pozostałe” i „bez wartości” (`id === null`) nie mają dedykowanego filtra — tabela pokazuje okres, kierunek i filtry raportu z komunikatem.
 
 Przykłady URL FE:
 
-- Kategorie główne, wydatki: `/app/raporty/breakdown?dateFrom=2025-01-01&dateTo=2025-01-31&groupBy=categoryMain&reportDirection=EXPENSE`
-- Podkategorie Żywności: `…&groupBy=categorySub&categoryId=1&reportDirection=EXPENSE`
-- Portfele, wpływy: `…&groupBy=wallet&reportDirection=INCOME`
+- Kategorie główne, wydatki (domyślnie): `/app/raporty/breakdown?dateFrom=2025-01-01&dateTo=2025-01-31&groupBy=categoryMain`
+- Podkategorie Żywności: `…&groupBy=categorySub&categoryId=1`
+- Portfele, wpływy: `…&groupBy=wallet&reportDirections=INCOME`
+- Oba kierunki: `…&reportDirections=EXPENSE,INCOME`
 
 ### Trend (`TrendReport.tsx`)
 
@@ -517,11 +524,13 @@ Parametry raportu można zapisać per użytkownik i typ (`trend` | `breakdown`).
 {
   "period": { "mode": "range", "year": 2025, "month": 7, "quarter": 3, "dateFrom": "2025-01-01" },
   "groupBy": "categoryMain",
-  "reportDirection": "EXPENSE",
+  "reportDirections": ["EXPENSE"],
   "chartTop": 8,
   "filters": { }
 }
 ```
+
+- `reportDirections` — tablica `EXPENSE` \| `INCOME` (zapis nowy). Stary klucz `reportDirection` (string) jest akceptowany przy wczytywaniu — migracja w [`reportSavedParams.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.ts).
 
 - `chartTop` — wartość wybrana przez użytkownika (clamp do liczby grup dotyczy tylko wykresu, nie zapisu).
 - `period.dateFrom` / `dateTo` — tylko przy `mode: "range"` (puste = otwarty zakres, brak klucza).

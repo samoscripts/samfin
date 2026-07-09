@@ -9,6 +9,7 @@ import { formatAmount } from '@/shared/utils/format'
 interface BreakdownTableProps {
   groups: BreakdownGroup[]
   groupBy: BreakdownGroupBy
+  bothDirections?: boolean
   onRowSelect?: (group: BreakdownGroup) => void
   onDrillDown?: (group: BreakdownGroup) => void
   activeId?: string | null
@@ -18,6 +19,7 @@ interface BreakdownTableProps {
 export default function BreakdownTable({
   groups,
   groupBy,
+  bothDirections = false,
   onRowSelect,
   onDrillDown,
   activeId,
@@ -32,12 +34,28 @@ export default function BreakdownTable({
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
               <th className={embedded ? 'px-3 py-2.5 font-medium' : 'px-5 py-3 font-medium'}>Nazwa</th>
-              <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
-                Kwota
-              </th>
-              <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
-                Udział
-              </th>
+              {bothDirections ? (
+                <>
+                  <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
+                    Wydatek
+                  </th>
+                  <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
+                    Wpływ
+                  </th>
+                  <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
+                    Bilans
+                  </th>
+                </>
+              ) : (
+                <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
+                  Kwota
+                </th>
+              )}
+              {!bothDirections && (
+                <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
+                  Udział
+                </th>
+              )}
               <th className={[embedded ? 'px-3 py-2.5' : 'px-5 py-3', 'font-medium text-right'].join(' ')}>
                 Pozycji
               </th>
@@ -70,26 +88,57 @@ export default function BreakdownTable({
                   >
                     {group.name}
                   </td>
-                  <td
-                    className={[
-                      embedded ? 'px-3 py-2.5' : 'px-5 py-3',
-                      'text-right tabular-nums text-gray-900 dark:text-gray-100',
-                    ].join(' ')}
-                  >
-                    {formatAmount(group.amount)}
-                  </td>
-                  <td
-                    className={[
-                      embedded ? 'px-3 py-2.5' : 'px-5 py-3',
-                      'text-right tabular-nums text-gray-500 dark:text-gray-400',
-                    ].join(' ')}
-                  >
-                    {group.share.toLocaleString('pl-PL', {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                    %
-                  </td>
+                  {bothDirections ? (
+                    <>
+                      <td
+                        className={[
+                          embedded ? 'px-3 py-2.5' : 'px-5 py-3',
+                          'text-right tabular-nums text-gray-900 dark:text-gray-100',
+                        ].join(' ')}
+                      >
+                        {formatAmount(group.expenses ?? 0)}
+                      </td>
+                      <td
+                        className={[
+                          embedded ? 'px-3 py-2.5' : 'px-5 py-3',
+                          'text-right tabular-nums text-gray-900 dark:text-gray-100',
+                        ].join(' ')}
+                      >
+                        {formatAmount(group.income ?? 0)}
+                      </td>
+                      <td
+                        className={[
+                          embedded ? 'px-3 py-2.5' : 'px-5 py-3',
+                          'text-right tabular-nums text-gray-900 dark:text-gray-100',
+                        ].join(' ')}
+                      >
+                        {formatAmount((group.income ?? 0) - (group.expenses ?? 0))}
+                      </td>
+                    </>
+                  ) : (
+                    <td
+                      className={[
+                        embedded ? 'px-3 py-2.5' : 'px-5 py-3',
+                        'text-right tabular-nums text-gray-900 dark:text-gray-100',
+                      ].join(' ')}
+                    >
+                      {formatAmount(group.amount)}
+                    </td>
+                  )}
+                  {!bothDirections && (
+                    <td
+                      className={[
+                        embedded ? 'px-3 py-2.5' : 'px-5 py-3',
+                        'text-right tabular-nums text-gray-500 dark:text-gray-400',
+                      ].join(' ')}
+                    >
+                      {group.share.toLocaleString('pl-PL', {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}
+                      %
+                    </td>
+                  )}
                   <td
                     className={[
                       embedded ? 'px-3 py-2.5' : 'px-5 py-3',

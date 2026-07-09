@@ -7,6 +7,7 @@ export interface BreakdownReportParams {
   periodMode?: string
   groupBy?: string
   reportDirection?: string
+  reportDirections?: string
   walletId?: number | string
   categoryId?: number | string
   concernId?: number | string

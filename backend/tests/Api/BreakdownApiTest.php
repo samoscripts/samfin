@@ -97,6 +97,7 @@ final class BreakdownApiTest extends ApiTestCase
 
         self::assertSame('categoryMain', $data['groupBy']);
         self::assertSame('EXPENSE', $data['direction']);
+        self::assertSame(['EXPENSE'], $data['directions']);
         self::assertSame(200.0, $data['total']);
         self::assertSame(3, $data['itemCount']);
         self::assertSame(40.0, $data['unclassifiedAmount']);
@@ -176,6 +177,104 @@ final class BreakdownApiTest extends ApiTestCase
         self::assertCount(1, $nullGroup);
         self::assertSame('Bez portfela', $nullGroup[0]['name']);
         self::assertSame(30.0, $nullGroup[0]['amount']);
+    }
+
+    public function testReportDirectionsInvalidValueReturns422(): void
+    {
+        $this->createUser(apiToken: self::TEST_USER_TOKEN);
+
+        $this->requestJson(
+            'GET',
+            '/api/reports/breakdown?dateFrom=2025-01-01&dateTo=2025-01-31&reportDirections=FOO',
+            token: self::TEST_USER_TOKEN,
+        );
+
+        $this->assertJsonResponse(422);
+    }
+
+    public function testReportDirectionsBothPivotsIncomeExpense(): void
+    {
+        $user = $this->createUser(apiToken: self::TEST_USER_TOKEN);
+        $em   = static::getContainer()->get(EntityManagerInterface::class);
+
+        $food    = $this->createCategory($em, $user, 'Żywność');
+        $bread   = $this->createCategory($em, $user, 'Pieczywo', $food);
+        $veggies = $this->createCategory($em, $user, 'Warzywa', $food);
+        $salary  = $this->createCategory($em, $user, 'Wynagrodzenie');
+        $wallet  = $this->createWallet($em, $user, 'Budżet domowy');
+
+        $tx1 = $this->createTransaction($em, $user, '2025-01-05', Transaction::DIRECTION_EXPENSE);
+        $this->addItem($em, $user, $tx1, -10000, $bread, $wallet);
+        $this->addItem($em, $user, $tx1, -6000, $veggies, $wallet);
+
+        $tx2 = $this->createTransaction($em, $user, '2025-01-10', Transaction::DIRECTION_EXPENSE);
+        $this->addItem($em, $user, $tx2, -4000, null, $wallet);
+
+        $tx3 = $this->createTransaction($em, $user, '2025-01-12', Transaction::DIRECTION_INCOME);
+        $this->addItem($em, $user, $tx3, 50000, $salary, $wallet);
+
+        $em->flush();
+
+        $this->requestJson(
+            'GET',
+            '/api/reports/breakdown?dateFrom=2025-01-01&dateTo=2025-01-31&groupBy=categoryMain&reportDirections=EXPENSE,INCOME',
+            token: self::TEST_USER_TOKEN,
+        );
+
+        $data = $this->assertJsonResponse(200);
+
+        self::assertSame(['EXPENSE', 'INCOME'], $data['directions']);
+        self::assertSame(200.0, $data['total']);
+        self::assertSame(200.0, $data['totals']['expenses']);
+        self::assertSame(500.0, $data['totals']['income']);
+        self::assertSame(300.0, $data['totals']['net']);
+        self::assertSame(4, $data['itemCount']);
+
+        self::assertSame($salary->getId(), $data['groups'][0]['id']);
+        self::assertSame('Wynagrodzenie', $data['groups'][0]['name']);
+        self::assertSame(0.0, $data['groups'][0]['expenses']);
+        self::assertSame(500.0, $data['groups'][0]['income']);
+        self::assertSame(500.0, $data['groups'][0]['amount']);
+        self::assertSame(0.0, $data['groups'][0]['share']);
+        self::assertSame(100.0, $data['groups'][0]['shareIncome']);
+
+        self::assertSame($food->getId(), $data['groups'][1]['id']);
+        self::assertSame('Żywność', $data['groups'][1]['name']);
+        self::assertSame(160.0, $data['groups'][1]['expenses']);
+        self::assertSame(0.0, $data['groups'][1]['income']);
+        self::assertSame(160.0, $data['groups'][1]['amount']);
+        self::assertSame(80.0, $data['groups'][1]['share']);
+        self::assertSame(0.0, $data['groups'][1]['shareIncome']);
+    }
+
+    public function testBothDirectionsSortingByTurnover(): void
+    {
+        $user = $this->createUser(apiToken: self::TEST_USER_TOKEN);
+        $em   = static::getContainer()->get(EntityManagerInterface::class);
+
+        $food   = $this->createCategory($em, $user, 'Żywność');
+        $bread  = $this->createCategory($em, $user, 'Pieczywo', $food);
+        $salary = $this->createCategory($em, $user, 'Wynagrodzenie');
+
+        $txExpense = $this->createTransaction($em, $user, '2025-01-05', Transaction::DIRECTION_EXPENSE);
+        $this->addItem($em, $user, $txExpense, -10000, $bread);
+
+        $txIncome = $this->createTransaction($em, $user, '2025-01-06', Transaction::DIRECTION_INCOME);
+        $this->addItem($em, $user, $txIncome, 50000, $salary);
+
+        $em->flush();
+
+        $this->requestJson(
+            'GET',
+            '/api/reports/breakdown?dateFrom=2025-01-01&dateTo=2025-01-31&groupBy=categoryMain&reportDirections=EXPENSE,INCOME',
+            token: self::TEST_USER_TOKEN,
+        );
+
+        $data = $this->assertJsonResponse(200);
+
+        self::assertCount(2, $data['groups']);
+        self::assertSame($salary->getId(), $data['groups'][0]['id']);
+        self::assertSame($food->getId(), $data['groups'][1]['id']);
     }
 
     private function createCategory(
