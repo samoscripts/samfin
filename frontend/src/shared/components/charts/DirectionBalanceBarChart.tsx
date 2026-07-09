@@ -81,7 +81,6 @@ export default function DirectionBalanceBarChart({
       onMouseEnter={(entry) => {
         const row = entry as (typeof chartRows)[number]
         const net = Number(row.net ?? 0)
-        const direction = balanceDirection(net)
         setHoverPayload({ label: `${row.label} · Bilans`, value: net })
       }}
       onMouseLeave={() => {
