@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -26,8 +28,12 @@ import {
 import { chartThemeColors } from '@/shared/components/charts/chartColors'
 import { chartBarCommonProps, trendBarCellId } from '@/shared/components/charts/chartBarShared'
 import ChartHoverPanel, { type ChartHoverPayload } from '@/shared/components/charts/ChartHoverPanel'
+import ChartHeatmap from '@/shared/components/charts/ChartHeatmap'
+import { buildTrendHeatmapData } from '@/shared/components/charts/buildDirectionChartSeries'
+import type { DirectionChartSelection } from '@/shared/components/charts/directionChartTypes'
 import type {
   TrendBarSelection,
+  TrendChartType,
   TrendDirection,
   TrendReportData,
 } from '@/domains/home/reports/trend/types/trend'
@@ -43,19 +49,23 @@ export interface TrendChartLine {
   strokeDasharray?: string
   direction: TrendDirection
   seriesName: string
+  stackId?: string
 }
 
 function buildChartLines(
   data: TrendReportData,
   directions: TrendDirection[],
   chartStyle: ChartStyle,
+  chartType: TrendChartType,
 ): TrendChartLine[] {
   const lines: TrendChartLine[] = []
   const showIncome = directions.includes('INCOME')
   const showExpense = directions.includes('EXPENSE')
+  const useStack = chartType === 'stacked'
 
   if (data.seriesBy === 'none') {
     let colorIdx = 0
+    const stackId = useStack ? 'total' : undefined
     if (showExpense) {
       const { fill, fillOpacity } = getSeriesDisplayColor(chartStyle, 'EXPENSE', colorIdx)
       lines.push({
@@ -66,6 +76,7 @@ function buildChartLines(
         fillOpacity,
         direction: 'EXPENSE',
         seriesName: 'Razem',
+        stackId,
       })
     }
     if (showIncome) {
@@ -79,6 +90,7 @@ function buildChartLines(
         strokeDasharray: '6 3',
         direction: 'INCOME',
         seriesName: 'Razem',
+        stackId,
       })
     }
     return lines
@@ -86,6 +98,7 @@ function buildChartLines(
 
   const seriesList = data.points[0]?.series ?? []
   seriesList.forEach((series, index) => {
+    const stackId = useStack ? series.id : undefined
     if (showExpense) {
       const { fill, fillOpacity } = getSeriesDisplayColor(chartStyle, 'EXPENSE', index)
       lines.push({
@@ -96,6 +109,7 @@ function buildChartLines(
         fillOpacity,
         direction: 'EXPENSE',
         seriesName: series.name,
+        stackId,
       })
     }
     if (showIncome) {
@@ -109,6 +123,7 @@ function buildChartLines(
         strokeDasharray: '6 3',
         direction: 'INCOME',
         seriesName: series.name,
+        stackId,
       })
     }
   })
@@ -135,9 +150,60 @@ function buildChartRows(data: TrendReportData): Record<string, string | number>[
   })
 }
 
+function buildDivergingRows(
+  rows: Record<string, string | number>[],
+  lines: TrendChartLine[],
+): Record<string, string | number>[] {
+  const expenseKeys = new Set(
+    lines.filter((l) => l.direction === 'EXPENSE').map((l) => l.dataKey),
+  )
+  return rows.map((row) => {
+    const out = { ...row }
+    for (const key of expenseKeys) {
+      const raw = Number(row[key] ?? 0)
+      out[key] = raw > 0 ? -raw : 0
+    }
+    return out
+  })
+}
+
+function heatmapToTrendSelection(
+  selection: DirectionChartSelection,
+  data: TrendReportData,
+): TrendBarSelection {
+  const sep = selection.id.indexOf('::')
+  const seriesId = sep >= 0 ? selection.id.slice(0, sep) : selection.id
+  const period = sep >= 0 ? selection.id.slice(sep + 2) : ''
+  const dataKey =
+    data.seriesBy === 'none'
+      ? `total_${selection.direction === 'EXPENSE' ? 'expenses' : 'income'}`
+      : `${seriesId}_${selection.direction === 'EXPENSE' ? 'expenses' : 'income'}`
+
+  const point = data.points.find((p) => p.period === period)
+  const seriesName =
+    data.seriesBy === 'none'
+      ? 'Razem'
+      : (point?.series.find((s) => s.id === seriesId)?.name ?? seriesId)
+
+  const colorIndex =
+    data.seriesBy === 'none'
+      ? 0
+      : Math.max(0, data.points[0]?.series.findIndex((s) => s.id === seriesId) ?? 0)
+
+  return {
+    period,
+    periodLabel: formatTrendPeriodLabel(period),
+    dataKey,
+    seriesName,
+    direction: selection.direction,
+    amount: selection.amount,
+    colorIndex,
+  }
+}
+
 interface TrendChartProps {
   data: TrendReportData
-  chartType: 'line' | 'bar'
+  chartType: TrendChartType
   directions: TrendDirection[]
   chartStyle: ChartStyle
   activeBar?: TrendBarSelection | null
@@ -159,8 +225,8 @@ export default function TrendChart({
 
   const rows = useMemo(() => buildChartRows(data), [data])
   const lines = useMemo(
-    () => buildChartLines(data, directions, chartStyle),
-    [data, directions, chartStyle],
+    () => buildChartLines(data, directions, chartStyle, chartType),
+    [data, directions, chartStyle, chartType],
   )
   const bothDirections = directions.includes('INCOME') && directions.includes('EXPENSE')
 
@@ -171,6 +237,11 @@ export default function TrendChart({
       return true
     })
   }, [lines, directions])
+
+  const divergingRows = useMemo(
+    () => (chartType === 'diverging' ? buildDivergingRows(rows, visibleLines) : rows),
+    [chartType, rows, visibleLines],
+  )
 
   const legendSeries = useMemo<ChartLegendSeries[]>(
     () =>
@@ -203,11 +274,9 @@ export default function TrendChart({
   const periodDisplayLabel = (row: Record<string, string | number>) =>
     formatTrendPeriodLabel(String(row.period))
 
-  const handleBarClick = (
-    row: Record<string, string | number>,
-    line: TrendChartLine,
-  ) => {
-    const amount = Number(row[line.dataKey] ?? 0)
+  const handleBarClick = (row: Record<string, string | number>, line: TrendChartLine) => {
+    const raw = Number(row[line.dataKey] ?? 0)
+    const amount = chartType === 'diverging' && line.direction === 'EXPENSE' ? Math.abs(raw) : raw
     if (!onBarClick || amount <= 0) return
     onBarClick({
       period: String(row.period),
@@ -220,11 +289,9 @@ export default function TrendChart({
     })
   }
 
-  const handlePointHover = (
-    row: Record<string, string | number>,
-    line: TrendChartLine,
-  ) => {
-    const amount = Number(row[line.dataKey] ?? 0)
+  const handlePointHover = (row: Record<string, string | number>, line: TrendChartLine) => {
+    const raw = Number(row[line.dataKey] ?? 0)
+    const amount = chartType === 'diverging' && line.direction === 'EXPENSE' ? Math.abs(raw) : raw
     setHoveredCellId(trendBarCellId(String(row.period), line.dataKey))
     setHoverPayload({
       label: `${periodDisplayLabel(row)} · ${line.name}`,
@@ -236,6 +303,9 @@ export default function TrendChart({
     setHoveredCellId(null)
     setHoverPayload(null)
   }
+
+  const yTickFormatter =
+    chartType === 'diverging' ? (v: number) => `${Math.abs(v)}` : (v: number) => `${v}`
 
   const LINE_DOT_HIT_RADIUS = 8
   const LINE_DOT_VISIBLE_RADIUS = 4
@@ -262,12 +332,64 @@ export default function TrendChart({
           strokeOpacity={isHovered ? line.fillOpacity : 0}
           onMouseEnter={() => handlePointHover(payload, line)}
           onMouseLeave={clearPointHover}
+          onClick={() => handleBarClick(payload, line)}
+          className={onBarClick ? 'cursor-pointer' : undefined}
         />
       )
     }
 
+  const renderBarCells = (line: TrendChartLine) =>
+    rows.map((row) => {
+      const cellId = trendBarCellId(String(row.period), line.dataKey)
+      const paint = getTrendBarCellPaint({
+        direction: line.direction,
+        colorIndex: line.colorIndex,
+        chartStyle,
+        cellId,
+        activeCellId,
+        hoveredCellId,
+      })
+      return (
+        <Cell
+          key={cellId}
+          fill={paint.fill}
+          fillOpacity={paint.fillOpacity}
+          stroke={paint.stroke}
+          strokeWidth={paint.strokeWidth}
+        />
+      )
+    })
+
+  const barChartData = chartType === 'diverging' ? divergingRows : rows
+  const isGroupedBar = chartType === 'bar'
+
   const chartContent =
-    chartType === 'line' ? (
+    chartType === 'heatmap' ? (
+      <div className="space-y-6">
+        {directions.includes('EXPENSE') && (
+          <ChartHeatmap
+            {...buildTrendHeatmapData(data, 'EXPENSE')}
+            direction="EXPENSE"
+            chartStyle={chartStyle}
+            onCellClick={
+              onBarClick ? (sel) => onBarClick(heatmapToTrendSelection(sel, data)) : undefined
+            }
+            sectionLabel="Wydatki · heatmapa"
+          />
+        )}
+        {directions.includes('INCOME') && (
+          <ChartHeatmap
+            {...buildTrendHeatmapData(data, 'INCOME')}
+            direction="INCOME"
+            chartStyle={chartStyle}
+            onCellClick={
+              onBarClick ? (sel) => onBarClick(heatmapToTrendSelection(sel, data)) : undefined
+            }
+            sectionLabel="Wpływy · heatmapa"
+          />
+        )}
+      </div>
+    ) : chartType === 'line' ? (
       <ResponsiveContainer width="100%" height={380}>
         <LineChart data={rows} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
           <CartesianGrid stroke={theme.grid} strokeDasharray="3 3" />
@@ -290,17 +412,42 @@ export default function TrendChart({
           ))}
         </LineChart>
       </ResponsiveContainer>
+    ) : chartType === 'area' ? (
+      <ResponsiveContainer width="100%" height={380}>
+        <AreaChart data={rows} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+          <CartesianGrid stroke={theme.grid} strokeDasharray="3 3" />
+          <XAxis dataKey="label" tick={{ fill: theme.tick, fontSize: 12 }} />
+          <YAxis tick={{ fill: theme.tick, fontSize: 11 }} tickFormatter={(v) => `${v}`} />
+          <Legend content={renderLegend} />
+          {visibleLines.map((line) => (
+            <Area
+              key={line.dataKey}
+              type="monotone"
+              dataKey={line.dataKey}
+              name={line.name}
+              stroke={line.color}
+              strokeOpacity={line.fillOpacity}
+              fill={line.color}
+              fillOpacity={line.fillOpacity * 0.35}
+              strokeWidth={2}
+              strokeDasharray={line.strokeDasharray}
+              dot={renderLineDot(line)}
+              activeDot={false}
+            />
+          ))}
+        </AreaChart>
+      </ResponsiveContainer>
     ) : (
       <ResponsiveContainer width="100%" height={380}>
         <BarChart
-          data={rows}
+          data={barChartData}
           margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
-          barGap={bothDirections ? CHART_PAIRED_BAR_GAP : 4}
-          barCategoryGap={bothDirections ? '18%' : '12%'}
+          barGap={isGroupedBar && bothDirections ? CHART_PAIRED_BAR_GAP : 4}
+          barCategoryGap={isGroupedBar && bothDirections ? '18%' : '12%'}
         >
           <CartesianGrid stroke={theme.grid} strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" tick={{ fill: theme.tick, fontSize: 12 }} />
-          <YAxis tick={{ fill: theme.tick, fontSize: 11 }} tickFormatter={(v) => `${v}`} />
+          <YAxis tick={{ fill: theme.tick, fontSize: 11 }} tickFormatter={yTickFormatter} />
           <Legend content={renderLegend} />
           {visibleLines.map((line) => (
             <Bar
@@ -309,7 +456,12 @@ export default function TrendChart({
               name={line.name}
               fill={line.color}
               fillOpacity={line.fillOpacity}
-              radius={getPairedBarRadius(line.direction, bothDirections)}
+              stackId={chartType === 'stacked' ? line.stackId : undefined}
+              radius={
+                isGroupedBar
+                  ? getPairedBarRadius(line.direction, bothDirections)
+                  : [4, 4, 0, 0]
+              }
               {...chartBarCommonProps()}
               className={onBarClick ? 'cursor-pointer' : undefined}
               onClick={(row) => handleBarClick(row as Record<string, string | number>, line)}
@@ -318,37 +470,22 @@ export default function TrendChart({
               }
               onMouseLeave={clearPointHover}
             >
-              {rows.map((row) => {
-                const cellId = trendBarCellId(String(row.period), line.dataKey)
-                const paint = getTrendBarCellPaint({
-                  direction: line.direction,
-                  colorIndex: line.colorIndex,
-                  chartStyle,
-                  cellId,
-                  activeCellId,
-                  hoveredCellId,
-                })
-                return (
-                  <Cell
-                    key={cellId}
-                    fill={paint.fill}
-                    fillOpacity={paint.fillOpacity}
-                    stroke={paint.stroke}
-                    strokeWidth={paint.strokeWidth}
-                  />
-                )
-              })}
+              {renderBarCells(line)}
             </Bar>
           ))}
         </BarChart>
       </ResponsiveContainer>
     )
 
+  const emptyLabel =
+    chartType === 'line' || chartType === 'area'
+      ? 'Najedź na punkt'
+      : chartType === 'heatmap'
+        ? 'Najedź na komórkę'
+        : 'Najedź na słupek'
+
   return (
-    <ChartHoverPanel
-      payload={hoverPayload}
-      emptyLabel={chartType === 'line' ? 'Najedź na punkt' : 'Najedź na słupek'}
-    >
+    <ChartHoverPanel payload={chartType === 'heatmap' ? null : hoverPayload} emptyLabel={emptyLabel}>
       {chartContent}
     </ChartHoverPanel>
   )

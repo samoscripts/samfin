@@ -204,6 +204,7 @@ Uruchomienie: `make test-fe` (kontener `frontend`, Node ≥ 20). Pełny zestaw: 
 - **Deploy / build prod:** `scripts/deploy.sh` i `make build-frontend-prod` uruchamiają `npm run test` przed `npm run build`.
 - Pierwszy zestaw: migracja zapisów raportów Rozbicie — [`reportSavedParams.test.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.test.ts) (`reportDirection` → `reportDirections`).
 - Faza 2 (wykresy): [`chartDirectionBarStyle.test.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.test.ts), [`buildDirectionChartSeries.test.ts`](../frontend/src/shared/components/charts/buildDirectionChartSeries.test.ts), [`chartTopGroups.test.ts`](../frontend/src/domains/home/reports/shared/utils/chartTopGroups.test.ts).
+- Faza 3 (Trend): [`trendChartType.test.ts`](../frontend/src/domains/home/reports/trend/utils/trendChartType.test.ts), [`trendChartData.test.ts`](../frontend/src/domains/home/reports/trend/utils/trendChartData.test.ts).
 
 Reguła Cursor: `.cursor/rules/frontend-vitest.mdc`.
 

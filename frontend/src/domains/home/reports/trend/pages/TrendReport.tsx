@@ -35,6 +35,8 @@ import {
 
 import TrendChart from '@/domains/home/reports/trend/components/TrendChart'
 
+import TrendChartTypeTabs from '@/domains/home/reports/trend/components/TrendChartTypeTabs'
+
 import TrendFilterChips from '@/domains/home/reports/trend/components/TrendFilterChips'
 
 import TrendGranularityTabs from '@/domains/home/reports/trend/components/TrendGranularityTabs'
@@ -45,12 +47,32 @@ import { fetchTrendReport, type TrendReportParams } from '@/shared/api/trend'
 
 import type {
   TrendBarSelection,
+  TrendChartType,
   TrendGranularity,
   TrendQueryState,
   TrendReportData,
 } from '@/domains/home/reports/trend/types/trend'
 
 import { trendGranularityLabel } from '@/domains/home/reports/trend/utils/trendGranularity'
+
+import {
+  countTrendSeries,
+  limitTrendReportSeries,
+} from '@/domains/home/reports/trend/utils/trendChartData'
+
+import {
+  parseTrendChartType,
+  resolveTrendChartType,
+  serializeTrendChartType,
+  trendChartTypeSupportsSelection,
+} from '@/domains/home/reports/trend/utils/trendChartType'
+
+import ReportChartTopSection from '@/domains/home/reports/shared/components/ReportChartTopSection'
+
+import {
+  parseChartTop,
+  parseChartTopRaw,
+} from '@/domains/home/reports/shared/utils/chartTopGroups'
 
 import {
 
@@ -152,7 +174,17 @@ export default function TrendReport() {
 
   )
 
-  const chartType = searchParams.get('chart') === 'line' ? 'line' : 'bar'
+  const chartTypeRaw = parseTrendChartType(searchParams.get('chart'))
+
+  const effectiveChartType = useMemo(
+    () => resolveTrendChartType(chartTypeRaw, trendQuery.directions, trendQuery.seriesBy),
+    [chartTypeRaw, trendQuery.directions, trendQuery.seriesBy],
+  )
+
+  const chartTopSaved = useMemo(
+    () => parseChartTopRaw(searchParams.get('chartTop')),
+    [searchParams],
+  )
 
   const reportSavedId = searchParams.get(REPORT_SAVED_ID_PARAM)
 
@@ -169,8 +201,11 @@ export default function TrendReport() {
 
   const captureParams = useCallback(
     () =>
-      captureTrendParams(period, trendQuery, chartType) as unknown as Record<string, unknown>,
-    [period, trendQuery, chartType],
+      captureTrendParams(period, trendQuery, effectiveChartType, chartTopSaved) as unknown as Record<
+        string,
+        unknown
+      >,
+    [period, trendQuery, effectiveChartType, chartTopSaved],
   )
 
   const reportSaved = useReportSaved({
@@ -266,6 +301,26 @@ export default function TrendReport() {
 
 
 
+  const seriesCount = useMemo(() => countTrendSeries(data), [data])
+
+  const chartTopDisplay = useMemo(
+    () => parseChartTop(searchParams.get('chartTop'), seriesCount),
+    [searchParams, seriesCount],
+  )
+
+  const chartData = useMemo(() => {
+    if (trendQuery.seriesBy === 'none') return data
+    return limitTrendReportSeries(data, chartTopDisplay, trendQuery.directions).data
+  }, [data, trendQuery.seriesBy, trendQuery.directions, chartTopDisplay])
+
+  useEffect(() => {
+    if (effectiveChartType === chartTypeRaw) return
+    setSearchParams(
+      (prev) => serializeTrendChartType(effectiveChartType, new URLSearchParams(prev)),
+      { replace: true },
+    )
+  }, [effectiveChartType, chartTypeRaw, setSearchParams])
+
   useEffect(() => {
 
     setBarSelection(null)
@@ -282,7 +337,9 @@ export default function TrendReport() {
 
     trendFilterSignature,
 
-    chartType,
+    effectiveChartType,
+
+    chartTopDisplay,
 
   ])
 
@@ -416,25 +473,26 @@ export default function TrendReport() {
 
 
 
-  const toggleChart = useCallback(
-
-    (type: 'line' | 'bar') => {
-
-      setSearchParams((prev) => {
-
-        const params = new URLSearchParams(prev)
-
-        if (type === 'line') params.set('chart', 'line')
-        else params.delete('chart')
-
-        return params
-
-      }, { replace: true })
-
+  const setChartType = useCallback(
+    (type: TrendChartType) => {
+      setSearchParams(
+        (prev) => serializeTrendChartType(type, new URLSearchParams(prev)),
+        { replace: true },
+      )
     },
-
     [setSearchParams],
+  )
 
+  const handleChartTopChange = useCallback(
+    (next: number) => {
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev)
+        params.set('chartTop', String(next))
+        return params
+      }, { replace: true })
+      setBarSelection(null)
+    },
+    [setSearchParams],
   )
 
 
@@ -529,41 +587,12 @@ export default function TrendReport() {
 
         <div className="flex flex-wrap items-center gap-3">
 
-          <div className="flex gap-1.5">
-
-            {(['line', 'bar'] as const).map((type) => (
-
-              <button
-
-                key={type}
-
-                type="button"
-
-                onClick={() => toggleChart(type)}
-
-                className={[
-
-                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-
-                  chartType === type
-
-                    ? 'bg-[#163526] text-white dark:bg-[#c9a96e] dark:text-[#163526]'
-
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
-
-                ].join(' ')}
-
-              >
-
-                {type === 'line' ? 'Liniowy' : 'Słupkowy'}
-
-              </button>
-
-            ))}
-
-          </div>
-
-
+          <TrendChartTypeTabs
+            value={effectiveChartType}
+            directions={trendQuery.directions}
+            seriesBy={trendQuery.seriesBy}
+            onChange={setChartType}
+          />
 
           <TrendGranularityTabs
 
@@ -575,7 +604,24 @@ export default function TrendReport() {
 
           />
 
+          {trendQuery.seriesBy !== 'none' && (
+            <div className="w-full sm:w-auto sm:ml-auto">
+              <ReportChartTopSection
+                value={chartTopDisplay}
+                groupCount={seriesCount}
+                onChange={handleChartTopChange}
+              />
+            </div>
+          )}
+
         </div>
+
+        {seriesCount > 8 && (
+          <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg px-3 py-2">
+            Wykres może być nieczytelny przy {seriesCount} seriach — rozważ zawężenie wyboru lub
+            zmniejszenie Top na wykresie.
+          </p>
+        )}
 
 
 
@@ -593,9 +639,9 @@ export default function TrendReport() {
 
           <TrendChart
 
-            data={data}
+            data={chartData}
 
-            chartType={chartType}
+            chartType={effectiveChartType}
 
             directions={trendQuery.directions}
 
@@ -603,13 +649,15 @@ export default function TrendReport() {
 
             activeBar={barSelection}
 
-            onBarClick={chartType === 'bar' ? handleBarClick : undefined}
+            onBarClick={
+              trendChartTypeSupportsSelection(effectiveChartType) ? handleBarClick : undefined
+            }
 
           />
 
 
 
-          {chartType === 'bar' && (
+          {trendChartTypeSupportsSelection(effectiveChartType) && (
 
             <TrendPeriodTransactions
 

@@ -447,7 +447,9 @@ Przykłady URL FE:
   - tryb **miesiąc** / **kwartał** — brak wyboru (miesięczne kubełki w kwartale);
   - tryb **rok** — Miesięczny \| Kwartalny (`trendGranularity`);
   - tryb **zakres dat** — Miesięczny \| Kwartalny \| Roczny.
-- **Wykres:** **słupkowy domyślnie** (`?chart=line` dla liniowego); stały panel wartości w prawym górnym rogu wykresu ([`ChartHoverPanel.tsx`](../frontend/src/shared/components/charts/ChartHoverPanel.tsx)) — bez tooltipu zasłaniającego wykres (Trend + Rozbicie).
+- **Wykres:** typ w URL `chart` — domyślnie **słupkowy** (brak parametru); dostępne: `line`, `bar`, `stacked`, `area`, `diverging`, `heatmap` ([`trendChartType.ts`](../frontend/src/domains/home/reports/trend/utils/trendChartType.ts)). Skumulowany i zwierciadlany wymagają obu kierunków; heatmapa wymaga `trendSeriesBy≠none`. Auto-fallback do `bar` gdy typ niedostępny.
+- **Top serii** (`chartTop` w URL): przy porównaniu serii — limit Top N + „Pozostałe” ([`trendChartData.ts`](../frontend/src/domains/home/reports/trend/utils/trendChartData.ts)); ostrzeżenie UX przy >8 seriach.
+- Stały panel wartości w prawym górnym rogu wykresu ([`ChartHoverPanel.tsx`](../frontend/src/shared/components/charts/ChartHoverPanel.tsx)) — bez tooltipu zasłaniającego wykres (Trend + Rozbicie).
 - **Schemat kolorów:** globalny `chartStyle` (patrz wyżej); przy obu kierunkach — para słupków wydatek\|wpływ stykająca się.
 - Klik pojedynczego słupka (okres + seria) → panel z tabelą transakcji pod wykresem (ten sam `FilteredTransactionsTable` + `useReportRightPanel` co Rozbicie); wspólny styl słupków ([`chartBarShared.ts`](../frontend/src/shared/components/charts/chartBarShared.ts), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts)).
 
@@ -557,13 +559,15 @@ Parametry raportu można zapisać per użytkownik i typ (`trend` | `breakdown`).
 ```json
 {
   "period": { "mode": "range", "year": 2025, "month": 7, "quarter": 3 },
-  "chartType": "line",
+  "chartType": "stacked",
+  "chartTop": 8,
   "granularity": "quarter",
-  "query": { "seriesBy": "none", "directions": ["EXPENSE"], "granularity": "quarter", "terms": [], "categoryIds": [], "walletIds": [], "concernIds": [], "narrow": { } }
+  "query": { "seriesBy": "category", "directions": ["EXPENSE", "INCOME"], "granularity": "quarter", "terms": [], "categoryIds": ["1", "2"], "walletIds": [], "concernIds": [], "narrow": { } }
 }
 ```
 
-- `chartType` — `line` | `bar` (przyciski Liniowy / Słupkowy na stronie raportu).
+- `chartType` — `line` | `bar` | `stacked` | `area` | `diverging` | `heatmap` (odzwierciedlenie URL `chart=`).
+- `chartTop` — limit serii na wykresie (gdy `seriesBy≠none`; clamp tylko w UI).
 - `granularity` — `month` | `quarter` | `year` (przyciski podziału czasu; przy `month`/`quarter` okresu implicit `month`).
 - Stary format `chart: "line"` jest akceptowany przy wczytywaniu (migracja do `chartType`).
 

@@ -6,6 +6,8 @@ export type TrendGranularity = 'month' | 'quarter' | 'year'
 
 export type TrendDirection = 'EXPENSE' | 'INCOME'
 
+export type TrendChartType = 'line' | 'bar' | 'stacked' | 'area' | 'diverging' | 'heatmap'
+
 export interface TrendSeriesPoint {
   id: string
   name: string

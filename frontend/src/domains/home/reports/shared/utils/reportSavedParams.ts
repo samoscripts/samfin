@@ -7,7 +7,8 @@ import { serializeReportPeriodState } from '@/domains/home/reports/shared/utils/
 import type { BreakdownDirection, BreakdownDirections, BreakdownGroupBy } from '@/domains/home/reports/shared/types/breakdown'
 import { normalizeBreakdownDirections, serializeBreakdownDirections } from '@/domains/home/reports/breakdown/utils/breakdownUrl'
 
-import type { TrendGranularity, TrendQueryState } from '@/domains/home/reports/trend/types/trend'
+import type { TrendGranularity, TrendChartType, TrendQueryState } from '@/domains/home/reports/trend/types/trend'
+import { parseTrendChartType, serializeTrendChartType } from '@/domains/home/reports/trend/utils/trendChartType'
 
 import { implicitTrendGranularity } from '@/domains/home/reports/trend/utils/trendGranularity'
 
@@ -65,9 +66,11 @@ export interface TrendSavedParams {
 
   query: TrendQueryState
 
-  chartType: 'line' | 'bar'
+  chartType: TrendChartType
 
   granularity: TrendGranularity
+
+  chartTop: number
 
 }
 
@@ -192,9 +195,10 @@ export function normalizeTrendParams(raw: TrendSavedParams | Record<string, unkn
 
   const period = normalizePeriodSnapshot(p.period ?? { mode: 'month', year: 2025, month: 1, quarter: 1 })
 
-  const chartType: 'line' | 'bar' =
-
-    p.chartType === 'line' || p.chart === 'line' ? 'line' : 'bar'
+  const chartType: TrendChartType =
+    parseTrendChartType(
+      typeof p.chartType === 'string' ? p.chartType : p.chart === 'line' ? 'line' : null,
+    )
 
   const queryRaw = (p.query ?? {}) as TrendQueryState
 
@@ -202,7 +206,7 @@ export function normalizeTrendParams(raw: TrendSavedParams | Record<string, unkn
 
   const query = normalizeTrendQuery(queryRaw, granularity)
 
-  return { period, chartType, granularity, query }
+  return { period, chartType, granularity, query, chartTop: p.chartTop ?? 5 }
 
 }
 
@@ -352,7 +356,9 @@ export function captureTrendParams(
 
   query: TrendQueryState,
 
-  chartType: 'line' | 'bar',
+  chartType: TrendChartType,
+
+  chartTop: number,
 
 ): TrendSavedParams {
 
@@ -363,6 +369,8 @@ export function captureTrendParams(
     period: capturePeriodSnapshot(period),
 
     chartType,
+
+    chartTop,
 
     granularity,
 
@@ -410,9 +418,9 @@ export function applyTrendParams(
 
   url = serializeTrendQueryState(query, url, normalized.period.mode)
 
-  if (normalized.chartType === 'line') url.set('chart', 'line')
+  serializeTrendChartType(normalized.chartType, url)
 
-  else url.delete('chart')
+  url.set('chartTop', String(normalized.chartTop))
 
   if (reportSavedId != null) url.set(REPORT_SAVED_ID_PARAM, String(reportSavedId))
 
