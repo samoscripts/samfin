@@ -354,11 +354,12 @@ Testy Vitest: `chartDirectionBarStyle.test.ts`, `buildDirectionChartSeries.test.
 - Filtry w URL (jak transakcje): okres, portfel, kategoria, kierunek, kwota, opis, Skąd/Dokąd (UI nie udostępnia filtra statusu).
 - Przełącznik grupowania: kategorie główne / podkategorie / portfele / obszary.
 - **Kierunek:** multi-toggle Wydatki / Przychody (`reportDirections` w URL; domyślnie tylko Wydatek — brak parametru). Parsowanie: [`breakdownUrl.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownUrl.ts).
+- **Typ wykresu:** URL `breakdownChart=` (domyślnie `vertical` przy jednym kierunku, `stacked` przy obu); koercja przy zmianie kierunku — [`breakdownChartType.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownChartType.ts).
 - **KPI:** przy jednym kierunku — suma, liczba pozycji, średnia, kwota bez kategorii; przy obu kierunkach — Wydatki, Wpływy, Bilans, liczba pozycji.
-- Wykresy (recharts): słupki pionowe/poziome + tabela; przy obu kierunkach wykresy pokazują **wydatki** per grupa (sortowanie po obrocie), zakładka kołowa ukryta.
+- **Wykresy:** przy jednym kierunku — słupkowy pionowy/poziomy, kołowy, tabela; przy obu — skumulowany, skojarzony, zwierciadlany, bilans, tabela (komponenty Fazy 2: `DirectionStackedBarChart`, `DirectionGroupedBarChart`, `DirectionDivergingBarChart`, `DirectionBalanceBarChart`).
 - Tabela przy obu kierunkach: kolumny Wydatek \| Wpływ \| Bilans (bez udziału %).
 - Drill-down: klik kategorii głównej → podkategorie (`groupBy=categorySub` + `categoryId`).
-- Klik grupy → panel z kompaktową tabelą transakcji (`FilteredTransactionsTable` + `useFlowsQuery`), klik wiersza → zakładka **Szczegóły** w tym samym prawym panelu (`useReportRightPanel`); link do pełnej wyszukiwarki w stopce tabeli. Filtr kierunku w drill-down: `directions` w `FlowFilters` (oba kierunki gdy zaznaczone oba).
+- Klik grupy → panel transakcji; klik **segmentu** wykresu (wydatek/wpływ) → filtr jednego kierunku w drill-down; klik **wiersza tabeli** → oba kierunki gdy zaznaczone w raporcie.
 
 #### API: `GET /api/reports/breakdown`
 
@@ -384,7 +385,7 @@ Parametry query:
 
 \*Jeden spójny sposób okresu — jak `GET /api/reports/analytics`. Frontend zawsze wysyła wyliczone `dateFrom`/`dateTo` z `reportPeriod.ts`.
 
-**Nie w API (tylko FE):** `chartTop` — limit wykresu („Top N” + „Pozostałe”) liczy frontend z pełnej listy `groups`.
+**Nie w API (tylko FE):** `chartTop` — limit wykresu („Top N” + „Pozostałe”) liczy frontend z pełnej listy `groups`; `breakdownChart` — typ widoku wykresu/tabeli (jak `chart` w Trendzie).
 
 **Status transakcji:** UI nie udostępnia filtra statusu. Backend uwzględnia pozycje transakcji ze `status IN ('CLASSIFIED', 'PARTIALLY_CLASSIFIED')`.
 
@@ -436,6 +437,8 @@ Przykłady URL FE:
 - Podkategorie Żywności: `…&groupBy=categorySub&categoryId=1`
 - Portfele, wpływy: `…&groupBy=wallet&reportDirections=INCOME`
 - Oba kierunki: `…&reportDirections=EXPENSE,INCOME`
+- Skumulowany (domyślny przy obu): `…&reportDirections=EXPENSE,INCOME` (bez `breakdownChart`)
+- Zwierciadlany: `…&reportDirections=EXPENSE,INCOME&breakdownChart=diverging`
 
 ### Trend (`TrendReport.tsx`)
 
@@ -545,9 +548,12 @@ Parametry raportu można zapisać per użytkownik i typ (`trend` | `breakdown`).
   "groupBy": "categoryMain",
   "reportDirections": ["EXPENSE"],
   "chartTop": 8,
+  "breakdownChart": "vertical",
   "filters": { }
 }
 ```
+
+- `breakdownChart` — `vertical` \| `horizontal` \| `donut` \| `stacked` \| `grouped` \| `diverging` \| `balance` \| `table` (odzwierciedlenie URL `breakdownChart=`; domyślny klucz może być pominięty w URL).
 
 - `reportDirections` — tablica `EXPENSE` \| `INCOME` (zapis nowy). Stary klucz `reportDirection` (string) jest akceptowany przy wczytywaniu — migracja w [`reportSavedParams.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.ts). Testy: [`reportSavedParams.test.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.test.ts) (`make test-fe`).
 

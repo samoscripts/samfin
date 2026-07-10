@@ -4,6 +4,16 @@ export type BreakdownDirection = 'EXPENSE' | 'INCOME'
 
 export type BreakdownDirections = BreakdownDirection[]
 
+export type BreakdownChartTab =
+  | 'vertical'
+  | 'horizontal'
+  | 'donut'
+  | 'stacked'
+  | 'grouped'
+  | 'diverging'
+  | 'balance'
+  | 'table'
+
 export interface BreakdownTotals {
   expenses: number
   income: number

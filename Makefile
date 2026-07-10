@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help up down build restart logs shell sf npm migrate cc fix-frontend-node-modules build-info build-frontend-prod deploy deploy-all deploy-full-rsync git-deploy-alias mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-build-i mobile-copy-apk mobile-install-apk mobile-icons test test-fe test-all test-db-setup test-db-migrate
+.PHONY: help up down build restart logs shell sf npm migrate cc sync fix-frontend-node-modules build-info build-frontend-prod deploy deploy-all deploy-full-rsync git-deploy-alias mobile-install mobile-sync mobile-open mobile-doctor mobile-setup-android mobile-build-apk mobile-build mobile-build-i mobile-copy-apk mobile-install-apk mobile-icons test test-fe test-all test-db-setup test-db-migrate
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ help:
 	@echo "  make sf CMD=...      php bin/console ..."
 	@echo "  make composer-install  composer install w kontenerze"
 	@echo "  make cc              cache:clear"
+	@echo "  make sync            po git pull: composer + cache + migracje"
 	@echo "  make routes          debug:router"
 	@echo "  make test            PHPUnit (APP_ENV=test, w kontenerze)"
 	@echo "  make test-fe         Vitest (frontend, w kontenerze)"
@@ -90,6 +91,8 @@ composer-install:
 
 cc:
 	docker compose exec app php bin/console cache:clear
+
+sync: composer-install cc migrate
 
 sf:
 	docker compose exec app php bin/console $(CMD)

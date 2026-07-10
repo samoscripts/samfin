@@ -10,6 +10,7 @@ export interface BreakdownDrillDownFiltersInput {
   group: BreakdownGroup
   groupBy: BreakdownGroupBy
   directions: BreakdownDirections
+  drillDownDirections?: BreakdownDirections
   dateFrom: string
   dateTo: string
   reportFilters?: FlowFilters
@@ -19,6 +20,7 @@ export function breakdownGroupToFlowFilters({
   group,
   groupBy,
   directions,
+  drillDownDirections,
   dateFrom,
   dateTo,
   reportFilters = {},
@@ -27,7 +29,7 @@ export function breakdownGroupToFlowFilters({
     ...reportFilters,
     dateFrom,
     dateTo,
-    directions: [...directions],
+    directions: [...(drillDownDirections ?? directions)],
   }
 
   const isOthers = group.id === CHART_OTHERS_GROUP_ID

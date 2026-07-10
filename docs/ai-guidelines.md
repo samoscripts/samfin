@@ -157,10 +157,25 @@ Przed utworzeniem lub edycją pliku w `backend/migrations/` — [database.md —
 
 ---
 
+## Po aktualizacji kodu (dev)
+
+Po `git pull` / merge / rebase uruchom (kontenery muszą działać):
+
+```bash
+make sync
+```
+
+Skład: `composer install` + `cache:clear` + `migrate`. Bez tego po refaktorze ścieżek PHP typowy jest 500 (`LoaderLoadException`, stara ścieżka kontrolera w cache). Reguła Cursor: `.cursor/rules/dev-sync.mdc`.
+
+Weryfikacja: `curl http://localhost:3001/api/health` lub `make routes`.
+
+---
+
 ## Komendy przydatne w dev
 
 ```bash
 make up              # Docker
+make sync            # Po git pull (composer + cache + migracje)
 make migrate         # Migracje DB (w kontenerze, użytkownik www-data)
 make shell           # Bash w kontenerze PHP
 make sf CMD="debug:router"   # Lista tras

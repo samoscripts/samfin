@@ -1,0 +1,54 @@
+---
+description: Sync dev po git pull — composer, cache Symfony, migracje (SamFin)
+alwaysApply: true
+---
+
+# Sync dev po aktualizacji kodu
+
+SamFin dev działa w Docker Compose (`app`, `db`, `frontend`). Po `git pull` / merge / rebase **cache Symfony i autoloader nie odświeżają się same** — typowy objaw: 500 z `LoaderLoadException` i starą ścieżką pliku (np. `Configuration/Controller/` zamiast `Configuration/General/Controller/`).
+
+## Kiedy uruchamiać sync
+
+- Użytkownik pisze, że zrobił **pull**, **merge**, **rebase** lub zaktualizował repo.
+- Błąd Symfony 500: `Failed to open stream`, `LoaderLoadException`, brakujący plik kontrolera przy poprawnej ścieżce w `src/`.
+- W pullu były zmiany w `backend/migrations/` lub strukturze katalogów PHP.
+
+**Nie uruchamiaj `git pull` bez wyraźnej prośby użytkownika.**
+
+## Komenda (w kontenerze, z katalogu `fin/`)
+
+```bash
+make sync
+```
+
+Skład: `composer-install` + `cache:clear` + `migrate`.
+
+Ręcznie (gdy `make` niedostępne):
+
+```bash
+docker compose exec app composer install
+docker compose exec app php bin/console cache:clear
+docker compose exec -u www-data -T app php bin/console doctrine:migrations:migrate --no-interaction
+```
+
+## Frontend (Vite)
+
+Przy błędzie „does not provide an export named …” mimo że eksport jest w pliku:
+
+```bash
+docker compose restart frontend
+```
+
+Jeśli nie pomoże — wyczyść cache Vite w volume `frontend_node_modules`:
+
+```bash
+docker compose exec frontend rm -rf /app/node_modules/.vite
+docker compose restart frontend
+```
+
+## Weryfikacja
+
+```bash
+curl http://localhost:3001/api/health
+make routes
+```

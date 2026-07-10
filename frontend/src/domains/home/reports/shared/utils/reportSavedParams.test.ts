@@ -183,12 +183,14 @@ describe('captureBreakdownParams — round-trip zapisu', () => {
       ['EXPENSE', 'INCOME'],
       12,
       { categoryId: '3' },
+      'grouped',
     )
 
     expect(captured.reportDirections).toEqual(['EXPENSE', 'INCOME'])
     expect(captured).not.toHaveProperty('reportDirection')
     expect(captured.groupBy).toBe('categorySub')
     expect(captured.chartTop).toBe(12)
+    expect(captured.breakdownChart).toBe('grouped')
     expect(captured.filters.categoryId).toBe('3')
   })
 
@@ -206,5 +208,20 @@ describe('captureBreakdownParams — round-trip zapisu', () => {
 
     const url = applyBreakdownParams(normalized, periodDefaults)
     expect(url.get('reportDirections')).toBe('INCOME')
+    expect(url.get('breakdownChart')).toBeNull()
+  })
+
+  it('round-trip breakdownChart w URL', () => {
+    const captured = captureBreakdownParams(
+      parsedPeriod,
+      'wallet',
+      ['EXPENSE', 'INCOME'],
+      5,
+      {},
+      'diverging',
+    )
+    const url = applyBreakdownParams(captured, periodDefaults)
+    expect(url.get('breakdownChart')).toBe('diverging')
+    expect(url.get('reportDirections')).toBe('EXPENSE,INCOME')
   })
 })

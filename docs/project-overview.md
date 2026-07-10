@@ -45,9 +45,15 @@ fin/
 ## Uruchomienie (dev)
 
 ```bash
-make setup    # build + composer install
+make setup    # build + composer install (pierwsze uruchomienie)
 make migrate  # migracje bazy (w kontenerze Docker, użytkownik www-data)
 make up
+```
+
+Po każdym **`git pull`** (szczególnie zmiany w PHP lub migracjach):
+
+```bash
+make sync     # composer install + cache:clear + migrate
 ```
 
 - Backend API: `http://localhost:3001/api/health`

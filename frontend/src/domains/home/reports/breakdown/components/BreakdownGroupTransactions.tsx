@@ -46,6 +46,8 @@ interface BreakdownGroupTransactionsProps {
 
   directions: BreakdownDirections
 
+  drillDownDirections?: BreakdownDirections
+
   dateFrom: string
 
   dateTo: string
@@ -71,6 +73,8 @@ export default function BreakdownGroupTransactions({
   groupBy,
 
   directions,
+
+  drillDownDirections,
 
   dateFrom,
 
@@ -100,6 +104,8 @@ export default function BreakdownGroupTransactions({
 
       directions,
 
+      drillDownDirections,
+
       dateFrom,
 
       dateTo,
@@ -108,7 +114,7 @@ export default function BreakdownGroupTransactions({
 
     })
 
-  }, [group, groupBy, directions, dateFrom, dateTo, reportFilters])
+  }, [group, groupBy, directions, drillDownDirections, dateFrom, dateTo, reportFilters])
 
 
 

@@ -4,8 +4,9 @@ import type { ParsedReportPeriodState } from '@/domains/home/reports/shared/util
 
 import { serializeReportPeriodState } from '@/domains/home/reports/shared/utils/reportPeriod'
 
-import type { BreakdownDirection, BreakdownDirections, BreakdownGroupBy } from '@/domains/home/reports/shared/types/breakdown'
+import type { BreakdownDirection, BreakdownDirections, BreakdownGroupBy, BreakdownChartTab } from '@/domains/home/reports/shared/types/breakdown'
 import { normalizeBreakdownDirections, serializeBreakdownDirections } from '@/domains/home/reports/breakdown/utils/breakdownUrl'
+import { parseBreakdownChartTab, resolveBreakdownChartTab, serializeBreakdownChartTab } from '@/domains/home/reports/breakdown/utils/breakdownChartType'
 
 import type { TrendGranularity, TrendChartType, TrendQueryState } from '@/domains/home/reports/trend/types/trend'
 import { parseTrendChartType, serializeTrendChartType } from '@/domains/home/reports/trend/utils/trendChartType'
@@ -53,6 +54,8 @@ export interface BreakdownSavedParams {
   reportDirections: BreakdownDirections
 
   chartTop: number
+
+  breakdownChart: BreakdownChartTab
 
   filters: FlowFilters
 
@@ -147,6 +150,11 @@ export function normalizeBreakdownParams(
     reportDirections,
 
     chartTop: p.chartTop ?? 5,
+
+    breakdownChart: resolveBreakdownChartTab(
+      parseBreakdownChartTab(typeof p.breakdownChart === 'string' ? p.breakdownChart : null),
+      reportDirections,
+    ),
 
     filters: normalizeFlowFilters(p.filters ?? {}),
 
@@ -287,33 +295,21 @@ export function applyPeriodSnapshot(
 
 
 export function captureBreakdownParams(
-
   period: ParsedReportPeriodState,
-
   groupBy: BreakdownGroupBy,
-
   reportDirections: BreakdownDirections,
-
   chartTop: number,
-
   filters: FlowFilters,
-
+  breakdownChart: BreakdownChartTab,
 ): BreakdownSavedParams {
-
   return normalizeBreakdownParams({
-
     period: capturePeriodSnapshot(period),
-
     groupBy,
-
     reportDirections,
-
     chartTop,
-
+    breakdownChart,
     filters: { ...filters },
-
   })
-
 }
 
 
@@ -339,6 +335,8 @@ export function applyBreakdownParams(
   serializeBreakdownDirections(normalized.reportDirections, url)
 
   url.set('chartTop', String(normalized.chartTop))
+
+  serializeBreakdownChartTab(normalized.breakdownChart, normalized.reportDirections, url)
 
   if (reportSavedId != null) url.set(REPORT_SAVED_ID_PARAM, String(reportSavedId))
 

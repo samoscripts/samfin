@@ -49,6 +49,14 @@ import {
   parseBreakdownDirections,
   serializeBreakdownDirections,
 } from '@/domains/home/reports/breakdown/utils/breakdownUrl'
+import {
+  parseBreakdownChartTab,
+  resolveBreakdownChartTab,
+  serializeBreakdownChartTab,
+} from '@/domains/home/reports/breakdown/utils/breakdownChartType'
+import type { BreakdownChartTab, BreakdownDirection } from '@/domains/home/reports/shared/types/breakdown'
+
+type BreakdownChartSelection = { id: string; direction?: BreakdownDirection }
 import BreakdownCharts from '@/domains/home/reports/breakdown/components/BreakdownCharts'
 import { useChartStyle } from '@/shared/hooks/useChartStyle'
 
@@ -103,7 +111,9 @@ export default function BreakdownReport() {
   const categoryId = filters.categoryId ?? ''
 
   const [categories, setCategories] = useState<Category[]>([])
-  const [activeChartId, setActiveChartId] = useState<string | null>(null)
+  const [chartSelection, setChartSelection] = useState<BreakdownChartSelection | null>(null)
+  const activeChartId = chartSelection?.id ?? null
+  const activeChartDirection = chartSelection?.direction ?? null
   const [data, setData] = useState<BreakdownReportData>(() => emptyData(groupBy, directions))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -150,6 +160,14 @@ export default function BreakdownReport() {
     }
   }, [loadBreakdown, groupBy, directions])
 
+  useEffect(() => {
+    if (effectiveChartTab === chartTabRaw) return
+    setSearchParams(
+      (prev) => serializeBreakdownChartTab(effectiveChartTab, directions, new URLSearchParams(prev)),
+      { replace: true },
+    )
+  }, [effectiveChartTab, chartTabRaw, directions, setSearchParams])
+
   const chartTopDisplay = useMemo(
     () => parseChartTop(searchParams.get('chartTop'), data.groups.length),
     [searchParams, data.groups.length],
@@ -158,6 +176,12 @@ export default function BreakdownReport() {
   const chartTopSaved = useMemo(
     () => parseChartTopRaw(searchParams.get('chartTop')),
     [searchParams],
+  )
+
+  const chartTabRaw = parseBreakdownChartTab(searchParams.get('breakdownChart'))
+  const effectiveChartTab = useMemo(
+    () => resolveBreakdownChartTab(chartTabRaw, directions),
+    [chartTabRaw, directions],
   )
 
   const reportSavedId = searchParams.get(REPORT_SAVED_ID_PARAM)
@@ -178,8 +202,8 @@ export default function BreakdownReport() {
       captureBreakdownParams(period, groupBy, directions, chartTopSaved, {
         ...filters,
         walletId: walletId || undefined,
-      }) as unknown as Record<string, unknown>,
-    [period, groupBy, directions, chartTopSaved, filters, walletId],
+      }, effectiveChartTab) as unknown as Record<string, unknown>,
+    [period, groupBy, directions, chartTopSaved, filters, walletId, effectiveChartTab],
   )
 
   const reportSaved = useReportSaved({
@@ -298,7 +322,7 @@ export default function BreakdownReport() {
         groupBy: value,
         categoryId: value === 'categorySub' ? categoryId || null : null,
       })
-      setActiveChartId(null)
+      setChartSelection(null)
     },
     [patchParams, categoryId],
   )
@@ -309,12 +333,30 @@ export default function BreakdownReport() {
         const params = new URLSearchParams(prev)
         return serializeBreakdownDirections(nextDirections, params)
       }, { replace: true })
+      setChartSelection(null)
     },
     [setSearchParams],
   )
 
+  const handleChartTabChange = useCallback(
+    (tab: BreakdownChartTab) => {
+      setSearchParams(
+        (prev) => serializeBreakdownChartTab(tab, directions, new URLSearchParams(prev)),
+        { replace: true },
+      )
+      setChartSelection(null)
+    },
+    [setSearchParams, directions],
+  )
+
   const handleGroupSelect = useCallback((id: string) => {
-    setActiveChartId((prev) => (prev === id ? null : id))
+    setChartSelection((prev) => (prev?.id === id && !prev.direction ? null : { id }))
+  }, [])
+
+  const handleChartSegmentSelect = useCallback((id: string, direction: BreakdownDirection) => {
+    setChartSelection((prev) =>
+      prev?.id === id && prev.direction === direction ? null : { id, direction },
+    )
   }, [])
 
   const handleRowSelect = useCallback(
@@ -331,7 +373,7 @@ export default function BreakdownReport() {
         groupBy: 'categorySub',
         categoryId: String(group.id),
       })
-      setActiveChartId(String(group.id))
+      setChartSelection({ id: String(group.id) })
     },
     [patchParams],
   )
@@ -339,13 +381,13 @@ export default function BreakdownReport() {
   const handleChartTopChange = useCallback(
     (next: number) => {
       patchParams({ chartTop: String(next) })
-      setActiveChartId(null)
+      setChartSelection(null)
     },
     [patchParams],
   )
 
   const handleClearChartSelection = useCallback(() => {
-    setActiveChartId(null)
+    setChartSelection(null)
   }, [])
 
   const parentCategoryName =
@@ -477,8 +519,12 @@ export default function BreakdownReport() {
           groups={data.groups}
           groupBy={groupBy}
           chartTop={chartTopDisplay}
+          chartTab={effectiveChartTab}
+          onChartTabChange={handleChartTabChange}
           activeId={activeChartId}
+          activeDirection={activeChartDirection}
           onGroupClick={handleGroupSelect}
+          onChartSegmentClick={handleChartSegmentSelect}
           onRowSelect={handleRowSelect}
           onDrillDown={handleDrillDown}
           onClearSelection={handleClearChartSelection}
