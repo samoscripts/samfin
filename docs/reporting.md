@@ -332,9 +332,9 @@ Persystencja: `localStorage` (`fin.chartStyle`). Priorytet: URL → localStorage
 
 Implementacja: [`chartPalettes.ts`](../frontend/src/shared/components/charts/chartPalettes.ts), [`chartStyle.ts`](../frontend/src/shared/components/charts/chartStyle.ts), [`useChartStyle.ts`](../frontend/src/shared/hooks/useChartStyle.ts), [`ChartStyleSection.tsx`](../frontend/src/domains/home/reports/shared/components/ChartStyleSection.tsx).
 
-### Wspólne komponenty wykresów kierunkowych (Faza 2)
+### Wspólne komponenty wykresów kierunkowych
 
-Reużywalne komponenty w `frontend/src/shared/components/charts/` — fundament pod nowe typy wykresów w Trendzie (Faza 3) i Rozbiciu (Faza 4):
+Reużywalne komponenty w `frontend/src/shared/components/charts/` — używane w Trendzie i Rozbiciu (plan Fazy 2–4, zrealizowany 2026-07-10):
 
 | Komponent | Plik | Opis |
 |-----------|------|------|
@@ -347,7 +347,7 @@ Reużywalne komponenty w `frontend/src/shared/components/charts/` — fundament 
 
 Helpery: [`buildDirectionChartSeries.ts`](../frontend/src/shared/components/charts/buildDirectionChartSeries.ts) (mapowanie Trend/Rozbicie → serie Recharts), [`directionChartTypes.ts`](../frontend/src/shared/components/charts/directionChartTypes.ts) (`DirectionChartSelection`), [`chartDirectionBarStyle.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.ts) (`getHeatmapCellPaint`, `getBalanceCellPaint`). Limit Top N: uogólnione [`limitItemsForChart`](../frontend/src/domains/home/reports/shared/utils/chartTopGroups.ts).
 
-Testy Vitest: `chartDirectionBarStyle.test.ts`, `buildDirectionChartSeries.test.ts`, `chartTopGroups.test.ts`.
+Testy Vitest: `chartDirectionBarStyle.test.ts`, `buildDirectionChartSeries.test.ts`, `chartTopGroups.test.ts`, `trendChartType.test.ts`, `trendChartData.test.ts`, `breakdownChartType.test.ts`, `reportSavedParams.test.ts` (`make test-fe`).
 
 ### Rozbicie (`BreakdownReport.tsx`)
 
@@ -555,7 +555,7 @@ Parametry raportu można zapisać per użytkownik i typ (`trend` | `breakdown`).
 
 - `breakdownChart` — `vertical` \| `horizontal` \| `donut` \| `stacked` \| `grouped` \| `diverging` \| `balance` \| `table` (odzwierciedlenie URL `breakdownChart=`; domyślny klucz może być pominięty w URL).
 
-- `reportDirections` — tablica `EXPENSE` \| `INCOME` (zapis nowy). Stary klucz `reportDirection` (string) jest akceptowany przy wczytywaniu — migracja w [`reportSavedParams.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.ts). Testy: [`reportSavedParams.test.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.test.ts) (`make test-fe`).
+- `reportDirections` — tablica `EXPENSE` \| `INCOME` (zapis nowy). Stary klucz `reportDirection` (string) jest akceptowany przy wczytywaniu — migracja w [`reportSavedParams.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.ts). Testy: [`reportSavedParams.test.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.test.ts) (`make test-fe`; migracja kierunków + round-trip `breakdownChart`).
 
 - `chartTop` — wartość wybrana przez użytkownika (clamp do liczby grup dotyczy tylko wykresu, nie zapisu).
 - `period.dateFrom` / `dateTo` — tylko przy `mode: "range"` (puste = otwarty zakres, brak klucza).

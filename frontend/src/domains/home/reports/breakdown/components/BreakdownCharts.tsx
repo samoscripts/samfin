@@ -94,7 +94,6 @@ export default function BreakdownCharts({
   onOpenTransaction,
 }: BreakdownChartsProps) {
   const chartDirection: BreakdownDirection = primaryBreakdownChartDirection(directions)
-  const isTableTab = chartTab === 'table'
   const showLegend = breakdownChartTabShowsLegend(chartTab)
 
   const visibleTabs = useMemo(() => visibleBreakdownChartTabs(directions), [directions])

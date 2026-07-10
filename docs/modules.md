@@ -91,8 +91,10 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 | Plik | Route | Opis |
 |------|-------|------|
 | `Report/Analytics/Controller/AnalyticsController.php` | `GET /api/reports/analytics` | Zestawienie miesięczne (przychody, wydatki, saldo) |
-| `Report/Breakdown/Controller/BreakdownController.php` | `GET /api/reports/breakdown` | Rozbicie: agregacja pozycji w okresie wg kategorii/portfela/obszaru |
-| `Report/Breakdown/Service/BreakdownService.php` | — | Agregacja `transaction_items` (GROUP BY, KPI, share) |
+| `Report/Breakdown/Controller/BreakdownController.php` | `GET /api/reports/breakdown` | Rozbicie: agregacja pozycji w okresie wg kategorii/portfela/obszaru; query: `reportDirections` (CSV) lub `reportDirection` (kompat. wsteczna) |
+| `Report/Breakdown/DTO/BreakdownQuery.php` | — | Parsowanie `reportDirections` / `reportDirection`, `groupBy` |
+| `Report/Breakdown/Service/BreakdownService.php` | — | Agregacja `transaction_items` (GROUP BY, pivot `expenses`/`income` przy obu kierunkach, KPI, share) |
+| `Report/Shared/Repository/ReportItemQuery.php` | — | Wspólny filtr pozycji raportów (`IN (:directions)` z typami DBAL) — Breakdown + Trend |
 | `Report/Trend/Controller/TrendController.php` | `GET /api/reports/trend` | Trend: agregacja pozycji w kubełkach czasowych z porównaniem serii |
 | `Report/Trend/Service/TrendAggregationService.php` | — | Kubełki miesiąc/kwartał/rok + serie |
 | `Report/ReportSaved/Controller/ReportSavedController.php` | `GET/POST/PUT/DELETE /api/report-saved` | Zapisane parametry raportów Trend/Rozbicie |
@@ -102,6 +104,18 @@ Wzorzec CRUD: GET list/show, POST create, PUT update, DELETE → `active = false
 | `Report/Settlement/Controller/SettlementController.php` | `GET/PUT /api/reports/settlements/config` | Konfiguracja rozliczenia per użytkownik |
 | `Report/Settlement/Service/SettlementService.php` | — | Logika obliczeń rozliczenia |
 | `Report/Settlement/Entity/SettlementConfig.php` | — | Encja konfiguracji (`settlement_config`) |
+
+**Raporty — parametry tylko FE (nie w API):** `chartTop`, `chart` (Trend), `breakdownChart` (Rozbicie) — parsowanie i zapis w [`reportSavedParams.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.ts). Szczegóły UX i macierz typów wykresów: [`reporting.md`](reporting.md).
+
+**Raporty — frontend (`domains/home/reports/`):**
+
+| Obszar | Kluczowe pliki |
+|--------|----------------|
+| Wspólne | `shared/utils/reportPeriod.ts`, `reportSavedParams.ts`, `chartTopGroups.ts`, `shared/components/charts/*` (komponenty kierunkowe Fazy 2) |
+| Trend | `trend/pages/TrendReport.tsx`, `trend/components/TrendChart.tsx`, `trend/utils/trendChartType.ts`, `trend/utils/trendChartData.ts`, `trend/utils/trendUrl.ts` |
+| Rozbicie | `breakdown/pages/BreakdownReport.tsx`, `breakdown/components/BreakdownCharts.tsx`, `breakdown/utils/breakdownUrl.ts`, `breakdown/utils/breakdownChartType.ts`, `breakdown/utils/breakdownDrillDownFilters.ts` |
+
+**Testy API raportów:** [`BreakdownApiTest.php`](../backend/tests/Api/BreakdownApiTest.php) (`reportDirections`, pivot, sortowanie), [`TrendApiTest.php`](../backend/tests/Api/TrendApiTest.php), [`ReportSavedApiTest.php`](../backend/tests/Api/ReportSavedApiTest.php) (`reportDirections` w zapisie).
 
 ### Repozytoria
 

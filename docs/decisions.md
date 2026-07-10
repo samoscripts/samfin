@@ -358,7 +358,7 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 
 ### ADR-P09: Rozbicie — wiele kierunków (Wpływ + Wydatek)
 
-**Status:** Przyjęte (2026-07-10) — backend + FE (Faza 1: multi-toggle, URL, zapis, KPI, tabela, drill-down).
+**Status:** Zrealizowane (2026-07-10) — backend + FE (Fazy 1–4 planu wykresów: oba kierunki, KPI, tabela, drill-down per segment, typy wykresów).
 
 **Decyzja:** `GET /api/reports/breakdown` przyjmuje `reportDirections` (CSV), analogicznie do `trendDirections` w Trendzie. Zachowana kompatybilność: `reportDirection` (pojedynczy) i brak parametru → jeden kierunek `EXPENSE`.
 
@@ -366,9 +366,12 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 - Przy obu kierunkach agregacja pivot (`expenses` / `income` per grupa); sortowanie grup po obrocie (`expenses + income`).
 - `share` i `shareIncome` liczone osobno względem sum wydatków i wpływów.
 - Skalar `total` w odpowiedzi przy obu kierunkach = suma wydatków (`totals.expenses`).
-- FE: multi-toggle w sidebarze, URL `reportDirections`, migracja zapisów `reportDirection` → `reportDirections`; nowe typy wykresów — Faza 4 planu.
+- FE: multi-toggle w sidebarze, URL `reportDirections`, migracja zapisów `reportDirection` → `reportDirections`.
+- FE wykresy Rozbicia: URL `breakdownChart=` + zapis `breakdownChart` w `BreakdownSavedParams`; przy jednym kierunku — pionowy/poziomy/kołowy/tabela; przy obu — skumulowany/skojarzony/zwierciadlany/bilans/tabela (komponenty wspólne z Trendem, patrz [`reporting.md`](reporting.md)).
 
 **Powód:** Porównanie wpływów i wydatków w jednym okresie bez dwóch osobnych raportów.
+
+**Pliki:** `BreakdownQuery.php`, `BreakdownService.php`, `ReportItemQuery.php`; FE: `breakdownUrl.ts`, `breakdownChartType.ts`, `BreakdownCharts.tsx`, `reportSavedParams.ts`.
 
 ---
 
@@ -679,3 +682,4 @@ Globalnie: **Skąd ≠ Dokąd** (UI wyklucza drugie pole; backend `assertDistinc
 | 2026-07-06 | ADR-038: rozliczenia — roczne okresy rozliczeniowe, snapshot przy zamknięciu, `settlementYear` w API |
 | 2026-07-06 | ADR-039: rozliczenia — wkłady własne (`source_exp_deposit`), Σ rotacji bez modelu kredytu |
 | 2026-07-10 | ADR-040: podmenu Konfiguracji (Ogólne / Reguły / Dashboard), katalogi `general/` + `rules/` |
+| 2026-07-10 | ADR-P09 (domknięcie): Rozbicie — rozszerzenie wykresów (Fazy 2–4), `breakdownChart` w URL/zapisach; Trend — 6 typów wykresów + `chartTop` serii |

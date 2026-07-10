@@ -160,6 +160,12 @@ export default function BreakdownReport() {
     }
   }, [loadBreakdown, groupBy, directions])
 
+  const chartTabRaw = parseBreakdownChartTab(searchParams.get('breakdownChart'))
+  const effectiveChartTab = useMemo(
+    () => resolveBreakdownChartTab(chartTabRaw, directions),
+    [chartTabRaw, directions],
+  )
+
   useEffect(() => {
     if (effectiveChartTab === chartTabRaw) return
     setSearchParams(
@@ -176,12 +182,6 @@ export default function BreakdownReport() {
   const chartTopSaved = useMemo(
     () => parseChartTopRaw(searchParams.get('chartTop')),
     [searchParams],
-  )
-
-  const chartTabRaw = parseBreakdownChartTab(searchParams.get('breakdownChart'))
-  const effectiveChartTab = useMemo(
-    () => resolveBreakdownChartTab(chartTabRaw, directions),
-    [chartTabRaw, directions],
   )
 
   const reportSavedId = searchParams.get(REPORT_SAVED_ID_PARAM)

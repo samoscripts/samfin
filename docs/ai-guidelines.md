@@ -217,9 +217,10 @@ Uruchomienie: `make test-fe` (kontener `frontend`, Node ≥ 20). Pełny zestaw: 
 - Pliki: `frontend/src/**/*.test.ts` (obok testowanego modułu).
 - Konfiguracja: `frontend/vite.config.ts` (`test.environment: node`), skrypt `npm run test`.
 - **Deploy / build prod:** `scripts/deploy.sh` i `make build-frontend-prod` uruchamiają `npm run test` przed `npm run build`.
-- Pierwszy zestaw: migracja zapisów raportów Rozbicie — [`reportSavedParams.test.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.test.ts) (`reportDirection` → `reportDirections`).
+- Pierwszy zestaw: migracja zapisów raportów Rozbicie — [`reportSavedParams.test.ts`](../frontend/src/domains/home/reports/shared/utils/reportSavedParams.test.ts) (`reportDirection` → `reportDirections`, round-trip `breakdownChart`).
 - Faza 2 (wykresy): [`chartDirectionBarStyle.test.ts`](../frontend/src/shared/components/charts/chartDirectionBarStyle.test.ts), [`buildDirectionChartSeries.test.ts`](../frontend/src/shared/components/charts/buildDirectionChartSeries.test.ts), [`chartTopGroups.test.ts`](../frontend/src/domains/home/reports/shared/utils/chartTopGroups.test.ts).
 - Faza 3 (Trend): [`trendChartType.test.ts`](../frontend/src/domains/home/reports/trend/utils/trendChartType.test.ts), [`trendChartData.test.ts`](../frontend/src/domains/home/reports/trend/utils/trendChartData.test.ts).
+- Faza 4 (Rozbicie): [`breakdownChartType.test.ts`](../frontend/src/domains/home/reports/breakdown/utils/breakdownChartType.test.ts) (parse/serialize URL, koercja taba przy zmianie kierunku).
 
 Reguła Cursor: `.cursor/rules/frontend-vitest.mdc`.
 
